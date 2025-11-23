@@ -1,0 +1,425 @@
+import { useState } from "react";
+import { useAuth } from "../hooks/useAuth";
+import { trpc } from "../lib/trpc";
+import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
+import { Button } from "../components/ui/button";
+import { Input } from "../components/ui/input";
+import { Plus, Edit, Trash2 } from "lucide-react";
+import { toast } from "sonner";
+import { format } from "date-fns";
+
+export default function WorkRecords() {
+    const { user } = useAuth();
+    const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+    const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+    const [selectedVehicleId, setSelectedVehicleId] = useState("");
+    const [selectedProcessId, setSelectedProcessId] = useState("");
+    const [workDate, setWorkDate] = useState(() => {
+        const today = new Date();
+        return format(today, "yyyy-MM-dd");
+    });
+    const [startTime, setStartTime] = useState("");
+    const [endTime, setEndTime] = useState("");
+    const [editingRecord, setEditingRecord] = useState<{
+        id: number;
+        vehicleId: string;
+        processId: string;
+        workDate: string;
+        startTime: string;
+        endTime: string;
+        workDescription: string;
+    } | null>(null);
+
+    const { data: workRecords, refetch } = trpc.workRecords.getTodayRecords.useQuery();
+    const { data: vehicles } = trpc.vehicles.list.useQuery({});
+    const { data: processes } = trpc.processes.list.useQuery();
+
+    const createWorkRecordMutation = trpc.workRecords.create.useMutation({
+        onSuccess: () => {
+            toast.success("作業記録を追加しました");
+            setIsAddDialogOpen(false);
+            refetch();
+            setSelectedVehicleId("");
+            setSelectedProcessId("");
+            setStartTime("");
+            setEndTime("");
+        },
+        onError: (error) => {
+            toast.error(error.message || "作業記録の追加に失敗しました");
+        },
+    });
+
+    const updateWorkRecordMutation = trpc.workRecords.updateMyRecord.useMutation({
+        onSuccess: () => {
+            toast.success("作業記録を更新しました");
+            setIsEditDialogOpen(false);
+            setEditingRecord(null);
+            refetch();
+        },
+        onError: (error) => {
+            toast.error(error.message || "作業記録の更新に失敗しました");
+        },
+    });
+
+    const deleteWorkRecordMutation = trpc.workRecords.deleteMyRecord.useMutation({
+        onSuccess: () => {
+            toast.success("作業記録を削除しました");
+            refetch();
+        },
+        onError: (error) => {
+            toast.error(error.message || "作業記録の削除に失敗しました");
+        },
+    });
+
+    const handleAddWork = () => {
+        if (!selectedVehicleId || !selectedProcessId || !workDate || !startTime) {
+            toast.error("車両、工程、日付、開始時刻を入力してください");
+            return;
+        }
+
+        const startDateTime = `${workDate}T${startTime}:00+09:00`;
+        const endDateTime = endTime ? `${workDate}T${endTime}:00+09:00` : undefined;
+
+        createWorkRecordMutation.mutate({
+            userId: user!.id,
+            vehicleId: parseInt(selectedVehicleId),
+            processId: parseInt(selectedProcessId),
+            startTime: startDateTime,
+            endTime: endDateTime,
+        });
+    };
+
+    const handleEdit = (record: any) => {
+        const startDate = new Date(record.startTime);
+        const endDate = record.endTime ? new Date(record.endTime) : new Date();
+
+        setEditingRecord({
+            id: record.id,
+            vehicleId: record.vehicleId.toString(),
+            processId: record.processId.toString(),
+            workDate: format(startDate, "yyyy-MM-dd"),
+            startTime: format(startDate, "HH:mm"),
+            endTime: record.endTime ? format(endDate, "HH:mm") : "",
+            workDescription: record.workDescription || "",
+        });
+        setIsEditDialogOpen(true);
+    };
+
+    const handleSaveEdit = () => {
+        if (!editingRecord) return;
+
+        if (!editingRecord.vehicleId || !editingRecord.processId || !editingRecord.workDate || !editingRecord.startTime) {
+            toast.error("車両、工程、日付、開始時刻を入力してください");
+            return;
+        }
+
+        const startDateTime = `${editingRecord.workDate}T${editingRecord.startTime}:00+09:00`;
+        const endDateTime = editingRecord.endTime
+            ? `${editingRecord.workDate}T${editingRecord.endTime}:00+09:00`
+            : undefined;
+
+        updateWorkRecordMutation.mutate({
+            id: editingRecord.id,
+            vehicleId: parseInt(editingRecord.vehicleId),
+            processId: parseInt(editingRecord.processId),
+            startTime: startDateTime,
+            endTime: endDateTime,
+            workDescription: editingRecord.workDescription || undefined,
+        });
+    };
+
+    const handleDelete = (id: number) => {
+        if (window.confirm("本当にこの作業記録を削除しますか？")) {
+            deleteWorkRecordMutation.mutate({ id });
+        }
+    };
+
+    const formatTime = (date: Date | string) => {
+        const d = typeof date === "string" ? new Date(date) : date;
+        return format(d, "HH:mm");
+    };
+
+    const formatDuration = (minutes: number | null) => {
+        if (!minutes) return "0分";
+        const hours = Math.floor(minutes / 60);
+        const mins = minutes % 60;
+        return hours > 0 ? `${hours}時間${mins}分` : `${mins}分`;
+    };
+
+    return (
+        <div className="space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <div>
+                    <h1 className="text-2xl sm:text-3xl font-bold">作業記録管理</h1>
+                    <p className="text-[hsl(var(--muted-foreground))] mt-2 text-sm sm:text-base">
+                        自分の作業記録を確認・追加します
+                    </p>
+                </div>
+                <Button onClick={() => setIsAddDialogOpen(true)} className="w-full sm:w-auto">
+                    <Plus className="h-4 w-4 mr-2" />
+                    作業追加
+                </Button>
+            </div>
+
+            <Card>
+                <CardHeader>
+                    <CardTitle>今日の作業記録</CardTitle>
+                </CardHeader>
+                <CardContent>
+                    {workRecords && workRecords.length > 0 ? (
+                        <div className="space-y-3">
+                            {workRecords.map((record) => (
+                                <div
+                                    key={record.id}
+                                    className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-3 border border-[hsl(var(--border))] rounded-lg"
+                                >
+                                    <div className="flex-1">
+                                        <p className="font-semibold text-base">{record.vehicleNumber}</p>
+                                        <p className="text-sm text-[hsl(var(--muted-foreground))]">
+                                            {record.processName}
+                                        </p>
+                                        <p className="text-xs text-[hsl(var(--muted-foreground))]">
+                                            {formatTime(record.startTime)}
+                                            {record.endTime ? ` - ${formatTime(record.endTime)}` : " (作業中)"}
+                                        </p>
+                                    </div>
+                                    <div className="flex items-center justify-between sm:justify-end gap-4">
+                                        <div className="text-right sm:text-left">
+                                            <p className="font-semibold">{formatDuration(record.durationMinutes)}</p>
+                                        </div>
+                                        <div className="flex gap-2">
+                                            <Button
+                                                size="sm"
+                                                variant="outline"
+                                                onClick={() => handleEdit(record)}
+                                            >
+                                                <Edit className="h-4 w-4" />
+                                            </Button>
+                                            <Button
+                                                size="sm"
+                                                variant="destructive"
+                                                onClick={() => handleDelete(record.id)}
+                                                disabled={deleteWorkRecordMutation.isPending}
+                                            >
+                                                <Trash2 className="h-4 w-4" />
+                                            </Button>
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    ) : (
+                        <p className="text-[hsl(var(--muted-foreground))] text-center py-4">
+                            今日の作業記録はありません
+                        </p>
+                    )}
+                </CardContent>
+            </Card>
+
+            {/* 作業編集ダイアログ */}
+            {isEditDialogOpen && editingRecord && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+                    <Card className="w-full max-w-md mx-4">
+                        <CardHeader>
+                            <CardTitle>作業記録を編集</CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                            <div>
+                                <label className="text-sm font-medium">日付</label>
+                                <Input
+                                    type="date"
+                                    value={editingRecord.workDate}
+                                    onChange={(e) =>
+                                        setEditingRecord({ ...editingRecord, workDate: e.target.value })
+                                    }
+                                />
+                            </div>
+                            <div>
+                                <label className="text-sm font-medium">車両</label>
+                                <select
+                                    key={`edit-vehicle-${editingRecord.vehicleId}`}
+                                    className="flex h-10 w-full rounded-md border border-[hsl(var(--input))] bg-[hsl(var(--background))] px-3 py-2 text-sm"
+                                    value={editingRecord.vehicleId}
+                                    onChange={(e) => {
+                                        e.preventDefault();
+                                        setEditingRecord({ ...editingRecord, vehicleId: e.target.value });
+                                    }}
+                                >
+                                    <option value="">選択してください</option>
+                                    {vehicles?.map((v) => (
+                                        <option key={v.id} value={v.id}>
+                                            {v.vehicleNumber}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div>
+                                <label className="text-sm font-medium">工程</label>
+                                <select
+                                    key={`edit-process-${editingRecord.processId}`}
+                                    className="flex h-10 w-full rounded-md border border-[hsl(var(--input))] bg-[hsl(var(--background))] px-3 py-2 text-sm"
+                                    value={editingRecord.processId}
+                                    onChange={(e) => {
+                                        e.preventDefault();
+                                        setEditingRecord({ ...editingRecord, processId: e.target.value });
+                                    }}
+                                >
+                                    <option value="">選択してください</option>
+                                    {processes?.map((p) => (
+                                        <option key={p.id} value={p.id}>
+                                            {p.name}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div>
+                                <label className="text-sm font-medium">開始時刻</label>
+                                <Input
+                                    type="time"
+                                    value={editingRecord.startTime}
+                                    onChange={(e) =>
+                                        setEditingRecord({ ...editingRecord, startTime: e.target.value })
+                                    }
+                                    required
+                                />
+                            </div>
+                            <div>
+                                <label className="text-sm font-medium">終了時刻（任意）</label>
+                                <Input
+                                    type="time"
+                                    value={editingRecord.endTime}
+                                    onChange={(e) =>
+                                        setEditingRecord({ ...editingRecord, endTime: e.target.value })
+                                    }
+                                />
+                            </div>
+                            <div>
+                                <label className="text-sm font-medium">作業内容（任意）</label>
+                                <Input
+                                    type="text"
+                                    value={editingRecord.workDescription}
+                                    onChange={(e) =>
+                                        setEditingRecord({ ...editingRecord, workDescription: e.target.value })
+                                    }
+                                    placeholder="作業内容を入力"
+                                />
+                            </div>
+                            <div className="flex gap-2">
+                                <Button
+                                    className="flex-1"
+                                    onClick={handleSaveEdit}
+                                    disabled={updateWorkRecordMutation.isPending}
+                                >
+                                    保存
+                                </Button>
+                                <Button
+                                    variant="outline"
+                                    className="flex-1"
+                                    onClick={() => {
+                                        setIsEditDialogOpen(false);
+                                        setEditingRecord(null);
+                                    }}
+                                >
+                                    キャンセル
+                                </Button>
+                            </div>
+                        </CardContent>
+                    </Card>
+                </div>
+            )}
+
+            {/* 作業追加ダイアログ */}
+            {isAddDialogOpen && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+                    <Card className="w-full max-w-md mx-4">
+                        <CardHeader>
+                            <CardTitle>作業記録を追加</CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                            <div>
+                                <label className="text-sm font-medium">日付</label>
+                                <Input
+                                    type="date"
+                                    value={workDate}
+                                    onChange={(e) => setWorkDate(e.target.value)}
+                                />
+                            </div>
+                            <div>
+                                <label className="text-sm font-medium">車両</label>
+                                <select
+                                    key={`vehicle-${selectedVehicleId}`}
+                                    className="flex h-10 w-full rounded-md border border-[hsl(var(--input))] bg-[hsl(var(--background))] px-3 py-2 text-sm"
+                                    value={selectedVehicleId}
+                                    onChange={(e) => {
+                                        e.preventDefault();
+                                        setSelectedVehicleId(e.target.value);
+                                    }}
+                                >
+                                    <option value="">選択してください</option>
+                                    {vehicles?.map((v) => (
+                                        <option key={v.id} value={v.id}>
+                                            {v.vehicleNumber}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div>
+                                <label className="text-sm font-medium">工程</label>
+                                <select
+                                    key={`process-${selectedProcessId}`}
+                                    className="flex h-10 w-full rounded-md border border-[hsl(var(--input))] bg-[hsl(var(--background))] px-3 py-2 text-sm"
+                                    value={selectedProcessId}
+                                    onChange={(e) => {
+                                        e.preventDefault();
+                                        setSelectedProcessId(e.target.value);
+                                    }}
+                                >
+                                    <option value="">選択してください</option>
+                                    {processes?.map((p) => (
+                                        <option key={p.id} value={p.id}>
+                                            {p.name}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div>
+                                <label className="text-sm font-medium">開始時刻</label>
+                                <Input
+                                    type="time"
+                                    value={startTime}
+                                    onChange={(e) => setStartTime(e.target.value)}
+                                    required
+                                />
+                            </div>
+                            <div>
+                                <label className="text-sm font-medium">終了時刻（任意）</label>
+                                <Input
+                                    type="time"
+                                    value={endTime}
+                                    onChange={(e) => setEndTime(e.target.value)}
+                                />
+                            </div>
+                            <div className="flex gap-2">
+                                <Button
+                                    className="flex-1"
+                                    onClick={handleAddWork}
+                                    disabled={createWorkRecordMutation.isPending}
+                                >
+                                    追加
+                                </Button>
+                                <Button
+                                    variant="outline"
+                                    className="flex-1"
+                                    onClick={() => setIsAddDialogOpen(false)}
+                                >
+                                    キャンセル
+                                </Button>
+                            </div>
+                        </CardContent>
+                    </Card>
+                </div>
+            )}
+        </div>
+    );
+}
+

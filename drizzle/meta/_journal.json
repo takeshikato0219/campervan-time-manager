@@ -1,0 +1,13 @@
+{
+  "version": "7",
+  "dialect": "mysql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "5",
+      "when": 1763902542416,
+      "tag": "0000_funny_namorita",
+      "breakpoints": true
+    }
+  ]
+}

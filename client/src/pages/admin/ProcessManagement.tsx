@@ -1,0 +1,291 @@
+import React, { useState } from "react";
+import { useAuth } from "../../hooks/useAuth";
+import { trpc } from "../../lib/trpc";
+import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/card";
+import { Button } from "../../components/ui/button";
+import { Input } from "../../components/ui/input";
+import { Plus, Edit, Trash2 } from "lucide-react";
+import { toast } from "sonner";
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from "../../components/ui/table";
+
+export default function ProcessManagement() {
+    const { user } = useAuth();
+
+    // 管理者のみアクセス可能
+    if (user?.role !== "admin") {
+        return (
+            <div className="flex items-center justify-center min-h-[400px]">
+                <div className="text-center">
+                    <p className="text-lg font-semibold">アクセス権限がありません</p>
+                    <p className="text-[hsl(var(--muted-foreground))] mt-2">
+                        このページは管理者のみがアクセスできます
+                    </p>
+                </div>
+            </div>
+        );
+    }
+
+    const { data: processes, refetch } = trpc.processes.list.useQuery();
+    const [isDialogOpen, setIsDialogOpen] = useState(false);
+    const [editingProcess, setEditingProcess] = useState<{
+        id?: number;
+        name: string;
+        description: string;
+        majorCategory: string;
+        minorCategory: string;
+        displayOrder: string;
+    } | null>(null);
+
+    const createMutation = trpc.processes.create.useMutation({
+        onSuccess: () => {
+            toast.success("工程を登録しました");
+            setIsDialogOpen(false);
+            setEditingProcess(null);
+            refetch();
+        },
+        onError: (error) => {
+            toast.error(error.message || "工程の登録に失敗しました");
+        },
+    });
+
+    const updateMutation = trpc.processes.update.useMutation({
+        onSuccess: () => {
+            toast.success("工程を更新しました");
+            setIsDialogOpen(false);
+            setEditingProcess(null);
+            refetch();
+        },
+        onError: (error) => {
+            toast.error(error.message || "工程の更新に失敗しました");
+        },
+    });
+
+    const deleteMutation = trpc.processes.delete.useMutation({
+        onSuccess: () => {
+            toast.success("工程を削除しました");
+            refetch();
+        },
+        onError: (error) => {
+            toast.error(error.message || "工程の削除に失敗しました");
+        },
+    });
+
+    const handleEdit = (process: any) => {
+        setEditingProcess({
+            id: process.id,
+            name: process.name || "",
+            description: process.description || "",
+            majorCategory: process.majorCategory || "",
+            minorCategory: process.minorCategory || "",
+            displayOrder: process.displayOrder?.toString() || "0",
+        });
+        setIsDialogOpen(true);
+    };
+
+    const handleSave = () => {
+        if (!editingProcess || !editingProcess.name) {
+            toast.error("工程名を入力してください");
+            return;
+        }
+
+        if (editingProcess.id) {
+            updateMutation.mutate({
+                id: editingProcess.id,
+                name: editingProcess.name,
+                description: editingProcess.description || undefined,
+                majorCategory: editingProcess.majorCategory || undefined,
+                minorCategory: editingProcess.minorCategory || undefined,
+                displayOrder: editingProcess.displayOrder ? parseInt(editingProcess.displayOrder) : undefined,
+            });
+        } else {
+            createMutation.mutate({
+                name: editingProcess.name,
+                description: editingProcess.description || undefined,
+                majorCategory: editingProcess.majorCategory || undefined,
+                minorCategory: editingProcess.minorCategory || undefined,
+                displayOrder: editingProcess.displayOrder ? parseInt(editingProcess.displayOrder) : undefined,
+            });
+        }
+    };
+
+    const handleDelete = (id: number) => {
+        if (confirm("本当に削除しますか？")) {
+            deleteMutation.mutate({ id });
+        }
+    };
+
+    return (
+        <div className="space-y-6">
+            <div className="flex items-center justify-between">
+                <div>
+                    <h1 className="text-3xl font-bold">工程管理</h1>
+                    <p className="text-[hsl(var(--muted-foreground))] mt-2">
+                        工程の追加・編集・削除を行います
+                    </p>
+                </div>
+                <Button
+                    onClick={() => {
+                        setEditingProcess({
+                            name: "",
+                            description: "",
+                            majorCategory: "",
+                            minorCategory: "",
+                            displayOrder: "0",
+                        });
+                        setIsDialogOpen(true);
+                    }}
+                >
+                    <Plus className="h-4 w-4 mr-2" />
+                    工程追加
+                </Button>
+            </div>
+
+            <Card>
+                <CardHeader>
+                    <CardTitle>工程一覧</CardTitle>
+                </CardHeader>
+                <CardContent>
+                    {processes && processes.length > 0 ? (
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>表示順</TableHead>
+                                    <TableHead>工程名</TableHead>
+                                    <TableHead>大分類</TableHead>
+                                    <TableHead>小分類</TableHead>
+                                    <TableHead>説明</TableHead>
+                                    <TableHead>操作</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {processes.map((process) => (
+                                    <TableRow key={process.id}>
+                                        <TableCell>{process.displayOrder || 0}</TableCell>
+                                        <TableCell className="font-medium">{process.name}</TableCell>
+                                        <TableCell>{process.majorCategory || "-"}</TableCell>
+                                        <TableCell>{process.minorCategory || "-"}</TableCell>
+                                        <TableCell>{process.description || "-"}</TableCell>
+                                        <TableCell>
+                                            <div className="flex gap-2">
+                                                <Button
+                                                    size="sm"
+                                                    variant="outline"
+                                                    onClick={() => handleEdit(process)}
+                                                >
+                                                    <Edit className="h-4 w-4" />
+                                                </Button>
+                                                <Button
+                                                    size="sm"
+                                                    variant="destructive"
+                                                    onClick={() => handleDelete(process.id)}
+                                                >
+                                                    <Trash2 className="h-4 w-4" />
+                                                </Button>
+                                            </div>
+                                        </TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    ) : (
+                        <p className="text-center py-4 text-[hsl(var(--muted-foreground))]">
+                            工程がありません
+                        </p>
+                    )}
+                </CardContent>
+            </Card>
+
+            {/* 編集ダイアログ */}
+            {isDialogOpen && editingProcess && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+                    <Card className="w-full max-w-md mx-4">
+                        <CardHeader>
+                            <CardTitle>{editingProcess.id ? "工程を編集" : "工程を追加"}</CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                            <div>
+                                <label className="text-sm font-medium">工程名 *</label>
+                                <Input
+                                    value={editingProcess.name}
+                                    onChange={(e) =>
+                                        setEditingProcess({ ...editingProcess, name: e.target.value })
+                                    }
+                                    placeholder="工程名を入力"
+                                />
+                            </div>
+                            <div>
+                                <label className="text-sm font-medium">大分類</label>
+                                <Input
+                                    value={editingProcess.majorCategory}
+                                    onChange={(e) =>
+                                        setEditingProcess({ ...editingProcess, majorCategory: e.target.value })
+                                    }
+                                    placeholder="大分類を入力"
+                                />
+                            </div>
+                            <div>
+                                <label className="text-sm font-medium">小分類</label>
+                                <Input
+                                    value={editingProcess.minorCategory}
+                                    onChange={(e) =>
+                                        setEditingProcess({ ...editingProcess, minorCategory: e.target.value })
+                                    }
+                                    placeholder="小分類を入力"
+                                />
+                            </div>
+                            <div>
+                                <label className="text-sm font-medium">説明</label>
+                                <textarea
+                                    className="flex min-h-[80px] w-full rounded-md border border-[hsl(var(--input))] bg-[hsl(var(--background))] px-3 py-2 text-sm"
+                                    value={editingProcess.description}
+                                    onChange={(e) =>
+                                        setEditingProcess({ ...editingProcess, description: e.target.value })
+                                    }
+                                    placeholder="説明を入力"
+                                />
+                            </div>
+                            <div>
+                                <label className="text-sm font-medium">表示順</label>
+                                <Input
+                                    type="number"
+                                    value={editingProcess.displayOrder}
+                                    onChange={(e) =>
+                                        setEditingProcess({ ...editingProcess, displayOrder: e.target.value })
+                                    }
+                                    placeholder="0"
+                                />
+                            </div>
+                            <div className="flex gap-2">
+                                <Button
+                                    className="flex-1"
+                                    onClick={handleSave}
+                                    disabled={createMutation.isPending || updateMutation.isPending}
+                                >
+                                    保存
+                                </Button>
+                                <Button
+                                    variant="outline"
+                                    className="flex-1"
+                                    onClick={() => {
+                                        setIsDialogOpen(false);
+                                        setEditingProcess(null);
+                                    }}
+                                >
+                                    キャンセル
+                                </Button>
+                            </div>
+                        </CardContent>
+                    </Card>
+                </div>
+            )}
+        </div>
+    );
+}
+
