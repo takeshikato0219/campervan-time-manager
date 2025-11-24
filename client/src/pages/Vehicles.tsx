@@ -5,7 +5,7 @@ import { Button } from "../components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Input } from "../components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
-import { Plus, Search, Edit, Check, Archive, ChevronDown, ChevronUp, FileText, AlertCircle, UserPlus, Trash2 } from "lucide-react";
+import { Plus, Search, Edit, Check, Archive, FileText, AlertCircle, UserPlus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 
@@ -335,7 +335,6 @@ function VehicleDetailContent({ vehicleId, user }: { vehicleId: number; user: an
                                                         size="sm"
                                                         variant="outline"
                                                         onClick={() => {
-                                                            setRequestingVehicleId(vehicleId);
                                                             setRequestCheckItemId(status.checkItem.id.toString());
                                                             setIsRequestDialogOpen(true);
                                                         }}
@@ -451,7 +450,7 @@ function VehicleDetailContent({ vehicleId, user }: { vehicleId: number; user: an
             )}
 
             {/* チェック依頼ダイアログ */}
-            {isRequestDialogOpen && (
+            {isRequestDialogOpen && vehicleId === vehicle?.id && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-2 sm:p-4 overflow-y-auto">
                     <Card className="w-full max-w-md min-w-0 my-auto">
                         <CardHeader className="p-3 sm:p-4">
@@ -635,25 +634,10 @@ export default function Vehicles() {
     const [outsourcingDestination, setOutsourcingDestination] = useState("");
     const [outsourcingStartDate, setOutsourcingStartDate] = useState("");
     const [outsourcingEndDate, setOutsourcingEndDate] = useState("");
-    const [expandedVehicles, setExpandedVehicles] = useState<Set<number>>(new Set());
-    const [checkingItemId, setCheckingItemId] = useState<{ vehicleId: number; itemId: number } | null>(null);
-    const [checkNotes, setCheckNotes] = useState("");
-    const [checkStatus, setCheckStatus] = useState<"checked" | "needs_recheck" | "unchecked">("checked");
-    const [isRequestDialogOpen, setIsRequestDialogOpen] = useState(false);
-    const [requestingVehicleId, setRequestingVehicleId] = useState<number | null>(null);
-    const [requestCheckItemId, setRequestCheckItemId] = useState("");
-    const [requestedToUserId, setRequestedToUserId] = useState("");
-    const [requestMessage, setRequestMessage] = useState("");
-    const [requestDueDate, setRequestDueDate] = useState("");
-    const [isAttentionPointDialogOpen, setIsAttentionPointDialogOpen] = useState(false);
-    const [attentionPointVehicleId, setAttentionPointVehicleId] = useState<number | null>(null);
-    const [attentionPointContent, setAttentionPointContent] = useState("");
-
     const { data: vehicles, refetch } = trpc.vehicles.list.useQuery({
         status: activeTab,
     });
     const { data: vehicleTypes } = trpc.vehicleTypes.list.useQuery();
-    const { data: users } = trpc.users.list.useQuery(undefined, { enabled: user?.role === "admin" });
 
     const registerMutation = trpc.vehicles.create.useMutation({
         onSuccess: () => {
@@ -1037,32 +1021,6 @@ export default function Vehicles() {
                                         </div>
                                         <div className="flex flex-col gap-2 pt-2">
                                             <div className="flex gap-1 sm:gap-2">
-                                                <Button
-                                                    size="sm"
-                                                    variant="outline"
-                                                    className="flex-1 text-xs sm:text-sm"
-                                                    onClick={() => {
-                                                        const newExpanded = new Set(expandedVehicles);
-                                                        if (newExpanded.has(vehicle.id)) {
-                                                            newExpanded.delete(vehicle.id);
-                                                        } else {
-                                                            newExpanded.add(vehicle.id);
-                                                        }
-                                                        setExpandedVehicles(newExpanded);
-                                                    }}
-                                                >
-                                                    {expandedVehicles.has(vehicle.id) ? (
-                                                        <>
-                                                            <ChevronUp className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
-                                                            詳細を閉じる
-                                                        </>
-                                                    ) : (
-                                                        <>
-                                                            <ChevronDown className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
-                                                            詳細を表示
-                                                        </>
-                                                    )}
-                                                </Button>
                                                 {user?.role === "admin" && (
                                                     <>
                                                         <Button
@@ -1169,9 +1127,7 @@ export default function Vehicles() {
                                             )}
                                         </div>
                                     </CardContent>
-                                    {expandedVehicles.has(vehicle.id) && (
-                                        <VehicleDetailContent vehicleId={vehicle.id} user={user} />
-                                    )}
+                                    <VehicleDetailContent vehicleId={vehicle.id} user={user} />
                                 </Card>
                             ))}
                         </div>
