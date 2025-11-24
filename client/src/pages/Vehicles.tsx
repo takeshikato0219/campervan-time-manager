@@ -11,7 +11,23 @@ import { toast } from "sonner";
 import { format } from "date-fns";
 
 // 車両詳細コンテンツコンポーネント
-function VehicleDetailContent({ vehicleId, user }: { vehicleId: number; user: any }) {
+function VehicleDetailContent({ 
+    vehicleId, 
+    user, 
+    vehicleStatus, 
+    completeMutation, 
+    archiveMutation, 
+    uncompleteMutation, 
+    unarchiveMutation 
+}: { 
+    vehicleId: number; 
+    user: any;
+    vehicleStatus?: "in_progress" | "completed" | "archived";
+    completeMutation?: any;
+    archiveMutation?: any;
+    uncompleteMutation?: any;
+    unarchiveMutation?: any;
+}) {
     const { data: vehicle } = trpc.vehicles.get.useQuery({ id: vehicleId });
     const { data: attentionPoints, refetch: refetchAttentionPoints } = trpc.vehicles.getAttentionPoints.useQuery(
         { vehicleId },
@@ -161,6 +177,85 @@ function VehicleDetailContent({ vehicleId, user }: { vehicleId: number; user: an
                     )}
                 </CardContent>
             </Card>
+
+            {/* アクションボタン（一番下） */}
+            {user?.role === "admin" && vehicleStatus && completeMutation && archiveMutation && uncompleteMutation && unarchiveMutation && (
+                <div className="flex flex-col gap-1.5 sm:gap-2 pt-2 border-t">
+                    {vehicleStatus === "in_progress" && (
+                        <div className="flex gap-1.5 sm:gap-2">
+                            <Button
+                                size="sm"
+                                variant="outline"
+                                className="flex-1 text-[10px] sm:text-xs md:text-sm h-7 sm:h-8"
+                                onClick={() => {
+                                    if (confirm("この車両を完成にしますか？")) {
+                                        completeMutation.mutate({ id: vehicleId });
+                                    }
+                                }}
+                            >
+                                <Check className="h-3 w-3 sm:h-4 sm:w-4 mr-0.5 sm:mr-1" />
+                                完成
+                            </Button>
+                            <Button
+                                size="sm"
+                                variant="outline"
+                                className="flex-1 text-[10px] sm:text-xs md:text-sm h-7 sm:h-8"
+                                onClick={() => {
+                                    if (confirm("この車両を保管にしますか？")) {
+                                        archiveMutation.mutate({ id: vehicleId });
+                                    }
+                                }}
+                            >
+                                <Archive className="h-3 w-3 sm:h-4 sm:w-4 mr-0.5 sm:mr-1" />
+                                保管
+                            </Button>
+                        </div>
+                    )}
+                    {vehicleStatus === "completed" && (
+                        <div className="flex gap-1.5 sm:gap-2">
+                            <Button
+                                size="sm"
+                                variant="outline"
+                                className="flex-1 text-[10px] sm:text-xs h-7 sm:h-8"
+                                onClick={() => {
+                                    if (confirm("この車両を作業中に戻しますか？")) {
+                                        uncompleteMutation.mutate({ id: vehicleId });
+                                    }
+                                }}
+                            >
+                                作業中に戻す
+                            </Button>
+                            <Button
+                                size="sm"
+                                variant="outline"
+                                className="flex-1 text-[10px] sm:text-xs h-7 sm:h-8"
+                                onClick={() => {
+                                    if (confirm("この車両を保管にしますか？")) {
+                                        archiveMutation.mutate({ id: vehicleId });
+                                    }
+                                }}
+                            >
+                                <Archive className="h-3 w-3 sm:h-4 sm:w-4 mr-0.5 sm:mr-1" />
+                                保管
+                            </Button>
+                        </div>
+                    )}
+                    {vehicleStatus === "archived" && (
+                        <Button
+                            size="sm"
+                            variant="outline"
+                            className="w-full text-[10px] sm:text-xs h-7 sm:h-8"
+                            onClick={() => {
+                                if (confirm("この車両を完成に戻しますか？")) {
+                                    unarchiveMutation.mutate({ id: vehicleId });
+                                }
+                            }}
+                        >
+                            完成に戻す
+                        </Button>
+                    )}
+                </div>
+            )}
 
             {/* 注意ポイント追加ダイアログ */}
             {isAttentionPointDialogOpen && (
@@ -770,86 +865,16 @@ export default function Vehicles() {
                                             </div>
                                         )}
 
-                                        {/* アクションボタン */}
-                                        {user?.role === "admin" && (
-                                            <div className="flex flex-col gap-1.5 sm:gap-2 pt-2 border-t">
-                                                {vehicle.status === "in_progress" && (
-                                                    <div className="flex gap-1.5 sm:gap-2">
-                                                        <Button
-                                                            size="sm"
-                                                            variant="outline"
-                                                            className="flex-1 text-[10px] sm:text-xs md:text-sm h-7 sm:h-8"
-                                                            onClick={() => {
-                                                                if (confirm("この車両を完成にしますか？")) {
-                                                                    completeMutation.mutate({ id: vehicle.id });
-                                                                }
-                                                            }}
-                                                        >
-                                                            <Check className="h-3 w-3 sm:h-4 sm:w-4 mr-0.5 sm:mr-1" />
-                                                            完成
-                                                        </Button>
-                                                        <Button
-                                                            size="sm"
-                                                            variant="outline"
-                                                            className="flex-1 text-[10px] sm:text-xs md:text-sm h-7 sm:h-8"
-                                                            onClick={() => {
-                                                                if (confirm("この車両を保管にしますか？")) {
-                                                                    archiveMutation.mutate({ id: vehicle.id });
-                                                                }
-                                                            }}
-                                                        >
-                                                            <Archive className="h-3 w-3 sm:h-4 sm:w-4 mr-0.5 sm:mr-1" />
-                                                            保管
-                                                        </Button>
-                                                    </div>
-                                                )}
-                                                {vehicle.status === "completed" && (
-                                                    <div className="flex gap-1.5 sm:gap-2">
-                                                        <Button
-                                                            size="sm"
-                                                            variant="outline"
-                                                            className="flex-1 text-[10px] sm:text-xs h-7 sm:h-8"
-                                                            onClick={() => {
-                                                                if (confirm("この車両を作業中に戻しますか？")) {
-                                                                    uncompleteMutation.mutate({ id: vehicle.id });
-                                                                }
-                                                            }}
-                                                        >
-                                                            作業中に戻す
-                                                        </Button>
-                                                        <Button
-                                                            size="sm"
-                                                            variant="outline"
-                                                            className="flex-1 text-[10px] sm:text-xs h-7 sm:h-8"
-                                                            onClick={() => {
-                                                                if (confirm("この車両を保管にしますか？")) {
-                                                                    archiveMutation.mutate({ id: vehicle.id });
-                                                                }
-                                                            }}
-                                                        >
-                                                            <Archive className="h-3 w-3 sm:h-4 sm:w-4 mr-0.5 sm:mr-1" />
-                                                            保管
-                                                        </Button>
-                                                    </div>
-                                                )}
-                                                {vehicle.status === "archived" && (
-                                                    <Button
-                                                        size="sm"
-                                                        variant="outline"
-                                                        className="w-full text-[10px] sm:text-xs h-7 sm:h-8"
-                                                        onClick={() => {
-                                                            if (confirm("この車両を完成に戻しますか？")) {
-                                                                unarchiveMutation.mutate({ id: vehicle.id });
-                                                            }
-                                                        }}
-                                                    >
-                                                        完成に戻す
-                                                    </Button>
-                                                )}
-                                            </div>
-                                        )}
                                     </CardContent>
-                                    <VehicleDetailContent vehicleId={vehicle.id} user={user} />
+                                    <VehicleDetailContent 
+                                        vehicleId={vehicle.id} 
+                                        user={user}
+                                        vehicleStatus={vehicle.status}
+                                        completeMutation={completeMutation}
+                                        archiveMutation={archiveMutation}
+                                        uncompleteMutation={uncompleteMutation}
+                                        unarchiveMutation={unarchiveMutation}
+                                    />
                                 </Card>
                             ))}
                         </div>
