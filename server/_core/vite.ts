@@ -50,7 +50,7 @@ export async function setupVite(app: Express, server: Server) {
 export function serveStatic(app: Express) {
     // 本番環境では、ビルド後のdist/publicディレクトリを参照
     // ビルド後のdist/index.jsから見て、dist/publicは同じdistディレクトリ内にある
-    const distPath = path.resolve(import.meta.dirname, "public");
+   const distPath = path.resolve(import.meta.dirname, "../../dist");
     console.log(`Serving static files from: ${distPath}`);
     if (!fs.existsSync(distPath)) {
         console.error(
