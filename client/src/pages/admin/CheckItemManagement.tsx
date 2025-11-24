@@ -28,6 +28,14 @@ export default function CheckItemManagement() {
         category: selectedCategory,
     });
 
+    // 既存の大カテゴリと小カテゴリの一覧を取得
+    const existingMajorCategories = checkItems
+        ? [...new Set(checkItems.map((item) => item.majorCategory).filter((cat): cat is string => !!cat))]
+        : [];
+    const existingMinorCategories = checkItems
+        ? [...new Set(checkItems.map((item) => item.minorCategory).filter((cat): cat is string => !!cat))]
+        : [];
+
     const createMutation = trpc.checks.createCheckItem.useMutation({
         onSuccess: () => {
             toast.success("チェック項目を追加しました");
@@ -84,8 +92,8 @@ export default function CheckItemManagement() {
 
         createMutation.mutate({
             category: selectedCategory,
-            majorCategory: majorCategory || undefined,
-            minorCategory: minorCategory || undefined,
+            majorCategory: majorCategory && majorCategory !== "__new__" ? majorCategory : undefined,
+            minorCategory: minorCategory && minorCategory !== "__new__" ? minorCategory : undefined,
             name: itemName,
             description: itemDescription || undefined,
             displayOrder,
@@ -111,8 +119,8 @@ export default function CheckItemManagement() {
         updateMutation.mutate({
             id: editingItem.id,
             name: itemName,
-            majorCategory: majorCategory || undefined,
-            minorCategory: minorCategory || undefined,
+            majorCategory: majorCategory && majorCategory !== "__new__" ? majorCategory : undefined,
+            minorCategory: minorCategory && minorCategory !== "__new__" ? minorCategory : undefined,
             description: itemDescription || undefined,
             displayOrder,
         });
@@ -443,21 +451,53 @@ export default function CheckItemManagement() {
                             </div>
                             <div className="min-w-0">
                                 <label className="text-sm font-medium block mb-1">大カテゴリ</label>
-                                <Input
+                                <select
+                                    className="flex h-10 w-full min-w-0 rounded-md border border-[hsl(var(--input))] bg-[hsl(var(--background))] px-2 sm:px-3 py-2 text-sm"
                                     value={majorCategory}
                                     onChange={(e) => setMajorCategory(e.target.value)}
-                                    placeholder="大カテゴリを入力（任意）"
-                                    className="w-full min-w-0"
-                                />
+                                >
+                                    <option value="">選択してください（任意）</option>
+                                    {existingMajorCategories.map((cat) => (
+                                        <option key={cat} value={cat}>
+                                            {cat}
+                                        </option>
+                                    ))}
+                                    <option value="__new__">（新規追加）</option>
+                                </select>
+                                {majorCategory === "__new__" && (
+                                    <Input
+                                        value=""
+                                        onChange={(e) => setMajorCategory(e.target.value)}
+                                        placeholder="新しい大カテゴリを入力"
+                                        className="w-full min-w-0 mt-2"
+                                        autoFocus
+                                    />
+                                )}
                             </div>
                             <div className="min-w-0">
                                 <label className="text-sm font-medium block mb-1">小カテゴリ</label>
-                                <Input
+                                <select
+                                    className="flex h-10 w-full min-w-0 rounded-md border border-[hsl(var(--input))] bg-[hsl(var(--background))] px-2 sm:px-3 py-2 text-sm"
                                     value={minorCategory}
                                     onChange={(e) => setMinorCategory(e.target.value)}
-                                    placeholder="小カテゴリを入力（任意）"
-                                    className="w-full min-w-0"
-                                />
+                                >
+                                    <option value="">選択してください（任意）</option>
+                                    {existingMinorCategories.map((cat) => (
+                                        <option key={cat} value={cat}>
+                                            {cat}
+                                        </option>
+                                    ))}
+                                    <option value="__new__">（新規追加）</option>
+                                </select>
+                                {minorCategory === "__new__" && (
+                                    <Input
+                                        value=""
+                                        onChange={(e) => setMinorCategory(e.target.value)}
+                                        placeholder="新しい小カテゴリを入力"
+                                        className="w-full min-w-0 mt-2"
+                                        autoFocus
+                                    />
+                                )}
                             </div>
                             <div className="min-w-0">
                                 <label className="text-sm font-medium block mb-1">説明</label>
@@ -551,4 +591,6 @@ ${selectedCategory},内装,床,床材チェック,床材の状態を確認,2`}
         </div>
     );
 }
+
+
 

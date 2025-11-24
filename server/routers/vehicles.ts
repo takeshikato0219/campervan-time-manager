@@ -32,6 +32,32 @@ export const vehiclesRouter = createTRPCRouter({
                 vehicles = await db.select().from(schema.vehicles);
             }
 
+            // すべての車両の外注先を一度に取得
+            const vehicleIds = vehicles.map((v) => v.id);
+            let allOutsourcing: any[] = [];
+            if (vehicleIds.length > 0) {
+                const { inArray } = await import("drizzle-orm");
+                allOutsourcing = await db
+                    .select()
+                    .from(schema.vehicleOutsourcing)
+                    .where(inArray(schema.vehicleOutsourcing.vehicleId, vehicleIds))
+                    .orderBy(schema.vehicleOutsourcing.displayOrder);
+            }
+
+            // 車両IDごとに外注先をマッピング
+            const outsourcingMap = new Map<number, any[]>();
+            allOutsourcing.forEach((o) => {
+                const existing = outsourcingMap.get(o.vehicleId) || [];
+                existing.push({
+                    id: o.id,
+                    destination: o.destination,
+                    startDate: o.startDate,
+                    endDate: o.endDate,
+                    displayOrder: o.displayOrder,
+                });
+                outsourcingMap.set(o.vehicleId, existing);
+            });
+
             return vehicles.map((v) => ({
                 id: v.id,
                 vehicleNumber: v.vehicleNumber,
@@ -47,9 +73,10 @@ export const vehiclesRouter = createTRPCRouter({
                 hasPreferredNumber: v.hasPreferredNumber,
                 hasTireReplacement: v.hasTireReplacement,
                 instructionSheetUrl: v.instructionSheetUrl,
-                outsourcingDestination: v.outsourcingDestination,
-                outsourcingStartDate: v.outsourcingStartDate,
-                outsourcingEndDate: v.outsourcingEndDate,
+                outsourcingDestination: v.outsourcingDestination, // 後方互換性のため残す
+                outsourcingStartDate: v.outsourcingStartDate, // 後方互換性のため残す
+                outsourcingEndDate: v.outsourcingEndDate, // 後方互換性のため残す
+                outsourcing: outsourcingMap.get(v.id) || [], // 新しい外注先配列
                 completionDate: v.completionDate,
                 status: v.status,
                 targetTotalMinutes: v.targetTotalMinutes,
@@ -263,6 +290,13 @@ export const vehiclesRouter = createTRPCRouter({
                 .where(eq(schema.vehicleMemos.vehicleId, input.id))
                 .orderBy(schema.vehicleMemos.createdAt);
 
+            // 外注先を取得
+            const outsourcing = await db
+                .select()
+                .from(schema.vehicleOutsourcing)
+                .where(eq(schema.vehicleOutsourcing.vehicleId, input.id))
+                .orderBy(schema.vehicleOutsourcing.displayOrder);
+
             // 工程別作業時間を集計
             const processTimeMap = new Map<number, number>();
             workRecords.forEach((wr) => {
@@ -302,6 +336,13 @@ export const vehiclesRouter = createTRPCRouter({
                     userName: userMap.get(m.userId)?.name || userMap.get(m.userId)?.username || "不明",
                     content: m.content,
                     createdAt: m.createdAt,
+                })),
+                outsourcing: outsourcing.map((o) => ({
+                    id: o.id,
+                    destination: o.destination,
+                    startDate: o.startDate,
+                    endDate: o.endDate,
+                    displayOrder: o.displayOrder,
                 })),
                 processTime,
             };
@@ -545,6 +586,90 @@ export const vehiclesRouter = createTRPCRouter({
             }
 
             await db.delete(schema.vehicleAttentionPoints).where(eq(schema.vehicleAttentionPoints.id, input.id));
+
+            return { success: true };
+        }),
+
+    // 車両の外注先を取得
+    getVehicleOutsourcing: protectedProcedure
+        .input(z.object({ vehicleId: z.number() }))
+        .query(async ({ input }) => {
+            const db = await getDb();
+            if (!db) {
+                throw new TRPCError({
+                    code: "INTERNAL_SERVER_ERROR",
+                    message: "データベースに接続できません",
+                });
+            }
+
+            const outsourcing = await db
+                .select()
+                .from(schema.vehicleOutsourcing)
+                .where(eq(schema.vehicleOutsourcing.vehicleId, input.vehicleId))
+                .orderBy(schema.vehicleOutsourcing.displayOrder);
+
+            return outsourcing;
+        }),
+
+    // 車両の外注先を設定（最大2個、管理者のみ）
+    setVehicleOutsourcing: adminProcedure
+        .input(
+            z.object({
+                vehicleId: z.number(),
+                outsourcing: z
+                    .array(
+                        z.object({
+                            destination: z.string(),
+                            startDate: z.date().optional(),
+                            endDate: z.date().optional(),
+                        })
+                    )
+                    .max(2), // 最大2個
+            })
+        )
+        .mutation(async ({ input }) => {
+            const db = await getDb();
+            if (!db) {
+                throw new TRPCError({
+                    code: "INTERNAL_SERVER_ERROR",
+                    message: "データベースに接続できません",
+                });
+            }
+
+            // 既存の外注先を削除
+            await db
+                .delete(schema.vehicleOutsourcing)
+                .where(eq(schema.vehicleOutsourcing.vehicleId, input.vehicleId));
+
+            // 新しい外注先を追加
+            if (input.outsourcing.length > 0) {
+                await db.insert(schema.vehicleOutsourcing).values(
+                    input.outsourcing.map((o, index) => ({
+                        vehicleId: input.vehicleId,
+                        destination: o.destination,
+                        startDate: o.startDate,
+                        endDate: o.endDate,
+                        displayOrder: index + 1,
+                    }))
+                );
+            }
+
+            return { success: true };
+        }),
+
+    // 車両の外注先を削除（管理者のみ）
+    deleteVehicleOutsourcing: adminProcedure
+        .input(z.object({ id: z.number() }))
+        .mutation(async ({ input }) => {
+            const db = await getDb();
+            if (!db) {
+                throw new TRPCError({
+                    code: "INTERNAL_SERVER_ERROR",
+                    message: "データベースに接続できません",
+                });
+            }
+
+            await db.delete(schema.vehicleOutsourcing).where(eq(schema.vehicleOutsourcing.id, input.id));
 
             return { success: true };
         }),

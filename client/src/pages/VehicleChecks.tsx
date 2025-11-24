@@ -206,7 +206,15 @@ function VehicleCheckCard({
             <CardContent className="p-3 sm:p-4">
                 {checkData && checkData.checkStatus && checkData.checkStatus.length > 0 ? (
                     <div className="space-y-2">
-                        {checkData.checkStatus.map((status: any) => {
+                        {[...checkData.checkStatus].sort((a: any, b: any) => {
+                            // チェック済み（checked）を下に、それ以外を上に
+                            if (a.status === "checked" && b.status !== "checked") return 1;
+                            if (a.status !== "checked" && b.status === "checked") return -1;
+                            // 要再チェック（needs_recheck）を未チェック（unchecked）より上に
+                            if (a.status === "needs_recheck" && b.status === "unchecked") return -1;
+                            if (a.status === "unchecked" && b.status === "needs_recheck") return 1;
+                            return 0;
+                        }).map((status: any) => {
                             const getStatusLabel = (statusValue: string) => {
                                 switch (statusValue) {
                                     case "checked":

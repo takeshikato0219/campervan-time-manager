@@ -243,9 +243,9 @@ export default function Vehicles() {
     const [hasPreferredNumber, setHasPreferredNumber] = useState<"yes" | "no" | "">("");
     const [hasTireReplacement, setHasTireReplacement] = useState<"summer" | "winter" | "no" | "">("");
     const [instructionSheetFile, setInstructionSheetFile] = useState<File | null>(null);
-    const [outsourcingDestination, setOutsourcingDestination] = useState("");
-    const [outsourcingStartDate, setOutsourcingStartDate] = useState("");
-    const [outsourcingEndDate, setOutsourcingEndDate] = useState("");
+    const [outsourcing, setOutsourcing] = useState<Array<{ destination: string; startDate: string; endDate: string }>>([
+        { destination: "", startDate: "", endDate: "" },
+    ]);
     const { data: vehicles, refetch } = trpc.vehicles.list.useQuery({
         status: activeTab,
     });
@@ -279,9 +279,7 @@ export default function Vehicles() {
             setDesiredDeliveryDate("");
             setCheckDueDate("");
             setInstructionSheetFile(null);
-            setOutsourcingDestination("");
-            setOutsourcingStartDate("");
-            setOutsourcingEndDate("");
+            setOutsourcing([{ destination: "", startDate: "", endDate: "" }]);
             refetch();
         },
         onError: (error: any) => {
@@ -342,13 +340,23 @@ export default function Vehicles() {
 
     const createBroadcastMutation = trpc.salesBroadcasts.create.useMutation({
         onSuccess: () => {
-            toast.success("営業からの拡散を送信しました");
+            toast.success("拡散項目を送信しました");
             setIsBroadcastDialogOpen(false);
             setBroadcastingVehicleId(null);
             setBroadcastMessage("");
         },
         onError: (error: any) => {
-            toast.error(error.message || "拡散の送信に失敗しました");
+            toast.error(error.message || "拡散項目の送信に失敗しました");
+        },
+    });
+
+    const setVehicleOutsourcingMutation = trpc.vehicles.setVehicleOutsourcing.useMutation({
+        onSuccess: () => {
+            toast.success("外注先を更新しました");
+            refetch();
+        },
+        onError: (error: any) => {
+            toast.error(error.message || "外注先の更新に失敗しました");
         },
     });
 
@@ -411,17 +419,29 @@ export default function Vehicles() {
         setHasLine(vehicle.hasLine || "");
         setHasPreferredNumber(vehicle.hasPreferredNumber || "");
         setHasTireReplacement(vehicle.hasTireReplacement || "");
-        setOutsourcingDestination(vehicle.outsourcingDestination || "");
-        setOutsourcingStartDate(
-            vehicle.outsourcingStartDate
-                ? format(new Date(vehicle.outsourcingStartDate), "yyyy-MM-dd")
-                : ""
-        );
-        setOutsourcingEndDate(
-            vehicle.outsourcingEndDate
-                ? format(new Date(vehicle.outsourcingEndDate), "yyyy-MM-dd")
-                : ""
-        );
+        // 外注先を取得（新しいAPIを使用）
+        if (vehicle.outsourcing && vehicle.outsourcing.length > 0) {
+            setOutsourcing(
+                vehicle.outsourcing.map((o: any) => ({
+                    destination: o.destination || "",
+                    startDate: o.startDate ? format(new Date(o.startDate), "yyyy-MM-dd") : "",
+                    endDate: o.endDate ? format(new Date(o.endDate), "yyyy-MM-dd") : "",
+                }))
+            );
+        } else {
+            // 後方互換性: 古いフィールドから移行
+            setOutsourcing([
+                {
+                    destination: vehicle.outsourcingDestination || "",
+                    startDate: vehicle.outsourcingStartDate
+                        ? format(new Date(vehicle.outsourcingStartDate), "yyyy-MM-dd")
+                        : "",
+                    endDate: vehicle.outsourcingEndDate
+                        ? format(new Date(vehicle.outsourcingEndDate), "yyyy-MM-dd")
+                        : "",
+                },
+            ]);
+        }
         setInstructionSheetFile(null);
         setIsEditDialogOpen(true);
     };
@@ -484,25 +504,24 @@ export default function Vehicles() {
             updateData.hasTireReplacement = hasTireReplacement as "summer" | "winter" | "no";
         }
 
-        if (outsourcingDestination) {
-            updateData.outsourcingDestination = outsourcingDestination;
-        }
-
-        if (outsourcingStartDate) {
-            const date = new Date(outsourcingStartDate);
-            if (!isNaN(date.getTime())) {
-                updateData.outsourcingStartDate = date;
-            }
-        }
-
-        if (outsourcingEndDate) {
-            const date = new Date(outsourcingEndDate);
-            if (!isNaN(date.getTime())) {
-                updateData.outsourcingEndDate = date;
-            }
-        }
-
         updateMutation.mutate(updateData);
+
+        // 外注先を別途更新（最大2個）
+        const validOutsourcing = outsourcing
+            .filter((o) => o.destination.trim() !== "")
+            .slice(0, 2) // 最大2個
+            .map((o) => ({
+                destination: o.destination.trim(),
+                startDate: o.startDate ? new Date(o.startDate) : undefined,
+                endDate: o.endDate ? new Date(o.endDate) : undefined,
+            }));
+
+        if (validOutsourcing.length > 0 || outsourcing.some((o) => o.destination.trim() !== "")) {
+            setVehicleOutsourcingMutation.mutate({
+                vehicleId: editingVehicle.id,
+                outsourcing: validOutsourcing,
+            });
+        }
 
         // 指示書ファイルが選択されている場合はアップロード
         if (instructionSheetFile && editingVehicle) {
@@ -600,7 +619,7 @@ export default function Vehicles() {
                                                         title="車両チェック"
                                                     >
                                                         <ClipboardCheck className="h-3 w-3 sm:h-4 sm:w-4 mr-0.5 sm:mr-1" />
-                                                        <span className="hidden sm:inline">チェック</span>
+                                                        チェック
                                                     </Button>
                                                 </Link>
                                                 {user?.role === "admin" && (
@@ -623,10 +642,9 @@ export default function Vehicles() {
                                                                 setIsBroadcastDialogOpen(true);
                                                             }}
                                                             className="h-7 sm:h-8 px-2 text-[10px] sm:text-xs flex-1 sm:flex-none"
-                                                            title="営業からの拡散"
+                                                            title="拡散項目"
                                                         >
-                                                            <span className="hidden sm:inline">拡散</span>
-                                                            <span className="sm:hidden">拡</span>
+                                                            拡散項目
                                                         </Button>
                                                     </>
                                                 )}
@@ -676,25 +694,50 @@ export default function Vehicles() {
                                         </div>
 
                                         {/* 外注情報 */}
-                                        {(vehicle.outsourcingDestination || vehicle.outsourcingStartDate || vehicle.outsourcingEndDate) && (
+                                        {vehicle.outsourcing && vehicle.outsourcing.length > 0 && (
                                             <div className="pt-2 border-t">
                                                 <div className="flex items-center gap-2 mb-1.5 sm:mb-2">
                                                     <span className="text-[10px] sm:text-xs font-semibold text-gray-700">外注情報:</span>
                                                 </div>
-                                                <div className="flex flex-wrap gap-1.5 sm:gap-2">
-                                                    {vehicle.outsourcingDestination && (
-                                                        <span className="inline-flex items-center px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-md text-[10px] sm:text-xs font-medium bg-purple-100 text-purple-800 border border-purple-200 break-words">
-                                                            先: {vehicle.outsourcingDestination}
-                                                        </span>
-                                                    )}
-                                                    {vehicle.outsourcingStartDate && vehicle.outsourcingEndDate && (
-                                                        <span className="inline-flex items-center px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-md text-[10px] sm:text-xs font-medium bg-indigo-100 text-indigo-800 border border-indigo-200 whitespace-nowrap">
-                                                            {format(new Date(vehicle.outsourcingStartDate), "yyyy/MM/dd")} - {format(new Date(vehicle.outsourcingEndDate), "yyyy/MM/dd")}
-                                                        </span>
-                                                    )}
+                                                <div className="flex flex-col gap-1.5 sm:gap-2">
+                                                    {vehicle.outsourcing.map((o: any, index: number) => (
+                                                        <div key={o.id || index} className="flex flex-wrap gap-1.5 sm:gap-2">
+                                                            {o.destination && (
+                                                                <span className="inline-flex items-center px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-md text-[10px] sm:text-xs font-medium bg-purple-100 text-purple-800 border border-purple-200 break-words">
+                                                                    先: {o.destination}
+                                                                </span>
+                                                            )}
+                                                            {o.startDate && o.endDate && (
+                                                                <span className="inline-flex items-center px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-md text-[10px] sm:text-xs font-medium bg-indigo-100 text-indigo-800 border border-indigo-200 whitespace-nowrap">
+                                                                    {format(new Date(o.startDate), "yyyy/MM/dd")} - {format(new Date(o.endDate), "yyyy/MM/dd")}
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    ))}
                                                 </div>
                                             </div>
                                         )}
+                                        {/* 後方互換性: 古いフィールドを表示 */}
+                                        {(!vehicle.outsourcing || vehicle.outsourcing.length === 0) &&
+                                            (vehicle.outsourcingDestination || vehicle.outsourcingStartDate || vehicle.outsourcingEndDate) && (
+                                                <div className="pt-2 border-t">
+                                                    <div className="flex items-center gap-2 mb-1.5 sm:mb-2">
+                                                        <span className="text-[10px] sm:text-xs font-semibold text-gray-700">外注情報:</span>
+                                                    </div>
+                                                    <div className="flex flex-wrap gap-1.5 sm:gap-2">
+                                                        {vehicle.outsourcingDestination && (
+                                                            <span className="inline-flex items-center px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-md text-[10px] sm:text-xs font-medium bg-purple-100 text-purple-800 border border-purple-200 break-words">
+                                                                先: {vehicle.outsourcingDestination}
+                                                            </span>
+                                                        )}
+                                                        {vehicle.outsourcingStartDate && vehicle.outsourcingEndDate && (
+                                                            <span className="inline-flex items-center px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-md text-[10px] sm:text-xs font-medium bg-indigo-100 text-indigo-800 border border-indigo-200 whitespace-nowrap">
+                                                                {format(new Date(vehicle.outsourcingStartDate), "yyyy/MM/dd")} - {format(new Date(vehicle.outsourcingEndDate), "yyyy/MM/dd")}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            )}
 
                                         {/* オプション情報バッジ */}
                                         {(vehicle.hasCoating || vehicle.hasLine || vehicle.hasPreferredNumber || vehicle.hasTireReplacement) && (
@@ -1066,32 +1109,84 @@ export default function Vehicles() {
                                     </div>
                                 </div>
                             )}
-                            <div className="min-w-0">
-                                <label className="text-sm font-medium block mb-1">外注先</label>
-                                <Input
-                                    value={outsourcingDestination}
-                                    onChange={(e) => setOutsourcingDestination(e.target.value)}
-                                    placeholder="外注先を入力"
-                                    className="w-full min-w-0"
-                                />
-                            </div>
-                            <div className="min-w-0">
-                                <label className="text-sm font-medium block mb-1">外注開始日</label>
-                                <Input
-                                    type="date"
-                                    value={outsourcingStartDate}
-                                    onChange={(e) => setOutsourcingStartDate(e.target.value)}
-                                    className="w-full min-w-0"
-                                />
-                            </div>
-                            <div className="min-w-0">
-                                <label className="text-sm font-medium block mb-1">外注終了日</label>
-                                <Input
-                                    type="date"
-                                    value={outsourcingEndDate}
-                                    onChange={(e) => setOutsourcingEndDate(e.target.value)}
-                                    className="w-full min-w-0"
-                                />
+                            <div className="min-w-0 space-y-3">
+                                <label className="text-sm font-medium block mb-2">外注先（最大2個）</label>
+                                {outsourcing.map((o, index) => (
+                                    <div key={index} className="space-y-2 p-3 border border-[hsl(var(--border))] rounded-lg">
+                                        <div className="flex items-center justify-between mb-2">
+                                            <span className="text-xs font-medium text-[hsl(var(--muted-foreground))]">
+                                                外注先 {index + 1}
+                                            </span>
+                                            {index > 0 && (
+                                                <Button
+                                                    type="button"
+                                                    size="sm"
+                                                    variant="ghost"
+                                                    onClick={() => {
+                                                        setOutsourcing(outsourcing.filter((_, i) => i !== index));
+                                                    }}
+                                                    className="h-6 px-2 text-xs text-red-600 hover:text-red-800"
+                                                >
+                                                    <Trash2 className="h-3 w-3" />
+                                                    削除
+                                                </Button>
+                                            )}
+                                        </div>
+                                        <div className="min-w-0">
+                                            <label className="text-xs font-medium block mb-1">外注先</label>
+                                            <Input
+                                                value={o.destination}
+                                                onChange={(e) => {
+                                                    const newOutsourcing = [...outsourcing];
+                                                    newOutsourcing[index].destination = e.target.value;
+                                                    setOutsourcing(newOutsourcing);
+                                                }}
+                                                placeholder="外注先を入力"
+                                                className="w-full min-w-0"
+                                            />
+                                        </div>
+                                        <div className="min-w-0">
+                                            <label className="text-xs font-medium block mb-1">外注開始日</label>
+                                            <Input
+                                                type="date"
+                                                value={o.startDate}
+                                                onChange={(e) => {
+                                                    const newOutsourcing = [...outsourcing];
+                                                    newOutsourcing[index].startDate = e.target.value;
+                                                    setOutsourcing(newOutsourcing);
+                                                }}
+                                                className="w-full min-w-0"
+                                            />
+                                        </div>
+                                        <div className="min-w-0">
+                                            <label className="text-xs font-medium block mb-1">外注終了日</label>
+                                            <Input
+                                                type="date"
+                                                value={o.endDate}
+                                                onChange={(e) => {
+                                                    const newOutsourcing = [...outsourcing];
+                                                    newOutsourcing[index].endDate = e.target.value;
+                                                    setOutsourcing(newOutsourcing);
+                                                }}
+                                                className="w-full min-w-0"
+                                            />
+                                        </div>
+                                    </div>
+                                ))}
+                                {outsourcing.length < 2 && (
+                                    <Button
+                                        type="button"
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => {
+                                            setOutsourcing([...outsourcing, { destination: "", startDate: "", endDate: "" }]);
+                                        }}
+                                        className="w-full text-xs"
+                                    >
+                                        <Plus className="h-3 w-3 mr-1" />
+                                        外注先を追加
+                                    </Button>
+                                )}
                             </div>
                             <div className="flex flex-col sm:flex-row gap-2 pt-2 flex-shrink-0">
                                 <Button
@@ -1118,6 +1213,7 @@ export default function Vehicles() {
                                         setHasLine("");
                                         setHasPreferredNumber("");
                                         setHasTireReplacement("");
+                                        setOutsourcing([{ destination: "", startDate: "", endDate: "" }]);
                                     }}
                                 >
                                     キャンセル
@@ -1128,12 +1224,12 @@ export default function Vehicles() {
                 </div>
             )}
 
-            {/* 営業からの拡散ダイアログ */}
+            {/* 拡散項目ダイアログ */}
             {isBroadcastDialogOpen && broadcastingVehicleId && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-2 sm:p-4 overflow-y-auto">
                     <Card className="w-full max-w-md min-w-0 my-auto">
                         <CardHeader className="p-3 sm:p-4 md:p-6">
-                            <CardTitle className="text-base sm:text-lg md:text-xl">営業からの拡散</CardTitle>
+                            <CardTitle className="text-base sm:text-lg md:text-xl">拡散項目</CardTitle>
                         </CardHeader>
                         <CardContent className="p-3 sm:p-4 md:p-6 space-y-3 sm:space-y-4">
                             <div className="min-w-0">

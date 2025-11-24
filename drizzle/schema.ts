@@ -240,3 +240,15 @@ export const vehicleAttentionPoints = mysqlTable("vehicleAttentionPoints", {
     updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
 
+// 20. vehicleOutsourcing: 車両外注先（最大2個）
+export const vehicleOutsourcing = mysqlTable("vehicleOutsourcing", {
+    id: int("id").autoincrement().primaryKey(),
+    vehicleId: int("vehicleId").notNull(),
+    destination: varchar("destination", { length: 255 }).notNull(), // 外注先
+    startDate: date("startDate"), // 外注開始日
+    endDate: date("endDate"), // 外注終了日
+    displayOrder: int("displayOrder").default(0), // 表示順（1番目、2番目）
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
