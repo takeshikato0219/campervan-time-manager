@@ -9,11 +9,7 @@ cmds = [
 
 [phases.build]
 cmds = [
-  "pnpm install --no-frozen-lockfile && pnpm run build"
-]
-
-[phases.deploy]
-cmds = [
+  "pnpm install --no-frozen-lockfile && pnpm run build",
   "pnpm run db:push"
 ]
 
