@@ -57,25 +57,29 @@ export default function AppLayout({ children }: AppLayoutProps) {
         <div className="min-h-screen bg-[hsl(var(--background))]">
             {/* ヘッダー */}
             <header className="sticky top-0 z-30 w-full border-b border-[hsl(var(--border))] bg-[hsl(var(--card))]">
-                <div className="container mx-auto flex h-16 items-center justify-between px-4">
-                    <div className="flex items-center gap-4">
+                <div className="container mx-auto flex h-16 items-center justify-between px-2 sm:px-4 gap-2">
+                    <div className="flex items-center gap-2 sm:gap-4 min-w-0 flex-1">
                         <Button
                             variant="ghost"
                             size="icon"
-                            className="md:hidden"
+                            className="md:hidden flex-shrink-0"
                             onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
                         >
                             {isMobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
                         </Button>
-                        <h1 className="text-xl font-bold">キャンピングカー架装時間管理</h1>
+                        <Link href="/" className="min-w-0 flex-1">
+                            <h1 className="text-base sm:text-xl font-bold truncate cursor-pointer hover:opacity-80 transition-opacity">
+                                キャンピングカー架装時間管理
+                            </h1>
+                        </Link>
                     </div>
-                    <div className="flex items-center gap-4">
-                        <span className="text-sm text-[hsl(var(--muted-foreground))]">
+                    <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
+                        <span className="text-xs sm:text-sm text-[hsl(var(--muted-foreground))] truncate max-w-[80px] sm:max-w-none">
                             {user?.name || user?.username}さん
                         </span>
-                        <Button variant="ghost" size="sm" onClick={handleLogout}>
-                            <LogOut className="h-4 w-4 mr-2" />
-                            ログアウト
+                        <Button variant="ghost" size="sm" onClick={handleLogout} className="px-2 sm:px-3">
+                            <LogOut className="h-4 w-4 sm:mr-2" />
+                            <span className="hidden sm:inline">ログアウト</span>
                         </Button>
                     </div>
                 </div>

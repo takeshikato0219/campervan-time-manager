@@ -93,23 +93,12 @@ export default function Login() {
                         </Button>
                     </form>
 
-                    <div className="mt-6 p-4 bg-[hsl(var(--muted))] rounded-lg text-sm space-y-3">
-                        <div>
-                            <p className="font-semibold mb-2">初期アカウント情報:</p>
-                            <p className="mb-1">
-                                <strong>管理者:</strong> admin / admin123
-                            </p>
-                            <p>
-                                <strong>スタッフ:</strong> user001～user040 / password
-                            </p>
-                        </div>
-                        <div className="pt-3 border-t border-[hsl(var(--border))]">
-                            <p className="font-semibold mb-2 text-amber-600">⚠️ データベース設定が必要です</p>
-                            <p className="text-xs text-[hsl(var(--muted-foreground))]">
-                                ログインするには、.envファイルにDATABASE_URLを設定し、データベースをセットアップしてください。
-                                詳細は SETUP_DATABASE.md を参照してください。
-                            </p>
-                        </div>
+                    <div className="mt-6 flex justify-center">
+                        <img 
+                            src="/katomotor.png" 
+                            alt="Kato Motor" 
+                            className="max-w-full h-auto max-h-32 object-contain"
+                        />
                     </div>
                 </CardContent>
             </Card>
