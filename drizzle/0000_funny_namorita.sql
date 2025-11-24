@@ -1,4 +1,4 @@
-CREATE TABLE `attendanceEditLogs` (
+CREATE TABLE IF NOT EXISTS `attendanceEditLogs` (
 	`id` int AUTO_INCREMENT NOT NULL,
 	`attendanceId` int NOT NULL,
 	`editorId` int NOT NULL,
@@ -9,7 +9,7 @@ CREATE TABLE `attendanceEditLogs` (
 	CONSTRAINT `attendanceEditLogs_id` PRIMARY KEY(`id`)
 );
 --> statement-breakpoint
-CREATE TABLE `attendanceRecords` (
+CREATE TABLE IF NOT EXISTS `attendanceRecords` (
 	`id` int AUTO_INCREMENT NOT NULL,
 	`userId` int NOT NULL,
 	`clockIn` timestamp NOT NULL,
@@ -22,7 +22,7 @@ CREATE TABLE `attendanceRecords` (
 	CONSTRAINT `attendanceRecords_id` PRIMARY KEY(`id`)
 );
 --> statement-breakpoint
-CREATE TABLE `breakTimes` (
+CREATE TABLE IF NOT EXISTS `breakTimes` (
 	`id` int AUTO_INCREMENT NOT NULL,
 	`name` varchar(100) NOT NULL,
 	`startTime` varchar(10) NOT NULL,
@@ -34,7 +34,7 @@ CREATE TABLE `breakTimes` (
 	CONSTRAINT `breakTimes_id` PRIMARY KEY(`id`)
 );
 --> statement-breakpoint
-CREATE TABLE `feedbackComments` (
+CREATE TABLE IF NOT EXISTS `feedbackComments` (
 	`id` int AUTO_INCREMENT NOT NULL,
 	`workRecordId` int NOT NULL,
 	`userId` int NOT NULL,
@@ -44,7 +44,7 @@ CREATE TABLE `feedbackComments` (
 	CONSTRAINT `feedbackComments_id` PRIMARY KEY(`id`)
 );
 --> statement-breakpoint
-CREATE TABLE `notifications` (
+CREATE TABLE IF NOT EXISTS `notifications` (
 	`id` int AUTO_INCREMENT NOT NULL,
 	`userId` int NOT NULL,
 	`title` varchar(255) NOT NULL,
@@ -55,7 +55,7 @@ CREATE TABLE `notifications` (
 	CONSTRAINT `notifications_id` PRIMARY KEY(`id`)
 );
 --> statement-breakpoint
-CREATE TABLE `processes` (
+CREATE TABLE IF NOT EXISTS `processes` (
 	`id` int AUTO_INCREMENT NOT NULL,
 	`name` varchar(100) NOT NULL,
 	`description` text,
@@ -67,7 +67,7 @@ CREATE TABLE `processes` (
 	CONSTRAINT `processes_id` PRIMARY KEY(`id`)
 );
 --> statement-breakpoint
-CREATE TABLE `users` (
+CREATE TABLE IF NOT EXISTS `users` (
 	`id` int AUTO_INCREMENT NOT NULL,
 	`username` varchar(64) NOT NULL,
 	`password` text NOT NULL,
@@ -79,7 +79,7 @@ CREATE TABLE `users` (
 	CONSTRAINT `users_username_unique` UNIQUE(`username`)
 );
 --> statement-breakpoint
-CREATE TABLE `vehicleMemos` (
+CREATE TABLE IF NOT EXISTS `vehicleMemos` (
 	`id` int AUTO_INCREMENT NOT NULL,
 	`vehicleId` int NOT NULL,
 	`userId` int NOT NULL,
@@ -89,7 +89,7 @@ CREATE TABLE `vehicleMemos` (
 	CONSTRAINT `vehicleMemos_id` PRIMARY KEY(`id`)
 );
 --> statement-breakpoint
-CREATE TABLE `vehicleProcessTargets` (
+CREATE TABLE IF NOT EXISTS `vehicleProcessTargets` (
 	`id` int AUTO_INCREMENT NOT NULL,
 	`vehicleId` int NOT NULL,
 	`processId` int NOT NULL,
@@ -99,7 +99,7 @@ CREATE TABLE `vehicleProcessTargets` (
 	CONSTRAINT `vehicleProcessTargets_id` PRIMARY KEY(`id`)
 );
 --> statement-breakpoint
-CREATE TABLE `vehicleTypeProcessStandards` (
+CREATE TABLE IF NOT EXISTS `vehicleTypeProcessStandards` (
 	`id` int AUTO_INCREMENT NOT NULL,
 	`vehicleTypeId` int NOT NULL,
 	`processId` int NOT NULL,
@@ -109,7 +109,7 @@ CREATE TABLE `vehicleTypeProcessStandards` (
 	CONSTRAINT `vehicleTypeProcessStandards_id` PRIMARY KEY(`id`)
 );
 --> statement-breakpoint
-CREATE TABLE `vehicleTypes` (
+CREATE TABLE IF NOT EXISTS `vehicleTypes` (
 	`id` int AUTO_INCREMENT NOT NULL,
 	`name` varchar(100) NOT NULL,
 	`description` text,
@@ -119,7 +119,7 @@ CREATE TABLE `vehicleTypes` (
 	CONSTRAINT `vehicleTypes_id` PRIMARY KEY(`id`)
 );
 --> statement-breakpoint
-CREATE TABLE `vehicles` (
+CREATE TABLE IF NOT EXISTS `vehicles` (
 	`id` int AUTO_INCREMENT NOT NULL,
 	`vehicleNumber` varchar(100) NOT NULL,
 	`vehicleTypeId` int NOT NULL,
@@ -133,7 +133,7 @@ CREATE TABLE `vehicles` (
 	CONSTRAINT `vehicles_id` PRIMARY KEY(`id`)
 );
 --> statement-breakpoint
-CREATE TABLE `workRecords` (
+CREATE TABLE IF NOT EXISTS `workRecords` (
 	`id` int AUTO_INCREMENT NOT NULL,
 	`userId` int NOT NULL,
 	`vehicleId` int NOT NULL,

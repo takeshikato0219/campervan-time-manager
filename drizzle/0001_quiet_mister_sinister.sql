@@ -1,4 +1,4 @@
-CREATE TABLE `checkItems` (
+CREATE TABLE IF NOT EXISTS `checkItems` (
 	`id` int AUTO_INCREMENT NOT NULL,
 	`category` enum('一般','キャンパー','中古','修理','クレーム') NOT NULL,
 	`name` varchar(255) NOT NULL,
@@ -9,7 +9,7 @@ CREATE TABLE `checkItems` (
 	CONSTRAINT `checkItems_id` PRIMARY KEY(`id`)
 );
 --> statement-breakpoint
-CREATE TABLE `checkRequests` (
+CREATE TABLE IF NOT EXISTS `checkRequests` (
 	`id` int AUTO_INCREMENT NOT NULL,
 	`vehicleId` int NOT NULL,
 	`requestedBy` int NOT NULL,
@@ -22,7 +22,7 @@ CREATE TABLE `checkRequests` (
 	CONSTRAINT `checkRequests_id` PRIMARY KEY(`id`)
 );
 --> statement-breakpoint
-CREATE TABLE `vehicleChecks` (
+CREATE TABLE IF NOT EXISTS `vehicleChecks` (
 	`id` int AUTO_INCREMENT NOT NULL,
 	`vehicleId` int NOT NULL,
 	`checkItemId` int NOT NULL,
