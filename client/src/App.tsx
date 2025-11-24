@@ -8,6 +8,7 @@ import Vehicles from "./pages/Vehicles";
 import MyAttendance from "./pages/MyAttendance";
 import WorkRecords from "./pages/WorkRecords";
 import Analytics from "./pages/Analytics";
+import VehicleChecks from "./pages/VehicleChecks";
 import AttendanceManagement from "./pages/admin/AttendanceManagement";
 import WorkRecordManagement from "./pages/admin/WorkRecordManagement";
 import VehicleDetail from "./pages/VehicleDetail";
@@ -64,6 +65,9 @@ export default function App() {
                 </Route>
                 <Route path="/analytics">
                     {() => <ProtectedRoute component={Analytics} />}
+                </Route>
+                <Route path="/vehicle-checks">
+                    {() => <ProtectedRoute component={VehicleChecks} />}
                 </Route>
                 <Route path="/admin/attendance">
                     {() => <ProtectedRoute component={AttendanceManagement} />}
