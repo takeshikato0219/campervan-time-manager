@@ -141,7 +141,7 @@ function VehicleCheckCard({
     pendingRequests,
 }: {
     vehicle: any;
-    onCheck: (vehicleId: number, itemId: number) => void;
+    onCheck: (vehicleId: number, itemId: number, currentStatus?: string) => void;
     onRequestCheck: (vehicleId: number, checkItemId?: number) => void;
     onRecheckRequest: (vehicleId: number, checkItemId: number) => void;
     onCheckAll: (vehicleId: number, itemIds: number[]) => void;
@@ -156,7 +156,7 @@ function VehicleCheckCard({
 
     // 未チェック項目のIDリスト
     const uncheckedItemIds = checkData?.checkStatus
-        ?.filter((s: any) => !s.checked)
+        ?.filter((s: any) => s.status === "unchecked")
         .map((s: any) => s.checkItem.id) || [];
 
     return (
@@ -208,64 +208,106 @@ function VehicleCheckCard({
             <CardContent className="p-3 sm:p-4">
                 {checkData && checkData.checkStatus && checkData.checkStatus.length > 0 ? (
                     <div className="space-y-2">
-                        {checkData.checkStatus.map((status: any) => (
-                            <div
-                                key={status.checkItem.id}
-                                className={`p-2 sm:p-3 border rounded-lg ${status.checked ? "bg-green-50 border-green-200" : "bg-gray-50 border-gray-200"
-                                    }`}
-                            >
-                                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-                                    <div className="flex items-start gap-2 flex-1 min-w-0">
-                                        {status.checked ? (
-                                            <Check className="h-4 w-4 sm:h-5 sm:w-5 text-green-600 flex-shrink-0 mt-0.5" />
-                                        ) : (
-                                            <div className="h-4 w-4 sm:h-5 sm:w-5 border-2 border-gray-300 rounded flex-shrink-0 mt-0.5" />
-                                        )}
-                                        <div className="flex-1 min-w-0">
-                                            <p className="font-semibold text-sm sm:text-base">{status.checkItem.name}</p>
-                                            {status.checkItem.description && (
-                                                <p className="text-xs sm:text-sm text-[hsl(var(--muted-foreground))] mt-1">
-                                                    {status.checkItem.description}
-                                                </p>
-                                            )}
-                                            {status.checked && status.checkedBy && (
-                                                <p className="text-xs text-[hsl(var(--muted-foreground))] mt-1">
-                                                    チェック済み: {status.checkedBy.name || status.checkedBy.username} (
-                                                    {status.checkedAt
-                                                        ? format(new Date(status.checkedAt), "yyyy-MM-dd HH:mm")
-                                                        : ""}
-                                                    )
-                                                </p>
-                                            )}
-                                            {status.notes && (
-                                                <p className="text-xs text-[hsl(var(--muted-foreground))] mt-1">
-                                                    メモ: {status.notes}
-                                                </p>
+                        {checkData.checkStatus.map((status: any) => {
+                            const getStatusLabel = (statusValue: string) => {
+                                switch (statusValue) {
+                                    case "checked":
+                                        return "チェック済み";
+                                    case "needs_recheck":
+                                        return "要再チェック";
+                                    case "unchecked":
+                                    default:
+                                        return "未チェック";
+                                }
+                            };
+
+                            const getStatusColor = (statusValue: string) => {
+                                switch (statusValue) {
+                                    case "checked":
+                                        return "bg-green-50 border-green-200";
+                                    case "needs_recheck":
+                                        return "bg-orange-50 border-orange-200";
+                                    case "unchecked":
+                                    default:
+                                        return "bg-gray-50 border-gray-200";
+                                }
+                            };
+
+                            const getStatusIcon = (statusValue: string) => {
+                                switch (statusValue) {
+                                    case "checked":
+                                        return <Check className="h-4 w-4 sm:h-5 sm:w-5 text-green-600 flex-shrink-0 mt-0.5" />;
+                                    case "needs_recheck":
+                                        return <AlertCircle className="h-4 w-4 sm:h-5 sm:w-5 text-orange-600 flex-shrink-0 mt-0.5" />;
+                                    case "unchecked":
+                                    default:
+                                        return <div className="h-4 w-4 sm:h-5 sm:w-5 border-2 border-gray-300 rounded flex-shrink-0 mt-0.5" />;
+                                }
+                            };
+
+                            return (
+                                <div
+                                    key={status.checkItem.id}
+                                    className={`p-2 sm:p-3 border rounded-lg ${getStatusColor(status.status)}`}
+                                >
+                                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                                        <div className="flex items-start gap-2 flex-1 min-w-0">
+                                            {getStatusIcon(status.status)}
+                                            <div className="flex-1 min-w-0">
+                                                <div className="flex items-center gap-2 flex-wrap">
+                                                    <p className="font-semibold text-sm sm:text-base">{status.checkItem.name}</p>
+                                                    <span className={`text-xs px-2 py-0.5 rounded ${
+                                                        status.status === "checked" ? "bg-green-100 text-green-800" :
+                                                        status.status === "needs_recheck" ? "bg-orange-100 text-orange-800" :
+                                                        "bg-gray-100 text-gray-800"
+                                                    }`}>
+                                                        {getStatusLabel(status.status)}
+                                                    </span>
+                                                </div>
+                                                {status.checkItem.description && (
+                                                    <p className="text-xs sm:text-sm text-[hsl(var(--muted-foreground))] mt-1">
+                                                        {status.checkItem.description}
+                                                    </p>
+                                                )}
+                                                {status.status !== "unchecked" && status.checkedBy && (
+                                                    <p className="text-xs text-[hsl(var(--muted-foreground))] mt-1">
+                                                        {getStatusLabel(status.status)}: {status.checkedBy.name || status.checkedBy.username} (
+                                                        {status.checkedAt
+                                                            ? format(new Date(status.checkedAt), "yyyy-MM-dd HH:mm")
+                                                            : ""}
+                                                        )
+                                                    </p>
+                                                )}
+                                                {status.notes && (
+                                                    <p className="text-xs text-[hsl(var(--muted-foreground))] mt-1">
+                                                        メモ: {status.notes}
+                                                    </p>
+                                                )}
+                                            </div>
+                                        </div>
+                                        <div className="flex gap-2 flex-shrink-0">
+                                            <Button
+                                                size="sm"
+                                                onClick={() => onCheck(vehicle.id, status.checkItem.id, status.status)}
+                                                className="w-full sm:w-auto"
+                                            >
+                                                チェック
+                                            </Button>
+                                            {isAdmin && (
+                                                <Button
+                                                    size="sm"
+                                                    variant="outline"
+                                                    onClick={() => onRecheckRequest(vehicle.id, status.checkItem.id)}
+                                                    className="w-full sm:w-auto"
+                                                >
+                                                    再チェック依頼
+                                                </Button>
                                             )}
                                         </div>
                                     </div>
-                                    <div className="flex gap-2 flex-shrink-0">
-                                        <Button
-                                            size="sm"
-                                            onClick={() => onCheck(vehicle.id, status.checkItem.id)}
-                                            className="w-full sm:w-auto"
-                                        >
-                                            {status.checked ? "再チェック" : "チェック"}
-                                        </Button>
-                                        {isAdmin && status.checked && (
-                                            <Button
-                                                size="sm"
-                                                variant="outline"
-                                                onClick={() => onRecheckRequest(vehicle.id, status.checkItem.id)}
-                                                className="w-full sm:w-auto"
-                                            >
-                                                再チェック依頼
-                                            </Button>
-                                        )}
-                                    </div>
                                 </div>
-                            </div>
-                        ))}
+                            );
+                        })}
                     </div>
                 ) : (
                     <p className="text-center py-4 text-[hsl(var(--muted-foreground))] text-sm">
@@ -282,6 +324,7 @@ export default function VehicleChecks() {
     const [selectedCategory, setSelectedCategory] = useState<typeof CATEGORIES[number] | "all">("all");
     const [checkingVehicleId, setCheckingVehicleId] = useState<number | null>(null);
     const [checkingItemId, setCheckingItemId] = useState<number | null>(null);
+    const [checkStatus, setCheckStatus] = useState<"checked" | "needs_recheck" | "unchecked">("checked");
     const [checkNotes, setCheckNotes] = useState("");
     const [isRequestDialogOpen, setIsRequestDialogOpen] = useState(false);
     const [requestingVehicleId, setRequestingVehicleId] = useState<number | null>(null);
@@ -306,6 +349,7 @@ export default function VehicleChecks() {
             toast.success("チェックを完了しました");
             setCheckingVehicleId(null);
             setCheckingItemId(null);
+            setCheckStatus("checked");
             setCheckNotes("");
             // 全ての車両チェックデータを再取得
             utils.checks.getVehicleChecks.invalidate();
@@ -331,9 +375,17 @@ export default function VehicleChecks() {
         },
     });
 
-    const handleCheck = (vehicleId: number, itemId: number) => {
+    const handleCheck = (vehicleId: number, itemId: number, currentStatus?: string) => {
         setCheckingVehicleId(vehicleId);
         setCheckingItemId(itemId);
+        // 現在の状態に基づいてデフォルト値を設定
+        if (currentStatus === "needs_recheck") {
+            setCheckStatus("checked");
+        } else if (currentStatus === "checked") {
+            setCheckStatus("needs_recheck");
+        } else {
+            setCheckStatus("checked");
+        }
         setCheckNotes("");
     };
 
@@ -343,6 +395,7 @@ export default function VehicleChecks() {
         checkMutation.mutate({
             vehicleId: checkingVehicleId,
             checkItemId: checkingItemId,
+            status: checkStatus,
             notes: checkNotes || undefined,
         });
     };
@@ -495,6 +548,18 @@ export default function VehicleChecks() {
                         </CardHeader>
                         <CardContent className="p-3 sm:p-4 md:p-6 space-y-3 sm:space-y-4">
                             <div className="min-w-0">
+                                <label className="text-sm font-medium block mb-1">チェック状態 *</label>
+                                <select
+                                    className="flex h-10 w-full min-w-0 rounded-md border border-[hsl(var(--input))] bg-[hsl(var(--background))] px-2 sm:px-3 py-2 text-sm"
+                                    value={checkStatus}
+                                    onChange={(e) => setCheckStatus(e.target.value as "checked" | "needs_recheck" | "unchecked")}
+                                >
+                                    <option value="checked">チェック済み</option>
+                                    <option value="needs_recheck">要再チェック</option>
+                                    <option value="unchecked">未チェック</option>
+                                </select>
+                            </div>
+                            <div className="min-w-0">
                                 <label className="text-sm font-medium block mb-1">メモ（任意）</label>
                                 <Input
                                     value={checkNotes}
@@ -517,6 +582,7 @@ export default function VehicleChecks() {
                                     onClick={() => {
                                         setCheckingVehicleId(null);
                                         setCheckingItemId(null);
+                                        setCheckStatus("checked");
                                         setCheckNotes("");
                                     }}
                                 >

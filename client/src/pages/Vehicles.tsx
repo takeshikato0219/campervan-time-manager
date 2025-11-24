@@ -5,10 +5,609 @@ import { Button } from "../components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Input } from "../components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
-import { Plus, Search, Edit, Check, Archive } from "lucide-react";
+import { Plus, Search, Edit, Check, Archive, ChevronDown, ChevronUp, FileText, AlertCircle, UserPlus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-import { Link } from "wouter";
 import { format } from "date-fns";
+
+// 車両詳細コンテンツコンポーネント
+function VehicleDetailContent({ vehicleId, user }: { vehicleId: number; user: any }) {
+    const { data: vehicle } = trpc.vehicles.get.useQuery({ id: vehicleId });
+    const { data: attentionPoints, refetch: refetchAttentionPoints } = trpc.vehicles.getAttentionPoints.useQuery(
+        { vehicleId },
+        { enabled: !!vehicleId }
+    );
+    const { data: checkData, refetch: refetchChecks } = trpc.checks.getVehicleChecks.useQuery(
+        { vehicleId },
+        { enabled: !!vehicleId }
+    );
+    const { data: users } = trpc.users.list.useQuery(undefined, { enabled: user?.role === "admin" });
+    const { data: myCheckRequests } = trpc.checks.getMyCheckRequests.useQuery();
+
+    const addAttentionPointMutation = trpc.vehicles.addAttentionPoint.useMutation({
+        onSuccess: () => {
+            toast.success("注意ポイントを追加しました");
+            refetchAttentionPoints();
+        },
+        onError: (error) => {
+            toast.error(error.message || "注意ポイントの追加に失敗しました");
+        },
+    });
+
+    const deleteAttentionPointMutation = trpc.vehicles.deleteAttentionPoint.useMutation({
+        onSuccess: () => {
+            toast.success("注意ポイントを削除しました");
+            refetchAttentionPoints();
+        },
+        onError: (error) => {
+            toast.error(error.message || "注意ポイントの削除に失敗しました");
+        },
+    });
+
+    const checkMutation = trpc.checks.checkVehicle.useMutation({
+        onSuccess: () => {
+            toast.success("チェックを完了しました");
+            refetchChecks();
+        },
+        onError: (error) => {
+            toast.error(error.message || "チェックの実行に失敗しました");
+        },
+    });
+
+    const requestCheckMutation = trpc.checks.requestCheck.useMutation({
+        onSuccess: () => {
+            toast.success("チェック依頼を送信しました");
+            setIsRequestDialogOpen(false);
+            setRequestedToUserId("");
+            setRequestMessage("");
+            setRequestCheckItemId("");
+        },
+        onError: (error) => {
+            toast.error(error.message || "チェック依頼の送信に失敗しました");
+        },
+    });
+
+    const [isRequestDialogOpen, setIsRequestDialogOpen] = useState(false);
+    const [requestedToUserId, setRequestedToUserId] = useState("");
+    const [requestMessage, setRequestMessage] = useState("");
+    const [requestCheckItemId, setRequestCheckItemId] = useState("");
+    const [requestDueDate, setRequestDueDate] = useState("");
+    const [isAttentionPointDialogOpen, setIsAttentionPointDialogOpen] = useState(false);
+    const [attentionPointContent, setAttentionPointContent] = useState("");
+    const [checkingItemId, setCheckingItemId] = useState<number | null>(null);
+    const [checkNotes, setCheckNotes] = useState("");
+    const [checkStatus, setCheckStatus] = useState<"checked" | "needs_recheck" | "unchecked">("checked");
+
+    const formatDuration = (minutes: number | null) => {
+        if (!minutes) return "0分";
+        const hours = Math.floor(minutes / 60);
+        const mins = minutes % 60;
+        return hours > 0 ? `${hours}時間${mins}分` : `${mins}分`;
+    };
+
+    const getStatusLabel = (statusValue: string) => {
+        switch (statusValue) {
+            case "checked":
+                return "チェック済み";
+            case "needs_recheck":
+                return "要再チェック";
+            case "unchecked":
+            default:
+                return "未チェック";
+        }
+    };
+
+    const getStatusColor = (statusValue: string) => {
+        switch (statusValue) {
+            case "checked":
+                return "bg-green-50 border-green-200";
+            case "needs_recheck":
+                return "bg-orange-50 border-orange-200";
+            case "unchecked":
+            default:
+                return "bg-gray-50 border-gray-200";
+        }
+    };
+
+    const getStatusIcon = (statusValue: string) => {
+        switch (statusValue) {
+            case "checked":
+                return <Check className="h-4 w-4 text-green-600 flex-shrink-0" />;
+            case "needs_recheck":
+                return <AlertCircle className="h-4 w-4 text-orange-600 flex-shrink-0" />;
+            case "unchecked":
+            default:
+                return <div className="h-4 w-4 border-2 border-gray-300 rounded flex-shrink-0" />;
+        }
+    };
+
+    if (!vehicle) {
+        return (
+            <CardContent className="p-4">
+                <p className="text-center text-sm text-[hsl(var(--muted-foreground))]">読み込み中...</p>
+            </CardContent>
+        );
+    }
+
+    const pendingRequestsForThisVehicle = myCheckRequests?.filter(
+        (req) => req.vehicleId === vehicleId && req.status === "pending"
+    ) || [];
+
+    return (
+        <CardContent className="p-4 space-y-4 border-t">
+            {/* 指示書と注意ポイント */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* 指示書 */}
+                <Card>
+                    <CardHeader className="p-3">
+                        <CardTitle className="text-sm">指示書</CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-3">
+                        {vehicle.instructionSheetUrl ? (
+                            <a
+                                href={vehicle.instructionSheetUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex items-center gap-2 text-blue-600 hover:text-blue-800 underline text-sm"
+                            >
+                                <FileText className="h-4 w-4" />
+                                指示書を表示
+                            </a>
+                        ) : (
+                            <p className="text-xs text-[hsl(var(--muted-foreground))]">指示書がアップロードされていません</p>
+                        )}
+                    </CardContent>
+                </Card>
+
+                {/* 注意ポイント */}
+                <Card>
+                    <CardHeader className="p-3">
+                        <div className="flex items-center justify-between">
+                            <CardTitle className="text-sm">注意ポイント</CardTitle>
+                            <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => {
+                                    setAttentionPointContent("");
+                                    setIsAttentionPointDialogOpen(true);
+                                }}
+                                className="h-6 px-2 text-xs"
+                            >
+                                <Plus className="h-3 w-3 mr-1" />
+                                追加
+                            </Button>
+                        </div>
+                    </CardHeader>
+                    <CardContent className="p-3">
+                        {attentionPoints && attentionPoints.length > 0 ? (
+                            <div className="space-y-2">
+                                {attentionPoints.map((ap) => (
+                                    <div
+                                        key={ap.id}
+                                        className="p-2 border border-[hsl(var(--border))] rounded-lg bg-yellow-50"
+                                    >
+                                        <p className="text-xs">{ap.content}</p>
+                                        <div className="flex items-center justify-between mt-1">
+                                            <p className="text-xs text-[hsl(var(--muted-foreground))]">
+                                                {format(new Date(ap.createdAt), "yyyy-MM-dd HH:mm")} - {ap.userName}
+                                            </p>
+                                            {user?.role === "admin" && (
+                                                <Button
+                                                    size="sm"
+                                                    variant="ghost"
+                                                    onClick={() => {
+                                                        if (confirm("この注意ポイントを削除しますか？")) {
+                                                            deleteAttentionPointMutation.mutate({ id: ap.id });
+                                                        }
+                                                    }}
+                                                    className="h-5 px-1 text-red-600 hover:text-red-800"
+                                                >
+                                                    <Trash2 className="h-3 w-3" />
+                                                </Button>
+                                            )}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : (
+                            <p className="text-xs text-[hsl(var(--muted-foreground))]">注意ポイントがありません</p>
+                        )}
+                    </CardContent>
+                </Card>
+            </div>
+
+            {/* 作業履歴 */}
+            <Card>
+                <CardHeader className="p-3">
+                    <CardTitle className="text-sm">作業履歴</CardTitle>
+                </CardHeader>
+                <CardContent className="p-3">
+                    {vehicle.workRecords && vehicle.workRecords.length > 0 ? (
+                        <div className="space-y-2">
+                            {vehicle.workRecords.map((record: any) => (
+                                <div
+                                    key={record.id}
+                                    className="flex items-center justify-between p-2 border border-[hsl(var(--border))] rounded-lg text-xs"
+                                >
+                                    <div>
+                                        <p className="font-semibold">{record.processName}</p>
+                                        <p className="text-[hsl(var(--muted-foreground))]">
+                                            {record.userName} - {format(new Date(record.startTime), "yyyy-MM-dd HH:mm")}
+                                            {record.endTime
+                                                ? ` - ${format(new Date(record.endTime), "HH:mm")}`
+                                                : " (作業中)"}
+                                        </p>
+                                    </div>
+                                    <div className="text-right">
+                                        <p className="font-semibold">{formatDuration(record.durationMinutes)}</p>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    ) : (
+                        <p className="text-center py-2 text-xs text-[hsl(var(--muted-foreground))]">
+                            作業記録がありません
+                        </p>
+                    )}
+                </CardContent>
+            </Card>
+
+            {/* チェック項目 */}
+            {checkData && (
+                <Card>
+                    <CardHeader className="p-3">
+                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                            <CardTitle className="text-sm">チェック項目</CardTitle>
+                            {pendingRequestsForThisVehicle.length > 0 && (
+                                <div className="flex items-center gap-2 text-orange-600 text-xs">
+                                    <AlertCircle className="h-3 w-3" />
+                                    <span>チェック依頼が{pendingRequestsForThisVehicle.length}件あります</span>
+                                </div>
+                            )}
+                            {user?.role === "admin" && (
+                                <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => setIsRequestDialogOpen(true)}
+                                    className="h-6 px-2 text-xs"
+                                >
+                                    <UserPlus className="h-3 w-3 mr-1" />
+                                    チェック依頼
+                                </Button>
+                            )}
+                        </div>
+                    </CardHeader>
+                    <CardContent className="p-3">
+                        {checkData.checkStatus && checkData.checkStatus.length > 0 ? (
+                            <div className="space-y-2">
+                                {checkData.checkStatus.map((status: any) => (
+                                    <div
+                                        key={status.checkItem.id}
+                                        className={`p-2 border rounded-lg ${getStatusColor(status.status)}`}
+                                    >
+                                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                                            <div className="flex items-start gap-2 flex-1 min-w-0">
+                                                {getStatusIcon(status.status)}
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="flex items-center gap-2 flex-wrap">
+                                                        <p className="font-semibold text-xs">{status.checkItem.name}</p>
+                                                        <span className={`text-xs px-1.5 py-0.5 rounded ${status.status === "checked" ? "bg-green-100 text-green-800" :
+                                                            status.status === "needs_recheck" ? "bg-orange-100 text-orange-800" :
+                                                                "bg-gray-100 text-gray-800"
+                                                            }`}>
+                                                            {getStatusLabel(status.status)}
+                                                        </span>
+                                                    </div>
+                                                    {status.checkItem.description && (
+                                                        <p className="text-xs text-[hsl(var(--muted-foreground))] mt-1">
+                                                            {status.checkItem.description}
+                                                        </p>
+                                                    )}
+                                                    {status.status !== "unchecked" && status.checkedBy && (
+                                                        <p className="text-xs text-[hsl(var(--muted-foreground))] mt-1">
+                                                            {getStatusLabel(status.status)}: {status.checkedBy.name || status.checkedBy.username} (
+                                                            {status.checkedAt
+                                                                ? format(new Date(status.checkedAt), "yyyy-MM-dd HH:mm")
+                                                                : ""}
+                                                            )
+                                                        </p>
+                                                    )}
+                                                    {status.notes && (
+                                                        <p className="text-xs text-[hsl(var(--muted-foreground))] mt-1">
+                                                            メモ: {status.notes}
+                                                        </p>
+                                                    )}
+                                                </div>
+                                            </div>
+                                            <div className="flex gap-2 flex-shrink-0">
+                                                <Button
+                                                    size="sm"
+                                                    onClick={() => {
+                                                        setCheckingItemId(status.checkItem.id);
+                                                        setCheckStatus(status.status === "needs_recheck" ? "checked" : status.status === "checked" ? "needs_recheck" : "checked");
+                                                        setCheckNotes("");
+                                                    }}
+                                                    className="h-6 px-2 text-xs"
+                                                >
+                                                    チェック
+                                                </Button>
+                                                {user?.role === "admin" && (
+                                                    <Button
+                                                        size="sm"
+                                                        variant="outline"
+                                                        onClick={() => {
+                                                            setRequestingVehicleId(vehicleId);
+                                                            setRequestCheckItemId(status.checkItem.id.toString());
+                                                            setIsRequestDialogOpen(true);
+                                                        }}
+                                                        className="h-6 px-2 text-xs"
+                                                    >
+                                                        依頼
+                                                    </Button>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : (
+                            <p className="text-center py-2 text-xs text-[hsl(var(--muted-foreground))]">
+                                チェック項目が設定されていません
+                            </p>
+                        )}
+                    </CardContent>
+                </Card>
+            )}
+
+            {/* メモ */}
+            <Card>
+                <CardHeader className="p-3">
+                    <CardTitle className="text-sm">メモ</CardTitle>
+                </CardHeader>
+                <CardContent className="p-3">
+                    {vehicle.memos && vehicle.memos.length > 0 ? (
+                        <div className="space-y-2">
+                            {vehicle.memos.map((memo: any) => (
+                                <div
+                                    key={memo.id}
+                                    className="border-b border-[hsl(var(--border))] pb-2"
+                                >
+                                    <p className="text-xs">{memo.content}</p>
+                                    <p className="text-xs text-[hsl(var(--muted-foreground))] mt-1">
+                                        {format(new Date(memo.createdAt), "yyyy-MM-dd HH:mm")} - {memo.userName}
+                                    </p>
+                                </div>
+                            ))}
+                        </div>
+                    ) : (
+                        <p className="text-center py-2 text-xs text-[hsl(var(--muted-foreground))]">
+                            メモがありません
+                        </p>
+                    )}
+                </CardContent>
+            </Card>
+
+            {/* チェック実行ダイアログ */}
+            {checkingItemId && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-2 sm:p-4 overflow-y-auto">
+                    <Card className="w-full max-w-md min-w-0 my-auto">
+                        <CardHeader className="p-3 sm:p-4">
+                            <CardTitle className="text-sm">チェックを実行</CardTitle>
+                        </CardHeader>
+                        <CardContent className="p-3 sm:p-4 space-y-3">
+                            <div className="min-w-0">
+                                <label className="text-xs font-medium block mb-1">チェック状態 *</label>
+                                <select
+                                    className="flex h-9 w-full min-w-0 rounded-md border border-[hsl(var(--input))] bg-[hsl(var(--background))] px-2 py-1 text-xs"
+                                    value={checkStatus}
+                                    onChange={(e) => setCheckStatus(e.target.value as "checked" | "needs_recheck" | "unchecked")}
+                                >
+                                    <option value="checked">チェック済み</option>
+                                    <option value="needs_recheck">要再チェック</option>
+                                    <option value="unchecked">未チェック</option>
+                                </select>
+                            </div>
+                            <div className="min-w-0">
+                                <label className="text-xs font-medium block mb-1">メモ（任意）</label>
+                                <Input
+                                    value={checkNotes}
+                                    onChange={(e) => setCheckNotes(e.target.value)}
+                                    placeholder="メモを入力"
+                                    className="w-full min-w-0 h-9 text-xs"
+                                />
+                            </div>
+                            <div className="flex gap-2 pt-2">
+                                <Button
+                                    size="sm"
+                                    className="flex-1 h-8 text-xs"
+                                    onClick={() => {
+                                        checkMutation.mutate({
+                                            vehicleId,
+                                            checkItemId: checkingItemId,
+                                            status: checkStatus,
+                                            notes: checkNotes || undefined,
+                                        });
+                                        setCheckingItemId(null);
+                                        setCheckNotes("");
+                                    }}
+                                    disabled={checkMutation.isPending}
+                                >
+                                    チェック完了
+                                </Button>
+                                <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="flex-1 h-8 text-xs"
+                                    onClick={() => {
+                                        setCheckingItemId(null);
+                                        setCheckNotes("");
+                                    }}
+                                >
+                                    キャンセル
+                                </Button>
+                            </div>
+                        </CardContent>
+                    </Card>
+                </div>
+            )}
+
+            {/* チェック依頼ダイアログ */}
+            {isRequestDialogOpen && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-2 sm:p-4 overflow-y-auto">
+                    <Card className="w-full max-w-md min-w-0 my-auto">
+                        <CardHeader className="p-3 sm:p-4">
+                            <CardTitle className="text-sm">チェック依頼</CardTitle>
+                        </CardHeader>
+                        <CardContent className="p-3 sm:p-4 space-y-3">
+                            <div className="min-w-0">
+                                <label className="text-xs font-medium block mb-1">チェック項目 *</label>
+                                <select
+                                    className="flex h-9 w-full min-w-0 rounded-md border border-[hsl(var(--input))] bg-[hsl(var(--background))] px-2 py-1 text-xs"
+                                    value={requestCheckItemId}
+                                    onChange={(e) => setRequestCheckItemId(e.target.value)}
+                                >
+                                    <option value="">選択してください</option>
+                                    {checkData?.checkStatus?.map((status: any) => (
+                                        <option key={status.checkItem.id} value={status.checkItem.id}>
+                                            {status.checkItem.name}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div className="min-w-0">
+                                <label className="text-xs font-medium block mb-1">依頼先ユーザー *</label>
+                                <select
+                                    className="flex h-9 w-full min-w-0 rounded-md border border-[hsl(var(--input))] bg-[hsl(var(--background))] px-2 py-1 text-xs"
+                                    value={requestedToUserId}
+                                    onChange={(e) => setRequestedToUserId(e.target.value)}
+                                >
+                                    <option value="">選択してください</option>
+                                    {users?.map((u) => (
+                                        <option key={u.id} value={u.id}>
+                                            {u.name || u.username}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div className="min-w-0">
+                                <label className="text-xs font-medium block mb-1">期限日（任意）</label>
+                                <Input
+                                    type="date"
+                                    value={requestDueDate}
+                                    onChange={(e) => setRequestDueDate(e.target.value)}
+                                    className="w-full min-w-0 h-9 text-xs"
+                                />
+                            </div>
+                            <div className="min-w-0">
+                                <label className="text-xs font-medium block mb-1">メッセージ（任意）</label>
+                                <Input
+                                    value={requestMessage}
+                                    onChange={(e) => setRequestMessage(e.target.value)}
+                                    placeholder="依頼メッセージを入力"
+                                    className="w-full min-w-0 h-9 text-xs"
+                                />
+                            </div>
+                            <div className="flex gap-2 pt-2">
+                                <Button
+                                    size="sm"
+                                    className="flex-1 h-8 text-xs"
+                                    onClick={() => {
+                                        if (!requestedToUserId) {
+                                            toast.error("依頼先ユーザーを選択してください");
+                                            return;
+                                        }
+                                        if (!requestCheckItemId) {
+                                            toast.error("チェック項目を選択してください");
+                                            return;
+                                        }
+                                        requestCheckMutation.mutate({
+                                            vehicleId,
+                                            checkItemId: parseInt(requestCheckItemId),
+                                            requestedTo: parseInt(requestedToUserId),
+                                            dueDate: requestDueDate ? new Date(requestDueDate) : undefined,
+                                            message: requestMessage || undefined,
+                                        });
+                                    }}
+                                    disabled={requestCheckMutation.isPending}
+                                >
+                                    依頼送信
+                                </Button>
+                                <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="flex-1 h-8 text-xs"
+                                    onClick={() => {
+                                        setIsRequestDialogOpen(false);
+                                        setRequestedToUserId("");
+                                        setRequestMessage("");
+                                        setRequestCheckItemId("");
+                                        setRequestDueDate("");
+                                    }}
+                                >
+                                    キャンセル
+                                </Button>
+                            </div>
+                        </CardContent>
+                    </Card>
+                </div>
+            )}
+
+            {/* 注意ポイント追加ダイアログ */}
+            {isAttentionPointDialogOpen && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-2 sm:p-4 overflow-y-auto">
+                    <Card className="w-full max-w-md min-w-0 my-auto">
+                        <CardHeader className="p-3 sm:p-4">
+                            <CardTitle className="text-sm">注意ポイントを追加</CardTitle>
+                        </CardHeader>
+                        <CardContent className="p-3 sm:p-4 space-y-3">
+                            <div className="min-w-0">
+                                <label className="text-xs font-medium block mb-1">注意ポイント *</label>
+                                <textarea
+                                    value={attentionPointContent}
+                                    onChange={(e) => setAttentionPointContent(e.target.value)}
+                                    placeholder="注意ポイントを入力してください"
+                                    className="flex min-h-[100px] w-full rounded-md border border-[hsl(var(--input))] bg-[hsl(var(--background))] px-2 py-1 text-xs"
+                                    required
+                                />
+                            </div>
+                            <div className="flex gap-2 pt-2">
+                                <Button
+                                    size="sm"
+                                    className="flex-1 h-8 text-xs"
+                                    onClick={() => {
+                                        if (!attentionPointContent.trim()) {
+                                            toast.error("注意ポイントを入力してください");
+                                            return;
+                                        }
+                                        addAttentionPointMutation.mutate({
+                                            vehicleId,
+                                            content: attentionPointContent,
+                                        });
+                                        setIsAttentionPointDialogOpen(false);
+                                        setAttentionPointContent("");
+                                    }}
+                                    disabled={addAttentionPointMutation.isPending}
+                                >
+                                    {addAttentionPointMutation.isPending ? "追加中..." : "追加"}
+                                </Button>
+                                <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="flex-1 h-8 text-xs"
+                                    onClick={() => {
+                                        setIsAttentionPointDialogOpen(false);
+                                        setAttentionPointContent("");
+                                    }}
+                                >
+                                    キャンセル
+                                </Button>
+                            </div>
+                        </CardContent>
+                    </Card>
+                </div>
+            )}
+        </CardContent>
+    );
+}
 
 export default function Vehicles() {
     const { user } = useAuth();
@@ -36,11 +635,25 @@ export default function Vehicles() {
     const [outsourcingDestination, setOutsourcingDestination] = useState("");
     const [outsourcingStartDate, setOutsourcingStartDate] = useState("");
     const [outsourcingEndDate, setOutsourcingEndDate] = useState("");
+    const [expandedVehicles, setExpandedVehicles] = useState<Set<number>>(new Set());
+    const [checkingItemId, setCheckingItemId] = useState<{ vehicleId: number; itemId: number } | null>(null);
+    const [checkNotes, setCheckNotes] = useState("");
+    const [checkStatus, setCheckStatus] = useState<"checked" | "needs_recheck" | "unchecked">("checked");
+    const [isRequestDialogOpen, setIsRequestDialogOpen] = useState(false);
+    const [requestingVehicleId, setRequestingVehicleId] = useState<number | null>(null);
+    const [requestCheckItemId, setRequestCheckItemId] = useState("");
+    const [requestedToUserId, setRequestedToUserId] = useState("");
+    const [requestMessage, setRequestMessage] = useState("");
+    const [requestDueDate, setRequestDueDate] = useState("");
+    const [isAttentionPointDialogOpen, setIsAttentionPointDialogOpen] = useState(false);
+    const [attentionPointVehicleId, setAttentionPointVehicleId] = useState<number | null>(null);
+    const [attentionPointContent, setAttentionPointContent] = useState("");
 
     const { data: vehicles, refetch } = trpc.vehicles.list.useQuery({
         status: activeTab,
     });
     const { data: vehicleTypes } = trpc.vehicleTypes.list.useQuery();
+    const { data: users } = trpc.users.list.useQuery(undefined, { enabled: user?.role === "admin" });
 
     const registerMutation = trpc.vehicles.create.useMutation({
         onSuccess: () => {
@@ -424,11 +1037,32 @@ export default function Vehicles() {
                                         </div>
                                         <div className="flex flex-col gap-2 pt-2">
                                             <div className="flex gap-1 sm:gap-2">
-                                                <Link href={`/vehicles/${vehicle.id}`}>
-                                                    <Button size="sm" variant="outline" className="flex-1 text-xs sm:text-sm">
-                                                        詳細
-                                                    </Button>
-                                                </Link>
+                                                <Button
+                                                    size="sm"
+                                                    variant="outline"
+                                                    className="flex-1 text-xs sm:text-sm"
+                                                    onClick={() => {
+                                                        const newExpanded = new Set(expandedVehicles);
+                                                        if (newExpanded.has(vehicle.id)) {
+                                                            newExpanded.delete(vehicle.id);
+                                                        } else {
+                                                            newExpanded.add(vehicle.id);
+                                                        }
+                                                        setExpandedVehicles(newExpanded);
+                                                    }}
+                                                >
+                                                    {expandedVehicles.has(vehicle.id) ? (
+                                                        <>
+                                                            <ChevronUp className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
+                                                            詳細を閉じる
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <ChevronDown className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
+                                                            詳細を表示
+                                                        </>
+                                                    )}
+                                                </Button>
                                                 {user?.role === "admin" && (
                                                     <>
                                                         <Button
@@ -535,6 +1169,9 @@ export default function Vehicles() {
                                             )}
                                         </div>
                                     </CardContent>
+                                    {expandedVehicles.has(vehicle.id) && (
+                                        <VehicleDetailContent vehicleId={vehicle.id} user={user} />
+                                    )}
                                 </Card>
                             ))}
                         </div>
