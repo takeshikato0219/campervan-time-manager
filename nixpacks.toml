@@ -3,12 +3,19 @@ nixPkgs = ["nodejs_20", "pnpm-9_x"]
 
 [phases.install]
 cmds = [
-    "npm install -g corepack@0.24.1 && corepack enable",
-    "pnpm install --no-frozen-lockfile"
+  "npm install -g corepack@0.24.1 && corepack enable",
+  "pnpm install --no-frozen-lockfile"
 ]
 
 [phases.build]
-cmds = ["pnpm run build"]
+cmds = [
+  "pnpm install --no-frozen-lockfile && pnpm run build"
+]
+
+[phases.deploy]
+cmds = [
+  "pnpm run db:push"
+]
 
 [start]
 cmd = "pnpm start"
