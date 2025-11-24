@@ -40,12 +40,6 @@ function VehicleDetailContent({ vehicleId, user }: { vehicleId: number; user: an
     const [isAttentionPointDialogOpen, setIsAttentionPointDialogOpen] = useState(false);
     const [attentionPointContent, setAttentionPointContent] = useState("");
 
-    const formatDuration = (minutes: number | null) => {
-        if (!minutes) return "0分";
-        const hours = Math.floor(minutes / 60);
-        const mins = minutes % 60;
-        return hours > 0 ? `${hours}時間${mins}分` : `${mins}分`;
-    };
 
     if (!vehicle) {
         return (
@@ -58,9 +52,9 @@ function VehicleDetailContent({ vehicleId, user }: { vehicleId: number; user: an
     return (
         <CardContent className="p-4 sm:p-6 space-y-4 border-t bg-gray-50/50">
             {/* 指示書と注意ポイント */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
+            <div className="flex flex-row gap-3 sm:gap-4 overflow-x-auto">
                 {/* 指示書 */}
-                <Card>
+                <Card className="flex-shrink-0 min-w-[200px]">
                     <CardHeader className="p-3">
                         <CardTitle className="text-sm">指示書</CardTitle>
                     </CardHeader>
@@ -82,7 +76,7 @@ function VehicleDetailContent({ vehicleId, user }: { vehicleId: number; user: an
                 </Card>
 
                 {/* 注意ポイント */}
-                <Card>
+                <Card className="flex-shrink-0 min-w-[200px]">
                     <CardHeader className="p-3">
                         <div className="flex items-center justify-between">
                             <CardTitle className="text-sm">注意ポイント</CardTitle>
@@ -138,73 +132,6 @@ function VehicleDetailContent({ vehicleId, user }: { vehicleId: number; user: an
                 </Card>
             </div>
 
-            {/* 作業履歴 */}
-            <Card className="border-2">
-                <CardHeader className="p-3 sm:p-4 bg-white border-b">
-                    <CardTitle className="text-sm font-semibold">作業履歴</CardTitle>
-                </CardHeader>
-                <CardContent className="p-3 sm:p-4">
-                    {vehicle.workRecords && vehicle.workRecords.length > 0 ? (
-                        <div className="space-y-3">
-                            {/* 未完了の作業（上に表示） */}
-                            {vehicle.workRecords.filter((record: any) => !record.endTime).length > 0 && (
-                                <div className="space-y-2">
-                                    <h4 className="text-xs font-semibold text-orange-600 mb-2">作業中</h4>
-                                    {vehicle.workRecords
-                                        .filter((record: any) => !record.endTime)
-                                        .map((record: any) => (
-                                            <div
-                                                key={record.id}
-                                                className="flex items-center justify-between p-2.5 border-2 border-orange-200 rounded-lg bg-orange-50 text-xs"
-                                            >
-                                                <div>
-                                                    <p className="font-semibold text-orange-900">{record.processName}</p>
-                                                    <p className="text-orange-700 mt-0.5">
-                                                        {record.userName} - {format(new Date(record.startTime), "yyyy-MM-dd HH:mm")} (作業中)
-                                                    </p>
-                                                </div>
-                                                <div className="text-right">
-                                                    <p className="font-semibold text-orange-900">{formatDuration(record.durationMinutes)}</p>
-                                                </div>
-                                            </div>
-                                        ))}
-                                </div>
-                            )}
-                            {/* 完了した作業（下に表示） */}
-                            {vehicle.workRecords.filter((record: any) => record.endTime).length > 0 && (
-                                <div className="space-y-2">
-                                    {vehicle.workRecords.filter((record: any) => !record.endTime).length > 0 && (
-                                        <h4 className="text-xs font-semibold text-gray-600 mb-2 mt-4">完了済み</h4>
-                                    )}
-                                    {vehicle.workRecords
-                                        .filter((record: any) => record.endTime)
-                                        .map((record: any) => (
-                                            <div
-                                                key={record.id}
-                                                className="flex items-center justify-between p-2.5 border border-[hsl(var(--border))] rounded-lg bg-gray-50 text-xs"
-                                            >
-                                                <div>
-                                                    <p className="font-semibold">{record.processName}</p>
-                                                    <p className="text-[hsl(var(--muted-foreground))] mt-0.5">
-                                                        {record.userName} - {format(new Date(record.startTime), "yyyy-MM-dd HH:mm")}
-                                                        {` - ${format(new Date(record.endTime), "HH:mm")}`}
-                                                    </p>
-                                                </div>
-                                                <div className="text-right">
-                                                    <p className="font-semibold">{formatDuration(record.durationMinutes)}</p>
-                                                </div>
-                                            </div>
-                                        ))}
-                                </div>
-                            )}
-                        </div>
-                    ) : (
-                        <p className="text-center py-2 text-xs text-[hsl(var(--muted-foreground))]">
-                            作業記録がありません
-                        </p>
-                    )}
-                </CardContent>
-            </Card>
 
 
             {/* メモ */}
@@ -214,14 +141,14 @@ function VehicleDetailContent({ vehicleId, user }: { vehicleId: number; user: an
                 </CardHeader>
                 <CardContent className="p-3 sm:p-4">
                     {vehicle.memos && vehicle.memos.length > 0 ? (
-                        <div className="space-y-2">
+                        <div className="flex flex-row gap-2 overflow-x-auto">
                             {vehicle.memos.map((memo: any) => (
                                 <div
                                     key={memo.id}
-                                    className="border-b border-[hsl(var(--border))] pb-2"
+                                    className="flex-shrink-0 min-w-[200px] p-3 border border-[hsl(var(--border))] rounded-lg bg-white"
                                 >
-                                    <p className="text-xs">{memo.content}</p>
-                                    <p className="text-xs text-[hsl(var(--muted-foreground))] mt-1">
+                                    <p className="text-xs mb-1">{memo.content}</p>
+                                    <p className="text-xs text-[hsl(var(--muted-foreground))]">
                                         {format(new Date(memo.createdAt), "yyyy-MM-dd HH:mm")} - {memo.userName}
                                     </p>
                                 </div>
@@ -642,9 +569,17 @@ export default function Vehicles() {
                                     <CardHeader className="p-4 sm:p-6 bg-gradient-to-r from-blue-50 to-indigo-50 border-b">
                                         <div className="flex items-start justify-between gap-3">
                                             <div className="flex-1 min-w-0">
-                                                <CardTitle className="text-lg sm:text-xl font-bold truncate mb-2">
-                                                    {vehicle.vehicleNumber}
-                                                </CardTitle>
+                                                <div className="mb-2">
+                                                    <CardTitle className="text-lg sm:text-xl font-bold truncate mb-1">
+                                                        {vehicle.vehicleNumber}
+                                                    </CardTitle>
+                                                    <p className="text-xs text-gray-500 font-mono">ID: {vehicle.id}</p>
+                                                </div>
+                                                {vehicle.customerName && (
+                                                    <p className="text-base sm:text-lg font-semibold text-gray-900 mb-2">
+                                                        {vehicle.customerName}
+                                                    </p>
+                                                )}
                                                 <div className="flex flex-wrap items-center gap-2">
                                                     <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium bg-white/80 text-gray-700 border border-gray-200">
                                                         {vehicleTypes?.find((vt) => vt.id === vehicle.vehicleTypeId)?.name || "不明"}
@@ -700,16 +635,6 @@ export default function Vehicles() {
                                     <CardContent className="p-4 sm:p-6 space-y-4">
                                         {/* 基本情報セクション */}
                                         <div className="space-y-3">
-                                            {vehicle.customerName && (
-                                                <div className="flex items-center gap-2">
-                                                    <span className="text-xs font-medium text-[hsl(var(--muted-foreground))] min-w-[80px]">
-                                                        お客様名:
-                                                    </span>
-                                                    <span className="text-sm font-semibold text-gray-900">
-                                                        {vehicle.customerName}
-                                                    </span>
-                                                </div>
-                                            )}
                                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                                 {vehicle.desiredDeliveryDate && (
                                                     <div className="flex items-center gap-2">
@@ -748,6 +673,27 @@ export default function Vehicles() {
                                                 )}
                                             </div>
                                         </div>
+
+                                        {/* 外注情報 */}
+                                        {(vehicle.outsourcingDestination || vehicle.outsourcingStartDate || vehicle.outsourcingEndDate) && (
+                                            <div className="pt-2 border-t">
+                                                <div className="flex items-center gap-2 mb-2">
+                                                    <span className="text-xs font-semibold text-gray-700">外注情報:</span>
+                                                </div>
+                                                <div className="flex flex-wrap gap-2">
+                                                    {vehicle.outsourcingDestination && (
+                                                        <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium bg-purple-100 text-purple-800 border border-purple-200">
+                                                            先: {vehicle.outsourcingDestination}
+                                                        </span>
+                                                    )}
+                                                    {vehicle.outsourcingStartDate && vehicle.outsourcingEndDate && (
+                                                        <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium bg-indigo-100 text-indigo-800 border border-indigo-200">
+                                                            {format(new Date(vehicle.outsourcingStartDate), "yyyy/MM/dd")} - {format(new Date(vehicle.outsourcingEndDate), "yyyy/MM/dd")}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        )}
 
                                         {/* オプション情報バッジ */}
                                         {(vehicle.hasCoating || vehicle.hasLine || vehicle.hasPreferredNumber || vehicle.hasTireReplacement) && (
