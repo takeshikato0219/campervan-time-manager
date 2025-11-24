@@ -259,10 +259,10 @@ export default function VehicleChecks() {
 
             {/* カテゴリタブ */}
             <Tabs value={selectedCategory} onValueChange={(v) => setSelectedCategory(v as any)}>
-                <TabsList className="grid w-full grid-cols-3 sm:grid-cols-6">
-                    <TabsTrigger value="all" className="text-xs sm:text-sm">全て</TabsTrigger>
+                <TabsList className="grid w-full grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-1 sm:gap-2">
+                    <TabsTrigger value="all" className="text-xs sm:text-sm px-2 sm:px-3">全て</TabsTrigger>
                     {CATEGORIES.map((cat) => (
-                        <TabsTrigger key={cat} value={cat} className="text-xs sm:text-sm">
+                        <TabsTrigger key={cat} value={cat} className="text-xs sm:text-sm px-2 sm:px-3">
                             {cat}
                         </TabsTrigger>
                     ))}

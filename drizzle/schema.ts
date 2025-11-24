@@ -60,6 +60,13 @@ export const vehicles = mysqlTable("vehicles", {
         .notNull(),
     customerName: varchar("customerName", { length: 255 }),
     desiredDeliveryDate: date("desiredDeliveryDate"),
+    checkDueDate: date("checkDueDate"), // チェック期限日
+    reserveDate: date("reserveDate"), // 予備権の日付
+    reserveRound: varchar("reserveRound", { length: 50 }), // 予備権のR（例: "1R", "2R"）
+    hasCoating: mysqlEnum("hasCoating", ["yes", "no"]), // コーティングありなし
+    hasLine: mysqlEnum("hasLine", ["yes", "no"]), // ラインありなし
+    hasPreferredNumber: mysqlEnum("hasPreferredNumber", ["yes", "no"]), // 希望ナンバーありなし
+    hasTireReplacement: mysqlEnum("hasTireReplacement", ["yes", "no"]), // タイヤ交換ありなし
     completionDate: date("completionDate"),
     status: mysqlEnum("status", ["in_progress", "completed", "archived"])
         .default("in_progress")
@@ -158,6 +165,8 @@ export const notifications = mysqlTable("notifications", {
 export const checkItems = mysqlTable("checkItems", {
     id: int("id").autoincrement().primaryKey(),
     category: mysqlEnum("category", ["一般", "キャンパー", "中古", "修理", "クレーム"]).notNull(),
+    majorCategory: varchar("majorCategory", { length: 255 }), // 大カテゴリ
+    minorCategory: varchar("minorCategory", { length: 255 }), // 小カテゴリ
     name: varchar("name", { length: 255 }).notNull(),
     description: text("description"),
     displayOrder: int("displayOrder").default(0),
@@ -172,6 +181,9 @@ export const vehicleChecks = mysqlTable("vehicleChecks", {
     checkItemId: int("checkItemId").notNull(),
     checkedBy: int("checkedBy").notNull(), // チェックしたユーザーID
     checkedAt: timestamp("checkedAt").defaultNow().notNull(),
+    status: mysqlEnum("status", ["checked", "needs_recheck", "unchecked"])
+        .default("checked")
+        .notNull(), // チェック状態
     notes: text("notes"), // チェック時のメモ
     createdAt: timestamp("createdAt").defaultNow().notNull(),
     updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
@@ -181,8 +193,10 @@ export const vehicleChecks = mysqlTable("vehicleChecks", {
 export const checkRequests = mysqlTable("checkRequests", {
     id: int("id").autoincrement().primaryKey(),
     vehicleId: int("vehicleId").notNull(),
+    checkItemId: int("checkItemId").notNull(), // 依頼するチェック項目ID
     requestedBy: int("requestedBy").notNull(), // 依頼したユーザーID
     requestedTo: int("requestedTo").notNull(), // 依頼されたユーザーID
+    dueDate: date("dueDate"), // 期限日
     status: mysqlEnum("status", ["pending", "completed", "cancelled"])
         .default("pending")
         .notNull(),
@@ -190,5 +204,25 @@ export const checkRequests = mysqlTable("checkRequests", {
     completedAt: timestamp("completedAt"), // 完了日時
     createdAt: timestamp("createdAt").defaultNow().notNull(),
     updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+// 17. salesBroadcasts: 営業からの拡散
+export const salesBroadcasts = mysqlTable("salesBroadcasts", {
+    id: int("id").autoincrement().primaryKey(),
+    vehicleId: int("vehicleId").notNull(),
+    createdBy: int("createdBy").notNull(), // 作成者（営業）のユーザーID
+    message: text("message").notNull(), // コメント
+    expiresAt: timestamp("expiresAt").notNull(), // 有効期限（7日後）
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+// 18. salesBroadcastReads: 営業からの拡散の既読記録
+export const salesBroadcastReads = mysqlTable("salesBroadcastReads", {
+    id: int("id").autoincrement().primaryKey(),
+    broadcastId: int("broadcastId").notNull(), // 拡散ID
+    userId: int("userId").notNull(), // 読んだユーザーID
+    readAt: timestamp("readAt").defaultNow().notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 

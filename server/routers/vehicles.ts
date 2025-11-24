@@ -36,6 +36,13 @@ export const vehiclesRouter = createTRPCRouter({
                 category: v.category,
                 customerName: v.customerName,
                 desiredDeliveryDate: v.desiredDeliveryDate,
+                checkDueDate: v.checkDueDate,
+                reserveDate: v.reserveDate,
+                reserveRound: v.reserveRound,
+                hasCoating: v.hasCoating,
+                hasLine: v.hasLine,
+                hasPreferredNumber: v.hasPreferredNumber,
+                hasTireReplacement: v.hasTireReplacement,
                 completionDate: v.completionDate,
                 status: v.status,
                 targetTotalMinutes: v.targetTotalMinutes,
@@ -53,6 +60,13 @@ export const vehiclesRouter = createTRPCRouter({
                 category: z.enum(["一般", "キャンパー", "中古", "修理", "クレーム"]).default("一般"),
                 customerName: z.string().optional(),
                 desiredDeliveryDate: z.date().optional(),
+                checkDueDate: z.date().optional(),
+                reserveDate: z.date().optional(),
+                reserveRound: z.string().optional(),
+                hasCoating: z.enum(["yes", "no"]).optional(),
+                hasLine: z.enum(["yes", "no"]).optional(),
+                hasPreferredNumber: z.enum(["yes", "no"]).optional(),
+                hasTireReplacement: z.enum(["yes", "no"]).optional(),
                 targetTotalMinutes: z.number().optional(),
             })
         )
@@ -71,6 +85,13 @@ export const vehiclesRouter = createTRPCRouter({
                 category: input.category,
                 customerName: input.customerName,
                 desiredDeliveryDate: input.desiredDeliveryDate,
+                checkDueDate: input.checkDueDate,
+                reserveDate: input.reserveDate,
+                reserveRound: input.reserveRound,
+                hasCoating: input.hasCoating,
+                hasLine: input.hasLine,
+                hasPreferredNumber: input.hasPreferredNumber,
+                hasTireReplacement: input.hasTireReplacement,
                 targetTotalMinutes: input.targetTotalMinutes,
             });
 
@@ -96,6 +117,13 @@ export const vehiclesRouter = createTRPCRouter({
                 category: z.enum(["一般", "キャンパー", "中古", "修理", "クレーム"]).optional(),
                 customerName: z.string().optional(),
                 desiredDeliveryDate: z.date().optional(),
+                checkDueDate: z.date().optional(),
+                reserveDate: z.date().optional(),
+                reserveRound: z.string().optional(),
+                hasCoating: z.enum(["yes", "no"]).optional(),
+                hasLine: z.enum(["yes", "no"]).optional(),
+                hasPreferredNumber: z.enum(["yes", "no"]).optional(),
+                hasTireReplacement: z.enum(["yes", "no"]).optional(),
                 targetTotalMinutes: z.number().optional(),
             })
         )
@@ -108,19 +136,55 @@ export const vehiclesRouter = createTRPCRouter({
                 });
             }
 
-            const updateData: any = {};
-            if (input.vehicleNumber !== undefined) updateData.vehicleNumber = input.vehicleNumber;
-            if (input.vehicleTypeId !== undefined) updateData.vehicleTypeId = input.vehicleTypeId;
-            if (input.category !== undefined) updateData.category = input.category;
-            if (input.customerName !== undefined) updateData.customerName = input.customerName;
-            if (input.desiredDeliveryDate !== undefined)
-                updateData.desiredDeliveryDate = input.desiredDeliveryDate;
-            if (input.targetTotalMinutes !== undefined)
-                updateData.targetTotalMinutes = input.targetTotalMinutes;
+            try {
+                const updateData: any = {};
+                if (input.vehicleNumber !== undefined) updateData.vehicleNumber = input.vehicleNumber;
+                if (input.vehicleTypeId !== undefined) updateData.vehicleTypeId = input.vehicleTypeId;
+                if (input.category !== undefined) updateData.category = input.category;
+                if (input.customerName !== undefined) updateData.customerName = input.customerName;
+                if (input.desiredDeliveryDate !== undefined) {
+                    // 日付が有効か確認
+                    if (input.desiredDeliveryDate instanceof Date && !isNaN(input.desiredDeliveryDate.getTime())) {
+                        updateData.desiredDeliveryDate = input.desiredDeliveryDate;
+                    }
+                }
+                if (input.checkDueDate !== undefined) {
+                    // 日付が有効か確認
+                    if (input.checkDueDate instanceof Date && !isNaN(input.checkDueDate.getTime())) {
+                        updateData.checkDueDate = input.checkDueDate;
+                    }
+                }
+                if (input.reserveDate !== undefined) {
+                    if (input.reserveDate instanceof Date && !isNaN(input.reserveDate.getTime())) {
+                        updateData.reserveDate = input.reserveDate;
+                    }
+                }
+                if (input.reserveRound !== undefined) updateData.reserveRound = input.reserveRound;
+                if (input.hasCoating !== undefined) updateData.hasCoating = input.hasCoating;
+                if (input.hasLine !== undefined) updateData.hasLine = input.hasLine;
+                if (input.hasPreferredNumber !== undefined) updateData.hasPreferredNumber = input.hasPreferredNumber;
+                if (input.hasTireReplacement !== undefined) updateData.hasTireReplacement = input.hasTireReplacement;
+                if (input.targetTotalMinutes !== undefined)
+                    updateData.targetTotalMinutes = input.targetTotalMinutes;
 
-            await db.update(schema.vehicles).set(updateData).where(eq(schema.vehicles.id, input.id));
+                // 更新データが空の場合はエラー
+                if (Object.keys(updateData).length === 0) {
+                    throw new TRPCError({
+                        code: "BAD_REQUEST",
+                        message: "更新するデータがありません",
+                    });
+                }
 
-            return { success: true };
+                await db.update(schema.vehicles).set(updateData).where(eq(schema.vehicles.id, input.id));
+
+                return { success: true };
+            } catch (error: any) {
+                console.error("[vehicles.update] Error:", error);
+                throw new TRPCError({
+                    code: "INTERNAL_SERVER_ERROR",
+                    message: error.message || "車両の更新に失敗しました",
+                });
+            }
         }),
 
     // 車両詳細を取得

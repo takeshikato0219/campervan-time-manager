@@ -16,12 +16,22 @@ export default function Vehicles() {
     const [searchQuery, setSearchQuery] = useState("");
     const [isRegisterDialogOpen, setIsRegisterDialogOpen] = useState(false);
     const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+    const [isBroadcastDialogOpen, setIsBroadcastDialogOpen] = useState(false);
+    const [broadcastingVehicleId, setBroadcastingVehicleId] = useState<number | null>(null);
+    const [broadcastMessage, setBroadcastMessage] = useState("");
     const [editingVehicle, setEditingVehicle] = useState<any>(null);
     const [vehicleNumber, setVehicleNumber] = useState("");
     const [vehicleTypeId, setVehicleTypeId] = useState("");
     const [category, setCategory] = useState<"一般" | "キャンパー" | "中古" | "修理" | "クレーム">("一般");
     const [customerName, setCustomerName] = useState("");
     const [desiredDeliveryDate, setDesiredDeliveryDate] = useState("");
+    const [checkDueDate, setCheckDueDate] = useState("");
+    const [reserveDate, setReserveDate] = useState("");
+    const [reserveRound, setReserveRound] = useState("");
+    const [hasCoating, setHasCoating] = useState<"yes" | "no" | "">("");
+    const [hasLine, setHasLine] = useState<"yes" | "no" | "">("");
+    const [hasPreferredNumber, setHasPreferredNumber] = useState<"yes" | "no" | "">("");
+    const [hasTireReplacement, setHasTireReplacement] = useState<"yes" | "no" | "">("");
 
     const { data: vehicles, refetch } = trpc.vehicles.list.useQuery({
         status: activeTab,
@@ -37,6 +47,7 @@ export default function Vehicles() {
             setCategory("一般");
             setCustomerName("");
             setDesiredDeliveryDate("");
+            setCheckDueDate("");
             refetch();
         },
         onError: (error) => {
@@ -53,6 +64,7 @@ export default function Vehicles() {
             setVehicleTypeId("");
             setCustomerName("");
             setDesiredDeliveryDate("");
+            setCheckDueDate("");
             refetch();
         },
         onError: (error: any) => {
@@ -100,6 +112,18 @@ export default function Vehicles() {
         },
     });
 
+    const createBroadcastMutation = trpc.salesBroadcasts.create.useMutation({
+        onSuccess: () => {
+            toast.success("営業からの拡散を送信しました");
+            setIsBroadcastDialogOpen(false);
+            setBroadcastingVehicleId(null);
+            setBroadcastMessage("");
+        },
+        onError: (error: any) => {
+            toast.error(error.message || "拡散の送信に失敗しました");
+        },
+    });
+
     const filteredVehicles = vehicles?.filter((vehicle) => {
         const query = searchQuery.toLowerCase();
         const vehicleTypeName =
@@ -123,6 +147,13 @@ export default function Vehicles() {
             category,
             customerName: customerName || undefined,
             desiredDeliveryDate: desiredDeliveryDate ? new Date(desiredDeliveryDate) : undefined,
+            checkDueDate: checkDueDate ? new Date(checkDueDate) : undefined,
+            reserveDate: reserveDate ? new Date(reserveDate) : undefined,
+            reserveRound: reserveRound || undefined,
+            hasCoating: hasCoating || undefined,
+            hasLine: hasLine || undefined,
+            hasPreferredNumber: hasPreferredNumber || undefined,
+            hasTireReplacement: hasTireReplacement || undefined,
         });
     };
 
@@ -137,6 +168,21 @@ export default function Vehicles() {
                 ? format(new Date(vehicle.desiredDeliveryDate), "yyyy-MM-dd")
                 : ""
         );
+        setCheckDueDate(
+            vehicle.checkDueDate
+                ? format(new Date(vehicle.checkDueDate), "yyyy-MM-dd")
+                : ""
+        );
+        setReserveDate(
+            vehicle.reserveDate
+                ? format(new Date(vehicle.reserveDate), "yyyy-MM-dd")
+                : ""
+        );
+        setReserveRound(vehicle.reserveRound || "");
+        setHasCoating(vehicle.hasCoating || "");
+        setHasLine(vehicle.hasLine || "");
+        setHasPreferredNumber(vehicle.hasPreferredNumber || "");
+        setHasTireReplacement(vehicle.hasTireReplacement || "");
         setIsEditDialogOpen(true);
     };
 
@@ -146,14 +192,59 @@ export default function Vehicles() {
             return;
         }
 
-        updateMutation.mutate({
+        const updateData: any = {
             id: editingVehicle.id,
             vehicleNumber,
             vehicleTypeId: parseInt(vehicleTypeId),
             category,
-            customerName: customerName || undefined,
-            desiredDeliveryDate: desiredDeliveryDate ? new Date(desiredDeliveryDate) : undefined,
-        });
+        };
+
+        if (customerName) {
+            updateData.customerName = customerName;
+        }
+
+        if (desiredDeliveryDate) {
+            const date = new Date(desiredDeliveryDate);
+            if (!isNaN(date.getTime())) {
+                updateData.desiredDeliveryDate = date;
+            }
+        }
+
+        if (checkDueDate) {
+            const date = new Date(checkDueDate);
+            if (!isNaN(date.getTime())) {
+                updateData.checkDueDate = date;
+            }
+        }
+
+        if (reserveDate) {
+            const date = new Date(reserveDate);
+            if (!isNaN(date.getTime())) {
+                updateData.reserveDate = date;
+            }
+        }
+
+        if (reserveRound) {
+            updateData.reserveRound = reserveRound;
+        }
+
+        if (hasCoating) {
+            updateData.hasCoating = hasCoating as "yes" | "no";
+        }
+
+        if (hasLine) {
+            updateData.hasLine = hasLine as "yes" | "no";
+        }
+
+        if (hasPreferredNumber) {
+            updateData.hasPreferredNumber = hasPreferredNumber as "yes" | "no";
+        }
+
+        if (hasTireReplacement) {
+            updateData.hasTireReplacement = hasTireReplacement as "yes" | "no";
+        }
+
+        updateMutation.mutate(updateData);
     };
 
     return (
@@ -222,6 +313,41 @@ export default function Vehicles() {
                                                 {format(new Date(vehicle.desiredDeliveryDate), "yyyy年MM月dd日")}
                                             </p>
                                         )}
+                                        {vehicle.checkDueDate && (
+                                            <p className="text-sm">
+                                                <span className="text-[hsl(var(--muted-foreground))]">チェック期限:</span>{" "}
+                                                {format(new Date(vehicle.checkDueDate), "yyyy年MM月dd日")}
+                                            </p>
+                                        )}
+                                        {vehicle.reserveDate && (
+                                            <p className="text-sm">
+                                                <span className="text-[hsl(var(--muted-foreground))]">予備権:</span>{" "}
+                                                {format(new Date(vehicle.reserveDate), "yyyy年MM月dd日")}
+                                                {vehicle.reserveRound && ` ${vehicle.reserveRound}`}
+                                            </p>
+                                        )}
+                                        <div className="flex flex-wrap gap-1 text-xs">
+                                            {vehicle.hasCoating && (
+                                                <span className="px-2 py-0.5 bg-blue-100 text-blue-800 rounded">
+                                                    コーティング{vehicle.hasCoating === "yes" ? "あり" : "なし"}
+                                                </span>
+                                            )}
+                                            {vehicle.hasLine && (
+                                                <span className="px-2 py-0.5 bg-green-100 text-green-800 rounded">
+                                                    ライン{vehicle.hasLine === "yes" ? "あり" : "なし"}
+                                                </span>
+                                            )}
+                                            {vehicle.hasPreferredNumber && (
+                                                <span className="px-2 py-0.5 bg-purple-100 text-purple-800 rounded">
+                                                    希望ナンバー{vehicle.hasPreferredNumber === "yes" ? "あり" : "なし"}
+                                                </span>
+                                            )}
+                                            {vehicle.hasTireReplacement && (
+                                                <span className="px-2 py-0.5 bg-orange-100 text-orange-800 rounded">
+                                                    タイヤ交換{vehicle.hasTireReplacement === "yes" ? "あり" : "なし"}
+                                                </span>
+                                            )}
+                                        </div>
                                         <div className="flex flex-col gap-2 pt-2">
                                             <div className="flex gap-1 sm:gap-2">
                                                 <Link href={`/vehicles/${vehicle.id}`}>
@@ -230,14 +356,29 @@ export default function Vehicles() {
                                                     </Button>
                                                 </Link>
                                                 {user?.role === "admin" && (
-                                                    <Button
-                                                        size="sm"
-                                                        variant="outline"
-                                                        onClick={() => handleEdit(vehicle)}
-                                                        className="px-2 sm:px-3"
-                                                    >
-                                                        <Edit className="h-3 w-3 sm:h-4 sm:w-4" />
-                                                    </Button>
+                                                    <>
+                                                        <Button
+                                                            size="sm"
+                                                            variant="outline"
+                                                            onClick={() => handleEdit(vehicle)}
+                                                            className="px-2 sm:px-3"
+                                                        >
+                                                            <Edit className="h-3 w-3 sm:h-4 sm:w-4" />
+                                                        </Button>
+                                                        <Button
+                                                            size="sm"
+                                                            variant="outline"
+                                                            onClick={() => {
+                                                                setBroadcastingVehicleId(vehicle.id);
+                                                                setBroadcastMessage("");
+                                                                setIsBroadcastDialogOpen(true);
+                                                            }}
+                                                            className="px-2 sm:px-3"
+                                                            title="営業からの拡散"
+                                                        >
+                                                            拡散
+                                                        </Button>
+                                                    </>
                                                 )}
                                             </div>
                                             {/* 完成・保管ボタンは管理者のみ表示 */}
@@ -472,6 +613,78 @@ export default function Vehicles() {
                                     onChange={(e) => setDesiredDeliveryDate(e.target.value)}
                                 />
                             </div>
+                            <div>
+                                <label className="text-sm font-medium">チェック期限</label>
+                                <Input
+                                    type="date"
+                                    value={checkDueDate}
+                                    onChange={(e) => setCheckDueDate(e.target.value)}
+                                />
+                            </div>
+                            <div>
+                                <label className="text-sm font-medium">予備権の日付</label>
+                                <Input
+                                    type="date"
+                                    value={reserveDate}
+                                    onChange={(e) => setReserveDate(e.target.value)}
+                                />
+                            </div>
+                            <div>
+                                <label className="text-sm font-medium">予備権のR</label>
+                                <Input
+                                    value={reserveRound}
+                                    onChange={(e) => setReserveRound(e.target.value)}
+                                    placeholder="例: 1R, 2R"
+                                />
+                            </div>
+                            <div>
+                                <label className="text-sm font-medium">コーティング</label>
+                                <select
+                                    className="flex h-10 w-full rounded-md border border-[hsl(var(--input))] bg-[hsl(var(--background))] px-3 py-2 text-sm"
+                                    value={hasCoating}
+                                    onChange={(e) => setHasCoating(e.target.value as "yes" | "no" | "")}
+                                >
+                                    <option value="">選択してください</option>
+                                    <option value="yes">あり</option>
+                                    <option value="no">なし</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label className="text-sm font-medium">ライン</label>
+                                <select
+                                    className="flex h-10 w-full rounded-md border border-[hsl(var(--input))] bg-[hsl(var(--background))] px-3 py-2 text-sm"
+                                    value={hasLine}
+                                    onChange={(e) => setHasLine(e.target.value as "yes" | "no" | "")}
+                                >
+                                    <option value="">選択してください</option>
+                                    <option value="yes">あり</option>
+                                    <option value="no">なし</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label className="text-sm font-medium">希望ナンバー</label>
+                                <select
+                                    className="flex h-10 w-full rounded-md border border-[hsl(var(--input))] bg-[hsl(var(--background))] px-3 py-2 text-sm"
+                                    value={hasPreferredNumber}
+                                    onChange={(e) => setHasPreferredNumber(e.target.value as "yes" | "no" | "")}
+                                >
+                                    <option value="">選択してください</option>
+                                    <option value="yes">あり</option>
+                                    <option value="no">なし</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label className="text-sm font-medium">タイヤ交換</label>
+                                <select
+                                    className="flex h-10 w-full rounded-md border border-[hsl(var(--input))] bg-[hsl(var(--background))] px-3 py-2 text-sm"
+                                    value={hasTireReplacement}
+                                    onChange={(e) => setHasTireReplacement(e.target.value as "yes" | "no" | "")}
+                                >
+                                    <option value="">選択してください</option>
+                                    <option value="yes">あり</option>
+                                    <option value="no">なし</option>
+                                </select>
+                            </div>
                             <div className="flex gap-2">
                                 <Button
                                     className="flex-1"
@@ -490,6 +703,68 @@ export default function Vehicles() {
                                         setVehicleTypeId("");
                                         setCustomerName("");
                                         setDesiredDeliveryDate("");
+                                        setCheckDueDate("");
+                                        setReserveDate("");
+                                        setReserveRound("");
+                                        setHasCoating("");
+                                        setHasLine("");
+                                        setHasPreferredNumber("");
+                                        setHasTireReplacement("");
+                                    }}
+                                >
+                                    キャンセル
+                                </Button>
+                            </div>
+                        </CardContent>
+                    </Card>
+                </div>
+            )}
+
+            {/* 営業からの拡散ダイアログ */}
+            {isBroadcastDialogOpen && broadcastingVehicleId && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-2 sm:p-4 overflow-y-auto">
+                    <Card className="w-full max-w-md min-w-0 my-auto">
+                        <CardHeader className="p-3 sm:p-4 md:p-6">
+                            <CardTitle className="text-base sm:text-lg md:text-xl">営業からの拡散</CardTitle>
+                        </CardHeader>
+                        <CardContent className="p-3 sm:p-4 md:p-6 space-y-3 sm:space-y-4">
+                            <div className="min-w-0">
+                                <label className="text-sm font-medium block mb-1">コメント *</label>
+                                <textarea
+                                    value={broadcastMessage}
+                                    onChange={(e) => setBroadcastMessage(e.target.value)}
+                                    placeholder="全員に通知するコメントを入力してください"
+                                    className="flex min-h-[120px] w-full rounded-md border border-[hsl(var(--input))] bg-[hsl(var(--background))] px-3 py-2 text-sm"
+                                    required
+                                />
+                                <p className="text-xs text-[hsl(var(--muted-foreground))] mt-1">
+                                    このコメントは全員のダッシュボードに通知されます。一週間後に自動で削除されます。
+                                </p>
+                            </div>
+                            <div className="flex flex-col sm:flex-row gap-2 pt-2">
+                                <Button
+                                    className="flex-1 w-full sm:w-auto"
+                                    onClick={() => {
+                                        if (!broadcastMessage.trim()) {
+                                            toast.error("コメントを入力してください");
+                                            return;
+                                        }
+                                        createBroadcastMutation.mutate({
+                                            vehicleId: broadcastingVehicleId,
+                                            message: broadcastMessage,
+                                        });
+                                    }}
+                                    disabled={createBroadcastMutation.isPending}
+                                >
+                                    {createBroadcastMutation.isPending ? "送信中..." : "送信"}
+                                </Button>
+                                <Button
+                                    variant="outline"
+                                    className="flex-1 w-full sm:w-auto"
+                                    onClick={() => {
+                                        setIsBroadcastDialogOpen(false);
+                                        setBroadcastingVehicleId(null);
+                                        setBroadcastMessage("");
                                     }}
                                 >
                                     キャンセル

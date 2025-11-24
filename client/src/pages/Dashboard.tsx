@@ -33,9 +33,16 @@ export default function Dashboard() {
     const { data: processes } = trpc.processes.list.useQuery();
     const { data: todayAttendance } = trpc.attendance.getTodayStatus.useQuery();
     const { data: myCheckRequests } = trpc.checks.getMyCheckRequests.useQuery();
+    const { data: unreadBroadcasts, refetch: refetchBroadcasts } = trpc.salesBroadcasts.getUnread.useQuery();
 
     // 未完了のチェック依頼を取得
     const pendingCheckRequests = myCheckRequests?.filter((req) => req.status === "pending") || [];
+
+    const markBroadcastAsReadMutation = trpc.salesBroadcasts.markAsRead.useMutation({
+        onSuccess: () => {
+            refetchBroadcasts();
+        },
+    });
 
     // データ更新用のコールバック
     const refreshData = useCallback(() => {
@@ -112,6 +119,56 @@ export default function Dashboard() {
                     こんにちは、{user?.name || user?.username}さん
                 </p>
             </div>
+
+            {/* 営業からの拡散通知 */}
+            {unreadBroadcasts && unreadBroadcasts.length > 0 && (
+                <Card className="border-blue-200 bg-blue-50">
+                    <CardContent className="p-4">
+                        <div className="space-y-3">
+                            <div className="flex items-start gap-3">
+                                <AlertCircle className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />
+                                <div className="flex-1 min-w-0">
+                                    <p className="font-semibold text-blue-900 text-sm sm:text-base">
+                                        営業からの拡散が{unreadBroadcasts.length}件あります
+                                    </p>
+                                </div>
+                            </div>
+                            <div className="space-y-2">
+                                {unreadBroadcasts.map((broadcast) => (
+                                    <div
+                                        key={broadcast.id}
+                                        className="p-3 bg-white rounded-lg border border-blue-200"
+                                    >
+                                        <div className="flex items-start justify-between gap-2">
+                                            <div className="flex-1 min-w-0">
+                                                <p className="font-semibold text-sm sm:text-base text-blue-900">
+                                                    {broadcast.vehicle?.vehicleNumber || "車両ID: " + broadcast.vehicleId}
+                                                </p>
+                                                <p className="text-xs text-blue-700 mt-1">
+                                                    {broadcast.createdByUser?.name || broadcast.createdByUser?.username || "不明"}さんから
+                                                </p>
+                                                <p className="text-sm text-blue-800 mt-2 whitespace-pre-wrap">
+                                                    {broadcast.message}
+                                                </p>
+                                            </div>
+                                            <Button
+                                                size="sm"
+                                                variant="outline"
+                                                onClick={() => {
+                                                    markBroadcastAsReadMutation.mutate({ broadcastId: broadcast.id });
+                                                }}
+                                                className="flex-shrink-0"
+                                            >
+                                                確認
+                                            </Button>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </CardContent>
+                </Card>
+            )}
 
             {/* チェック依頼通知 */}
             {pendingCheckRequests.length > 0 && (

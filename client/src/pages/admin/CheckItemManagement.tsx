@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/ca
 import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../components/ui/tabs";
-import { Plus, Edit, Trash2 } from "lucide-react";
+import { Plus, Edit, Trash2, Upload, Download } from "lucide-react";
 import { toast } from "sonner";
 
 const CATEGORIES = ["一般", "キャンパー", "中古", "修理", "クレーム"] as const;
@@ -17,8 +17,12 @@ export default function CheckItemManagement() {
     const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
     const [editingItem, setEditingItem] = useState<any>(null);
     const [itemName, setItemName] = useState("");
+    const [majorCategory, setMajorCategory] = useState("");
+    const [minorCategory, setMinorCategory] = useState("");
     const [itemDescription, setItemDescription] = useState("");
     const [displayOrder, setDisplayOrder] = useState(0);
+    const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
+    const [csvText, setCsvText] = useState("");
 
     const { data: checkItems, refetch } = trpc.checks.listCheckItems.useQuery({
         category: selectedCategory,
@@ -60,6 +64,18 @@ export default function CheckItemManagement() {
         },
     });
 
+    const importMutation = trpc.checks.importFromCSV.useMutation({
+        onSuccess: (data) => {
+            toast.success(`${data.count}件のチェック項目をインポートしました`);
+            setIsImportDialogOpen(false);
+            setCsvText("");
+            refetch();
+        },
+        onError: (error) => {
+            toast.error(error.message || "CSVインポートに失敗しました");
+        },
+    });
+
     const handleAdd = () => {
         if (!itemName.trim()) {
             toast.error("項目名を入力してください");
@@ -68,6 +84,8 @@ export default function CheckItemManagement() {
 
         createMutation.mutate({
             category: selectedCategory,
+            majorCategory: majorCategory || undefined,
+            minorCategory: minorCategory || undefined,
             name: itemName,
             description: itemDescription || undefined,
             displayOrder,
@@ -77,6 +95,8 @@ export default function CheckItemManagement() {
     const handleEdit = (item: any) => {
         setEditingItem(item);
         setItemName(item.name);
+        setMajorCategory(item.majorCategory || "");
+        setMinorCategory(item.minorCategory || "");
         setItemDescription(item.description || "");
         setDisplayOrder(item.displayOrder || 0);
         setIsEditDialogOpen(true);
@@ -91,9 +111,106 @@ export default function CheckItemManagement() {
         updateMutation.mutate({
             id: editingItem.id,
             name: itemName,
+            majorCategory: majorCategory || undefined,
+            minorCategory: minorCategory || undefined,
             description: itemDescription || undefined,
             displayOrder,
         });
+    };
+
+    const handleCSVImport = () => {
+        if (!csvText.trim()) {
+            toast.error("CSVデータを入力してください");
+            return;
+        }
+
+        try {
+            const lines = csvText.trim().split("\n");
+            const items = [];
+
+            // ヘッダー行をスキップ（最初の行がヘッダーの場合）
+            const startIndex = lines[0]?.includes("区分") || lines[0]?.includes("category") ? 1 : 0;
+
+            for (let i = startIndex; i < lines.length; i++) {
+                const line = lines[i].trim();
+                if (!line) continue;
+
+                // CSVをパース（カンマ区切り、ダブルクォート対応）
+                const values: string[] = [];
+                let current = "";
+                let inQuotes = false;
+
+                for (let j = 0; j < line.length; j++) {
+                    const char = line[j];
+                    if (char === '"') {
+                        inQuotes = !inQuotes;
+                    } else if (char === "," && !inQuotes) {
+                        values.push(current.trim());
+                        current = "";
+                    } else {
+                        current += char;
+                    }
+                }
+                values.push(current.trim());
+
+                // カラム順序: 区分, 大カテゴリ, 小カテゴリ, 項目名, 説明, 表示順
+                if (values.length < 4) {
+                    toast.error(`行 ${i + 1}: カラム数が不足しています（区分、大カテゴリ、小カテゴリ、項目名は必須）`);
+                    return;
+                }
+
+                const category = values[0]?.trim();
+                if (!CATEGORIES.includes(category as any)) {
+                    toast.error(`行 ${i + 1}: 無効な区分です（${CATEGORIES.join(", ")}のいずれか）`);
+                    return;
+                }
+
+                items.push({
+                    category: category as typeof CATEGORIES[number],
+                    majorCategory: values[1]?.trim() || undefined,
+                    minorCategory: values[2]?.trim() || undefined,
+                    name: values[3]?.trim(),
+                    description: values[4]?.trim() || undefined,
+                    displayOrder: parseInt(values[5]?.trim() || "0") || 0,
+                });
+            }
+
+            if (items.length === 0) {
+                toast.error("有効なデータがありません");
+                return;
+            }
+
+            importMutation.mutate({ items });
+        } catch (error: any) {
+            toast.error(`CSVの解析に失敗しました: ${error.message}`);
+        }
+    };
+
+    const handleExportCSV = () => {
+        if (!checkItems || checkItems.length === 0) {
+            toast.error("エクスポートするデータがありません");
+            return;
+        }
+
+        const header = "区分,大カテゴリ,小カテゴリ,項目名,説明,表示順\n";
+        const rows = checkItems.map((item) => {
+            const category = item.category || "";
+            const majorCategory = item.majorCategory || "";
+            const minorCategory = item.minorCategory || "";
+            const name = `"${(item.name || "").replace(/"/g, '""')}"`;
+            const description = `"${(item.description || "").replace(/"/g, '""')}"`;
+            const displayOrder = item.displayOrder || 0;
+            return `${category},${majorCategory},${minorCategory},${name},${description},${displayOrder}`;
+        });
+
+        const csv = header + rows.join("\n");
+        const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = `checkItems_${selectedCategory}_${new Date().toISOString().split("T")[0]}.csv`;
+        link.click();
+        URL.revokeObjectURL(url);
     };
 
     const handleDelete = (id: number) => {
@@ -138,18 +255,41 @@ export default function CheckItemManagement() {
                     <TabsContent key={category} value={category} className="mt-4">
                         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
                             <h2 className="text-lg font-semibold">{category}のチェック項目</h2>
-                            <Button
-                                onClick={() => {
-                                    setItemName("");
-                                    setItemDescription("");
-                                    setDisplayOrder(0);
-                                    setIsAddDialogOpen(true);
-                                }}
-                                className="w-full sm:w-auto"
-                            >
-                                <Plus className="h-4 w-4 mr-2" />
-                                項目追加
-                            </Button>
+                            <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+                                <Button
+                                    variant="outline"
+                                    onClick={handleExportCSV}
+                                    className="w-full sm:w-auto"
+                                >
+                                    <Download className="h-4 w-4 mr-2" />
+                                    CSV出力
+                                </Button>
+                                <Button
+                                    variant="outline"
+                                    onClick={() => {
+                                        setCsvText("");
+                                        setIsImportDialogOpen(true);
+                                    }}
+                                    className="w-full sm:w-auto"
+                                >
+                                    <Upload className="h-4 w-4 mr-2" />
+                                    CSVインポート
+                                </Button>
+                                <Button
+                                    onClick={() => {
+                                        setItemName("");
+                                        setMajorCategory("");
+                                        setMinorCategory("");
+                                        setItemDescription("");
+                                        setDisplayOrder(0);
+                                        setIsAddDialogOpen(true);
+                                    }}
+                                    className="w-full sm:w-auto"
+                                >
+                                    <Plus className="h-4 w-4 mr-2" />
+                                    項目追加
+                                </Button>
+                            </div>
                         </div>
 
                         <div className="space-y-2">
@@ -160,6 +300,13 @@ export default function CheckItemManagement() {
                                             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                                                 <div className="flex-1">
                                                     <p className="font-semibold text-sm sm:text-base">{item.name}</p>
+                                                    {(item.majorCategory || item.minorCategory) && (
+                                                        <p className="text-xs text-[hsl(var(--muted-foreground))] mt-1">
+                                                            {item.majorCategory && <span>大: {item.majorCategory}</span>}
+                                                            {item.majorCategory && item.minorCategory && " / "}
+                                                            {item.minorCategory && <span>小: {item.minorCategory}</span>}
+                                                        </p>
+                                                    )}
                                                     {item.description && (
                                                         <p className="text-xs sm:text-sm text-[hsl(var(--muted-foreground))] mt-1">
                                                             {item.description}
@@ -221,6 +368,24 @@ export default function CheckItemManagement() {
                                 />
                             </div>
                             <div className="min-w-0">
+                                <label className="text-sm font-medium block mb-1">大カテゴリ</label>
+                                <Input
+                                    value={majorCategory}
+                                    onChange={(e) => setMajorCategory(e.target.value)}
+                                    placeholder="大カテゴリを入力（任意）"
+                                    className="w-full min-w-0"
+                                />
+                            </div>
+                            <div className="min-w-0">
+                                <label className="text-sm font-medium block mb-1">小カテゴリ</label>
+                                <Input
+                                    value={minorCategory}
+                                    onChange={(e) => setMinorCategory(e.target.value)}
+                                    placeholder="小カテゴリを入力（任意）"
+                                    className="w-full min-w-0"
+                                />
+                            </div>
+                            <div className="min-w-0">
                                 <label className="text-sm font-medium block mb-1">説明</label>
                                 <Input
                                     value={itemDescription}
@@ -277,6 +442,24 @@ export default function CheckItemManagement() {
                                 />
                             </div>
                             <div className="min-w-0">
+                                <label className="text-sm font-medium block mb-1">大カテゴリ</label>
+                                <Input
+                                    value={majorCategory}
+                                    onChange={(e) => setMajorCategory(e.target.value)}
+                                    placeholder="大カテゴリを入力（任意）"
+                                    className="w-full min-w-0"
+                                />
+                            </div>
+                            <div className="min-w-0">
+                                <label className="text-sm font-medium block mb-1">小カテゴリ</label>
+                                <Input
+                                    value={minorCategory}
+                                    onChange={(e) => setMinorCategory(e.target.value)}
+                                    placeholder="小カテゴリを入力（任意）"
+                                    className="w-full min-w-0"
+                                />
+                            </div>
+                            <div className="min-w-0">
                                 <label className="text-sm font-medium block mb-1">説明</label>
                                 <Input
                                     value={itemDescription}
@@ -308,6 +491,54 @@ export default function CheckItemManagement() {
                                     onClick={() => {
                                         setIsEditDialogOpen(false);
                                         setEditingItem(null);
+                                    }}
+                                >
+                                    キャンセル
+                                </Button>
+                            </div>
+                        </CardContent>
+                    </Card>
+                </div>
+            )}
+
+            {/* CSVインポートダイアログ */}
+            {isImportDialogOpen && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-2 sm:p-4 overflow-y-auto">
+                    <Card className="w-full max-w-2xl min-w-0 my-auto max-h-[90vh] overflow-y-auto">
+                        <CardHeader className="p-3 sm:p-4 md:p-6">
+                            <CardTitle className="text-base sm:text-lg md:text-xl">CSVインポート</CardTitle>
+                        </CardHeader>
+                        <CardContent className="p-3 sm:p-4 md:p-6 space-y-3 sm:space-y-4">
+                            <div className="min-w-0">
+                                <label className="text-sm font-medium block mb-1">
+                                    CSVデータ（区分, 大カテゴリ, 小カテゴリ, 項目名, 説明, 表示順）
+                                </label>
+                                <textarea
+                                    value={csvText}
+                                    onChange={(e) => setCsvText(e.target.value)}
+                                    placeholder={`区分,大カテゴリ,小カテゴリ,項目名,説明,表示順
+${selectedCategory},外装,塗装,塗装チェック,塗装状態を確認,1
+${selectedCategory},内装,床,床材チェック,床材の状態を確認,2`}
+                                    className="flex min-h-[200px] w-full rounded-md border border-[hsl(var(--input))] bg-[hsl(var(--background))] px-3 py-2 text-sm font-mono"
+                                />
+                                <p className="text-xs text-[hsl(var(--muted-foreground))] mt-1">
+                                    現在の区分: {selectedCategory}
+                                </p>
+                            </div>
+                            <div className="flex flex-col sm:flex-row gap-2 pt-2">
+                                <Button
+                                    className="flex-1 w-full sm:w-auto"
+                                    onClick={handleCSVImport}
+                                    disabled={importMutation.isPending}
+                                >
+                                    {importMutation.isPending ? "インポート中..." : "インポート"}
+                                </Button>
+                                <Button
+                                    variant="outline"
+                                    className="flex-1 w-full sm:w-auto"
+                                    onClick={() => {
+                                        setIsImportDialogOpen(false);
+                                        setCsvText("");
                                     }}
                                 >
                                     キャンセル

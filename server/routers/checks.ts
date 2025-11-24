@@ -39,6 +39,8 @@ export const checksRouter = createTRPCRouter({
         .input(
             z.object({
                 category: z.enum(["一般", "キャンパー", "中古", "修理", "クレーム"]),
+                majorCategory: z.string().optional(),
+                minorCategory: z.string().optional(),
                 name: z.string().min(1),
                 description: z.string().optional(),
                 displayOrder: z.number().default(0),
@@ -63,6 +65,8 @@ export const checksRouter = createTRPCRouter({
             z.object({
                 id: z.number(),
                 name: z.string().min(1).optional(),
+                majorCategory: z.string().optional(),
+                minorCategory: z.string().optional(),
                 description: z.string().optional(),
                 displayOrder: z.number().optional(),
             })
@@ -79,6 +83,46 @@ export const checksRouter = createTRPCRouter({
             const { id, ...updateData } = input;
             await db.update(schema.checkItems).set(updateData).where(eq(schema.checkItems.id, id));
             return { success: true };
+        }),
+
+    // CSVインポート（管理者のみ）
+    importFromCSV: adminProcedure
+        .input(
+            z.object({
+                items: z.array(
+                    z.object({
+                        category: z.enum(["一般", "キャンパー", "中古", "修理", "クレーム"]),
+                        majorCategory: z.string().optional(),
+                        minorCategory: z.string().optional(),
+                        name: z.string().min(1),
+                        description: z.string().optional(),
+                        displayOrder: z.number().default(0),
+                    })
+                ),
+            })
+        )
+        .mutation(async ({ input }) => {
+            const db = await getDb();
+            if (!db) {
+                throw new TRPCError({
+                    code: "INTERNAL_SERVER_ERROR",
+                    message: "データベースに接続できません",
+                });
+            }
+
+            try {
+                const results = [];
+                for (const item of input.items) {
+                    const [result] = await db.insert(schema.checkItems).values(item).$returningId();
+                    results.push({ id: result, name: item.name });
+                }
+                return { success: true, count: results.length, items: results };
+            } catch (error: any) {
+                throw new TRPCError({
+                    code: "INTERNAL_SERVER_ERROR",
+                    message: error.message || "CSVインポートに失敗しました",
+                });
+            }
         }),
 
     // チェック項目削除（管理者のみ）
@@ -152,15 +196,37 @@ export const checksRouter = createTRPCRouter({
 
             const userMap = new Map(users.map((u) => [u.id, u]));
 
+            // チェック項目IDを取得
+            const checkItemIds = [...new Set(checks.map((c) => c.checkItemId))];
+            let checkItemsData: any[] = [];
+            if (checkItemIds.length > 0) {
+                const { inArray } = await import("drizzle-orm");
+                checkItemsData = await db
+                    .select()
+                    .from(schema.checkItems)
+                    .where(inArray(schema.checkItems.id, checkItemIds));
+            }
+            const checkItemMap = new Map(checkItemsData.map((ci) => [ci.id, ci]));
+
+            // チェック依頼を取得
+            const checkRequests = await db
+                .select()
+                .from(schema.checkRequests)
+                .where(eq(schema.checkRequests.vehicleId, input.vehicleId));
+
             // チェック項目ごとにチェック状況を整理
             const checkStatus = checkItems.map((item) => {
                 const check = checks.find((c) => c.checkItemId === item.id);
+                const request = checkRequests.find((r) => r.checkItemId === item.id && r.status === "pending");
                 return {
                     checkItem: item,
                     checked: check ? true : false,
+                    status: check?.status || "unchecked",
                     checkedBy: check ? userMap.get(check.checkedBy) : null,
                     checkedAt: check ? check.checkedAt : null,
                     notes: check ? check.notes : null,
+                    hasRequest: request ? true : false,
+                    requestDueDate: request?.dueDate || null,
                 };
             });
 
@@ -176,6 +242,7 @@ export const checksRouter = createTRPCRouter({
             z.object({
                 vehicleId: z.number(),
                 checkItemId: z.number(),
+                status: z.enum(["checked", "needs_recheck", "unchecked"]).default("checked"),
                 notes: z.string().optional(),
             })
         )
@@ -205,6 +272,7 @@ export const checksRouter = createTRPCRouter({
                     .update(schema.vehicleChecks)
                     .set({
                         checkedBy: ctx.user!.id,
+                        status: input.status,
                         notes: input.notes || null,
                         checkedAt: new Date(),
                     })
@@ -215,6 +283,7 @@ export const checksRouter = createTRPCRouter({
                     vehicleId: input.vehicleId,
                     checkItemId: input.checkItemId,
                     checkedBy: ctx.user!.id,
+                    status: input.status,
                     notes: input.notes || null,
                 });
             }
@@ -227,7 +296,9 @@ export const checksRouter = createTRPCRouter({
         .input(
             z.object({
                 vehicleId: z.number(),
+                checkItemId: z.number(), // 依頼するチェック項目ID
                 requestedTo: z.number(), // 依頼先ユーザーID
+                dueDate: z.date().optional(), // 期限日
                 message: z.string().optional(),
             })
         )
@@ -242,8 +313,10 @@ export const checksRouter = createTRPCRouter({
 
             await db.insert(schema.checkRequests).values({
                 vehicleId: input.vehicleId,
+                checkItemId: input.checkItemId,
                 requestedBy: ctx.user!.id,
                 requestedTo: input.requestedTo,
+                dueDate: input.dueDate || null,
                 message: input.message || null,
                 status: "pending",
             });
@@ -266,12 +339,14 @@ export const checksRouter = createTRPCRouter({
             .from(schema.checkRequests)
             .where(eq(schema.checkRequests.requestedTo, ctx.user!.id));
 
-        // ユーザー情報と車両情報を取得
+        // ユーザー情報、車両情報、チェック項目情報を取得
         const userIds = [...new Set([...requests.map((r) => r.requestedBy), ...requests.map((r) => r.requestedTo)])];
         const vehicleIds = [...new Set(requests.map((r) => r.vehicleId))];
+        const checkItemIds = [...new Set(requests.map((r) => r.checkItemId))];
 
         let users: any[] = [];
         let vehicles: any[] = [];
+        let checkItems: any[] = [];
         if (userIds.length > 0) {
             const { inArray } = await import("drizzle-orm");
             users = await db.select().from(schema.users).where(inArray(schema.users.id, userIds));
@@ -280,14 +355,23 @@ export const checksRouter = createTRPCRouter({
             const { inArray } = await import("drizzle-orm");
             vehicles = await db.select().from(schema.vehicles).where(inArray(schema.vehicles.id, vehicleIds));
         }
+        if (checkItemIds.length > 0) {
+            const { inArray } = await import("drizzle-orm");
+            checkItems = await db
+                .select()
+                .from(schema.checkItems)
+                .where(inArray(schema.checkItems.id, checkItemIds));
+        }
 
         const userMap = new Map(users.map((u) => [u.id, u]));
         const vehicleMap = new Map(vehicles.map((v) => [v.id, v]));
+        const checkItemMap = new Map(checkItems.map((ci) => [ci.id, ci]));
 
         return requests.map((request) => ({
             ...request,
             requestedByUser: userMap.get(request.requestedBy),
             vehicle: vehicleMap.get(request.vehicleId),
+            checkItem: checkItemMap.get(request.checkItemId),
         }));
     }),
 

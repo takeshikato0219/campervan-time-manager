@@ -44,6 +44,46 @@ async function startServer() {
     console.warn("[Server] Failed to initialize initial data, continuing anyway:", error);
   }
 
+  // 期限切れの営業からの拡散を削除する処理
+  const deleteExpiredBroadcasts = async () => {
+    try {
+      const { getDb, schema } = await import("../db");
+      const { lt, inArray } = await import("drizzle-orm");
+
+      const db = await getDb();
+      if (!db) return;
+
+      const now = new Date();
+      const expiredBroadcasts = await db
+        .select()
+        .from(schema.salesBroadcasts)
+        .where(lt(schema.salesBroadcasts.expiresAt, now));
+
+      if (expiredBroadcasts.length > 0) {
+        const expiredIds = expiredBroadcasts.map((b) => b.id);
+
+        // 既読記録も削除
+        await db
+          .delete(schema.salesBroadcastReads)
+          .where(inArray(schema.salesBroadcastReads.broadcastId, expiredIds));
+
+        // 拡散を削除
+        await db
+          .delete(schema.salesBroadcasts)
+          .where(inArray(schema.salesBroadcasts.id, expiredIds));
+
+        console.log(`[自動削除] ${expiredBroadcasts.length}件の期限切れ拡散を削除しました`);
+      }
+    } catch (error) {
+      console.warn("[自動削除] 期限切れ拡散の削除に失敗しました:", error);
+    }
+  };
+
+  // 期限切れ拡散の自動削除を1時間ごとに実行
+  setInterval(deleteExpiredBroadcasts, 60 * 60 * 1000);
+  // 起動時にも実行
+  deleteExpiredBroadcasts();
+
   // 23:59での自動退勤処理を設定
   const scheduleAutoClose = async () => {
     try {
