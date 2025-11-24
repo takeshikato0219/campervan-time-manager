@@ -1,24 +1,13 @@
 import { useAuth } from "../hooks/useAuth";
 import { trpc } from "../lib/trpc";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
-import { Button } from "../components/ui/button";
-import { Clock } from "lucide-react";
 import { format } from "date-fns";
-import { toast } from "sonner";
 
 export default function MyAttendance() {
     const { user } = useAuth();
-    const { data: todayAttendance, refetch } = trpc.attendance.getTodayStatus.useQuery();
+    const { data: todayAttendance } = trpc.attendance.getTodayStatus.useQuery();
 
-    const clockInMutation = trpc.attendance.clockIn.useMutation({
-        onSuccess: () => {
-            toast.success("出勤しました");
-            refetch();
-        },
-        onError: (error) => {
-            toast.error(error.message || "出勤に失敗しました");
-        },
-    });
+    // 出勤打刻は管理者専用のため、一般ユーザーは使用不可
 
     const formatTime = (date: Date | string) => {
         const d = typeof date === "string" ? new Date(date) : date;
@@ -71,10 +60,9 @@ export default function MyAttendance() {
                     ) : (
                         <div className="text-center py-8">
                             <p className="text-[hsl(var(--muted-foreground))] mb-4">まだ出勤していません</p>
-                            <Button onClick={() => clockInMutation.mutate({ deviceType: "pc" })}>
-                                <Clock className="h-4 w-4 mr-2" />
-                                出勤
-                            </Button>
+                            <p className="text-sm text-[hsl(var(--muted-foreground))]">
+                                出勤は管理者が「出退勤管理」ページで行います
+                            </p>
                         </div>
                     )}
                 </CardContent>

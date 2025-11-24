@@ -160,12 +160,10 @@ export default function Vehicles() {
                         車両の一覧、登録、編集を行います
                     </p>
                 </div>
-                {user?.role === "admin" && (
-                    <Button onClick={() => setIsRegisterDialogOpen(true)} className="w-full sm:w-auto">
-                        <Plus className="h-4 w-4 mr-2" />
-                        車両登録
-                    </Button>
-                )}
+                <Button onClick={() => setIsRegisterDialogOpen(true)} className="w-full sm:w-auto">
+                    <Plus className="h-4 w-4 mr-2" />
+                    車両登録
+                </Button>
             </div>
 
             {/* 検索 */}

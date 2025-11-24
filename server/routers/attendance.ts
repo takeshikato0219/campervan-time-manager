@@ -139,8 +139,8 @@ export const attendanceRouter = createTRPCRouter({
         };
     }),
 
-    // 出勤打刻
-    clockIn: protectedProcedure
+    // 出勤打刻（管理者専用）
+    clockIn: adminProcedure
         .input(
             z.object({
                 deviceType: z.enum(["pc", "mobile"]).optional().default("pc"),
@@ -179,15 +179,13 @@ export const attendanceRouter = createTRPCRouter({
                 });
             }
 
-            const result = await db
+            await db
                 .insert(schema.attendanceRecords)
                 .values({
                     userId: ctx.user!.id,
                     clockIn: new Date(),
                     clockInDevice: input.deviceType,
                 });
-
-            const clockInTime = new Date();
 
             // 挿入されたレコードを取得（最新のものを取得）
             const allRecords = await db

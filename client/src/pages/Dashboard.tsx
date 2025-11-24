@@ -5,7 +5,7 @@ import { Button } from "../components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { Input } from "../components/ui/input";
 import TimelineCalendar from "../components/TimelineCalendar";
-import { Plus, Clock } from "lucide-react";
+import { Plus } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { useDateChangeDetector } from "../hooks/useDateChangeDetector";
@@ -67,15 +67,7 @@ export default function Dashboard() {
         },
     });
 
-    const clockInMutation = trpc.attendance.clockIn.useMutation({
-        onSuccess: () => {
-            toast.success("出勤しました");
-            utils.attendance.getTodayStatus.invalidate();
-        },
-        onError: (error) => {
-            toast.error(error.message || "出勤に失敗しました");
-        },
-    });
+    // 出勤打刻は管理者専用のため、一般ユーザーは使用不可
 
     const handleAddWork = () => {
         if (!selectedVehicleId || !selectedProcessId || !workDate || !startTime) {
@@ -147,10 +139,9 @@ export default function Dashboard() {
                     ) : (
                         <div className="text-center py-4">
                             <p className="text-[hsl(var(--muted-foreground))] mb-4">まだ出勤していません</p>
-                            <Button onClick={() => clockInMutation.mutate({ deviceType: "pc" })}>
-                                <Clock className="h-4 w-4 mr-2" />
-                                出勤
-                            </Button>
+                            <p className="text-xs text-[hsl(var(--muted-foreground))] mt-2">
+                                出勤は管理者が「出退勤管理」ページで行います
+                            </p>
                         </div>
                     )}
                 </CardContent>
