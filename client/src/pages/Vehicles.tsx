@@ -50,36 +50,36 @@ function VehicleDetailContent({ vehicleId, user }: { vehicleId: number; user: an
     }
 
     return (
-        <CardContent className="p-4 sm:p-6 space-y-4 border-t bg-gray-50/50">
+        <CardContent className="p-3 sm:p-4 md:p-6 space-y-3 sm:space-y-4 border-t bg-gray-50/50">
             {/* 指示書と注意ポイント */}
-            <div className="flex flex-row gap-3 sm:gap-4 overflow-x-auto">
+            <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 md:gap-4">
                 {/* 指示書 */}
-                <Card className="flex-shrink-0 min-w-[200px]">
-                    <CardHeader className="p-3">
-                        <CardTitle className="text-sm">指示書</CardTitle>
+                <Card className="flex-1 min-w-0 sm:min-w-[200px]">
+                    <CardHeader className="p-2 sm:p-3">
+                        <CardTitle className="text-xs sm:text-sm">指示書</CardTitle>
                     </CardHeader>
-                    <CardContent className="p-3">
+                    <CardContent className="p-2 sm:p-3">
                         {vehicle.instructionSheetUrl ? (
                             <a
                                 href={vehicle.instructionSheetUrl}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="flex items-center gap-2 text-blue-600 hover:text-blue-800 underline text-sm"
+                                className="flex items-center gap-1.5 sm:gap-2 text-blue-600 hover:text-blue-800 underline text-xs sm:text-sm"
                             >
-                                <FileText className="h-4 w-4" />
+                                <FileText className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
                                 指示書を表示
                             </a>
                         ) : (
-                            <p className="text-xs text-[hsl(var(--muted-foreground))]">指示書がアップロードされていません</p>
+                            <p className="text-[10px] sm:text-xs text-[hsl(var(--muted-foreground))]">指示書がアップロードされていません</p>
                         )}
                     </CardContent>
                 </Card>
 
                 {/* 注意ポイント */}
-                <Card className="flex-shrink-0 min-w-[200px]">
-                    <CardHeader className="p-3">
+                <Card className="flex-1 min-w-0 sm:min-w-[200px]">
+                    <CardHeader className="p-2 sm:p-3">
                         <div className="flex items-center justify-between">
-                            <CardTitle className="text-sm">注意ポイント</CardTitle>
+                            <CardTitle className="text-xs sm:text-sm">注意ポイント</CardTitle>
                             <Button
                                 size="sm"
                                 variant="outline"
@@ -87,24 +87,24 @@ function VehicleDetailContent({ vehicleId, user }: { vehicleId: number; user: an
                                     setAttentionPointContent("");
                                     setIsAttentionPointDialogOpen(true);
                                 }}
-                                className="h-6 px-2 text-xs"
+                                className="h-5 sm:h-6 px-1.5 sm:px-2 text-[10px] sm:text-xs"
                             >
-                                <Plus className="h-3 w-3 mr-1" />
+                                <Plus className="h-2.5 w-2.5 sm:h-3 sm:w-3 mr-0.5 sm:mr-1" />
                                 追加
                             </Button>
                         </div>
                     </CardHeader>
-                    <CardContent className="p-3">
+                    <CardContent className="p-2 sm:p-3">
                         {attentionPoints && attentionPoints.length > 0 ? (
-                            <div className="space-y-2">
+                            <div className="space-y-1.5 sm:space-y-2">
                                 {attentionPoints.map((ap) => (
                                     <div
                                         key={ap.id}
-                                        className="p-2 border border-[hsl(var(--border))] rounded-lg bg-yellow-50"
+                                        className="p-1.5 sm:p-2 border border-[hsl(var(--border))] rounded-lg bg-yellow-50"
                                     >
-                                        <p className="text-xs">{ap.content}</p>
-                                        <div className="flex items-center justify-between mt-1">
-                                            <p className="text-xs text-[hsl(var(--muted-foreground))]">
+                                        <p className="text-[10px] sm:text-xs break-words">{ap.content}</p>
+                                        <div className="flex items-center justify-between mt-0.5 sm:mt-1">
+                                            <p className="text-[10px] sm:text-xs text-[hsl(var(--muted-foreground))]">
                                                 {format(new Date(ap.createdAt), "yyyy-MM-dd HH:mm")} - {ap.userName}
                                             </p>
                                             {user?.role === "admin" && (
@@ -116,9 +116,9 @@ function VehicleDetailContent({ vehicleId, user }: { vehicleId: number; user: an
                                                             deleteAttentionPointMutation.mutate({ id: ap.id });
                                                         }
                                                     }}
-                                                    className="h-5 px-1 text-red-600 hover:text-red-800"
+                                                    className="h-4 sm:h-5 px-0.5 sm:px-1 text-red-600 hover:text-red-800"
                                                 >
-                                                    <Trash2 className="h-3 w-3" />
+                                                    <Trash2 className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
                                                 </Button>
                                             )}
                                         </div>
@@ -126,7 +126,7 @@ function VehicleDetailContent({ vehicleId, user }: { vehicleId: number; user: an
                                 ))}
                             </div>
                         ) : (
-                            <p className="text-xs text-[hsl(var(--muted-foreground))]">注意ポイントがありません</p>
+                            <p className="text-[10px] sm:text-xs text-[hsl(var(--muted-foreground))]">注意ポイントがありません</p>
                         )}
                     </CardContent>
                 </Card>
@@ -136,26 +136,26 @@ function VehicleDetailContent({ vehicleId, user }: { vehicleId: number; user: an
 
             {/* メモ */}
             <Card className="border-2">
-                <CardHeader className="p-3 sm:p-4 bg-white border-b">
-                    <CardTitle className="text-sm font-semibold">メモ</CardTitle>
+                <CardHeader className="p-2 sm:p-3 md:p-4 bg-white border-b">
+                    <CardTitle className="text-xs sm:text-sm font-semibold">メモ</CardTitle>
                 </CardHeader>
-                <CardContent className="p-3 sm:p-4">
+                <CardContent className="p-2 sm:p-3 md:p-4">
                     {vehicle.memos && vehicle.memos.length > 0 ? (
-                        <div className="flex flex-row gap-2 overflow-x-auto">
+                        <div className="flex flex-col sm:flex-row gap-2 sm:gap-2 overflow-x-auto">
                             {vehicle.memos.map((memo: any) => (
                                 <div
                                     key={memo.id}
-                                    className="flex-shrink-0 min-w-[200px] p-3 border border-[hsl(var(--border))] rounded-lg bg-white"
+                                    className="flex-1 sm:flex-shrink-0 sm:min-w-[200px] p-2 sm:p-3 border border-[hsl(var(--border))] rounded-lg bg-white"
                                 >
-                                    <p className="text-xs mb-1">{memo.content}</p>
-                                    <p className="text-xs text-[hsl(var(--muted-foreground))]">
+                                    <p className="text-[10px] sm:text-xs mb-1 break-words">{memo.content}</p>
+                                    <p className="text-[10px] sm:text-xs text-[hsl(var(--muted-foreground))]">
                                         {format(new Date(memo.createdAt), "yyyy-MM-dd HH:mm")} - {memo.userName}
                                     </p>
                                 </div>
                             ))}
                         </div>
                     ) : (
-                        <p className="text-center py-2 text-xs text-[hsl(var(--muted-foreground))]">
+                        <p className="text-center py-1 sm:py-2 text-[10px] sm:text-xs text-[hsl(var(--muted-foreground))]">
                             メモがありません
                         </p>
                     )}
@@ -566,41 +566,41 @@ export default function Vehicles() {
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
                             {filteredVehicles.map((vehicle) => (
                                 <Card key={vehicle.id} className="overflow-hidden">
-                                    <CardHeader className="p-4 sm:p-6 bg-gradient-to-r from-blue-50 to-indigo-50 border-b">
-                                        <div className="flex items-start justify-between gap-3">
-                                            <div className="flex-1 min-w-0">
-                                                <div className="mb-2">
-                                                    <CardTitle className="text-lg sm:text-xl font-bold truncate mb-1">
+                                    <CardHeader className="p-3 sm:p-4 md:p-6 bg-gradient-to-r from-blue-50 to-indigo-50 border-b">
+                                        <div className="flex flex-col sm:flex-row items-start justify-between gap-2 sm:gap-3">
+                                            <div className="flex-1 min-w-0 w-full sm:w-auto">
+                                                <div className="mb-1 sm:mb-2">
+                                                    <CardTitle className="text-base sm:text-lg md:text-xl font-bold truncate mb-0.5 sm:mb-1">
                                                         {vehicle.vehicleNumber}
                                                     </CardTitle>
-                                                    <p className="text-xs text-gray-500 font-mono">ID: {vehicle.id}</p>
+                                                    <p className="text-[10px] sm:text-xs text-gray-500 font-mono">ID: {vehicle.id}</p>
                                                 </div>
                                                 {vehicle.customerName && (
-                                                    <p className="text-base sm:text-lg font-semibold text-gray-900 mb-2">
+                                                    <p className="text-sm sm:text-base md:text-lg font-semibold text-gray-900 mb-1 sm:mb-2 break-words">
                                                         {vehicle.customerName}
                                                     </p>
                                                 )}
-                                                <div className="flex flex-wrap items-center gap-2">
-                                                    <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium bg-white/80 text-gray-700 border border-gray-200">
+                                                <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+                                                    <span className="inline-flex items-center px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-md text-[10px] sm:text-xs font-medium bg-white/80 text-gray-700 border border-gray-200">
                                                         {vehicleTypes?.find((vt) => vt.id === vehicle.vehicleTypeId)?.name || "不明"}
                                                     </span>
                                                     {vehicle.category && (
-                                                        <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold bg-blue-600 text-white">
+                                                        <span className="inline-flex items-center px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-md text-[10px] sm:text-xs font-semibold bg-blue-600 text-white">
                                                             {vehicle.category}
                                                         </span>
                                                     )}
                                                 </div>
                                             </div>
-                                            <div className="flex gap-1 flex-shrink-0">
-                                                <Link href="/vehicle-checks">
+                                            <div className="flex gap-1 flex-shrink-0 w-full sm:w-auto justify-end sm:justify-start">
+                                                <Link href="/vehicle-checks" className="flex-1 sm:flex-none">
                                                     <Button
                                                         size="sm"
                                                         variant="outline"
-                                                        className="h-8 px-2 text-xs"
+                                                        className="h-7 sm:h-8 px-2 text-[10px] sm:text-xs w-full sm:w-auto"
                                                         title="車両チェック"
                                                     >
-                                                        <ClipboardCheck className="h-4 w-4 mr-1" />
-                                                        チェック
+                                                        <ClipboardCheck className="h-3 w-3 sm:h-4 sm:w-4 mr-0.5 sm:mr-1" />
+                                                        <span className="hidden sm:inline">チェック</span>
                                                     </Button>
                                                 </Link>
                                                 {user?.role === "admin" && (
@@ -609,10 +609,10 @@ export default function Vehicles() {
                                                             size="sm"
                                                             variant="outline"
                                                             onClick={() => handleEdit(vehicle)}
-                                                            className="h-8 w-8 p-0"
+                                                            className="h-7 sm:h-8 w-7 sm:w-8 p-0 flex-shrink-0"
                                                             title="編集"
                                                         >
-                                                            <Edit className="h-4 w-4" />
+                                                            <Edit className="h-3 w-3 sm:h-4 sm:w-4" />
                                                         </Button>
                                                         <Button
                                                             size="sm"
@@ -622,49 +622,50 @@ export default function Vehicles() {
                                                                 setBroadcastMessage("");
                                                                 setIsBroadcastDialogOpen(true);
                                                             }}
-                                                            className="h-8 px-2 text-xs"
+                                                            className="h-7 sm:h-8 px-2 text-[10px] sm:text-xs flex-1 sm:flex-none"
                                                             title="営業からの拡散"
                                                         >
-                                                            拡散
+                                                            <span className="hidden sm:inline">拡散</span>
+                                                            <span className="sm:hidden">拡</span>
                                                         </Button>
                                                     </>
                                                 )}
                                             </div>
                                         </div>
                                     </CardHeader>
-                                    <CardContent className="p-4 sm:p-6 space-y-4">
+                                    <CardContent className="p-3 sm:p-4 md:p-6 space-y-3 sm:space-y-4">
                                         {/* 基本情報セクション */}
-                                        <div className="space-y-3">
-                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                        <div className="space-y-2 sm:space-y-3">
+                                            <div className="grid grid-cols-1 gap-2 sm:gap-3">
                                                 {vehicle.desiredDeliveryDate && (
-                                                    <div className="flex items-center gap-2">
-                                                        <span className="text-xs font-medium text-[hsl(var(--muted-foreground))] min-w-[80px]">
+                                                    <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
+                                                        <span className="text-[10px] sm:text-xs font-medium text-[hsl(var(--muted-foreground))] sm:min-w-[80px]">
                                                             希望納期:
                                                         </span>
-                                                        <span className="text-sm font-medium">
+                                                        <span className="text-xs sm:text-sm font-medium">
                                                             {format(new Date(vehicle.desiredDeliveryDate), "yyyy年MM月dd日")}
                                                         </span>
                                                     </div>
                                                 )}
                                                 {vehicle.checkDueDate && (
-                                                    <div className="flex items-center gap-2">
-                                                        <span className="text-xs font-medium text-[hsl(var(--muted-foreground))] min-w-[80px]">
+                                                    <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
+                                                        <span className="text-[10px] sm:text-xs font-medium text-[hsl(var(--muted-foreground))] sm:min-w-[80px]">
                                                             チェック期限:
                                                         </span>
-                                                        <span className="text-sm font-medium text-orange-600">
+                                                        <span className="text-xs sm:text-sm font-medium text-orange-600">
                                                             {format(new Date(vehicle.checkDueDate), "yyyy年MM月dd日")}
                                                         </span>
                                                     </div>
                                                 )}
                                                 {vehicle.reserveDate && (
-                                                    <div className="flex items-center gap-2">
-                                                        <span className="text-xs font-medium text-[hsl(var(--muted-foreground))] min-w-[80px]">
+                                                    <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
+                                                        <span className="text-[10px] sm:text-xs font-medium text-[hsl(var(--muted-foreground))] sm:min-w-[80px]">
                                                             予備権:
                                                         </span>
-                                                        <span className="text-sm font-medium">
+                                                        <span className="text-xs sm:text-sm font-medium">
                                                             {format(new Date(vehicle.reserveDate), "yyyy年MM月dd日")}
                                                             {vehicle.reserveRound && (
-                                                                <span className="ml-1 px-1.5 py-0.5 bg-gray-100 text-gray-700 rounded text-xs">
+                                                                <span className="ml-1 px-1 sm:px-1.5 py-0.5 bg-gray-100 text-gray-700 rounded text-[10px] sm:text-xs">
                                                                     {vehicle.reserveRound}
                                                                 </span>
                                                             )}
@@ -677,17 +678,17 @@ export default function Vehicles() {
                                         {/* 外注情報 */}
                                         {(vehicle.outsourcingDestination || vehicle.outsourcingStartDate || vehicle.outsourcingEndDate) && (
                                             <div className="pt-2 border-t">
-                                                <div className="flex items-center gap-2 mb-2">
-                                                    <span className="text-xs font-semibold text-gray-700">外注情報:</span>
+                                                <div className="flex items-center gap-2 mb-1.5 sm:mb-2">
+                                                    <span className="text-[10px] sm:text-xs font-semibold text-gray-700">外注情報:</span>
                                                 </div>
-                                                <div className="flex flex-wrap gap-2">
+                                                <div className="flex flex-wrap gap-1.5 sm:gap-2">
                                                     {vehicle.outsourcingDestination && (
-                                                        <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium bg-purple-100 text-purple-800 border border-purple-200">
+                                                        <span className="inline-flex items-center px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-md text-[10px] sm:text-xs font-medium bg-purple-100 text-purple-800 border border-purple-200 break-words">
                                                             先: {vehicle.outsourcingDestination}
                                                         </span>
                                                     )}
                                                     {vehicle.outsourcingStartDate && vehicle.outsourcingEndDate && (
-                                                        <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium bg-indigo-100 text-indigo-800 border border-indigo-200">
+                                                        <span className="inline-flex items-center px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-md text-[10px] sm:text-xs font-medium bg-indigo-100 text-indigo-800 border border-indigo-200 whitespace-nowrap">
                                                             {format(new Date(vehicle.outsourcingStartDate), "yyyy/MM/dd")} - {format(new Date(vehicle.outsourcingEndDate), "yyyy/MM/dd")}
                                                         </span>
                                                     )}
@@ -697,24 +698,24 @@ export default function Vehicles() {
 
                                         {/* オプション情報バッジ */}
                                         {(vehicle.hasCoating || vehicle.hasLine || vehicle.hasPreferredNumber || vehicle.hasTireReplacement) && (
-                                            <div className="flex flex-wrap gap-2 pt-2 border-t">
+                                            <div className="flex flex-wrap gap-1.5 sm:gap-2 pt-2 border-t">
                                                 {vehicle.hasCoating && (
-                                                    <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium bg-blue-100 text-blue-800 border border-blue-200">
+                                                    <span className="inline-flex items-center px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-md text-[10px] sm:text-xs font-medium bg-blue-100 text-blue-800 border border-blue-200">
                                                         コーティング{vehicle.hasCoating === "yes" ? "あり" : "なし"}
                                                     </span>
                                                 )}
                                                 {vehicle.hasLine && (
-                                                    <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium bg-green-100 text-green-800 border border-green-200">
+                                                    <span className="inline-flex items-center px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-md text-[10px] sm:text-xs font-medium bg-green-100 text-green-800 border border-green-200">
                                                         ライン{vehicle.hasLine === "yes" ? "あり" : "なし"}
                                                     </span>
                                                 )}
                                                 {vehicle.hasPreferredNumber && (
-                                                    <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium bg-purple-100 text-purple-800 border border-purple-200">
+                                                    <span className="inline-flex items-center px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-md text-[10px] sm:text-xs font-medium bg-purple-100 text-purple-800 border border-purple-200">
                                                         希望ナンバー{vehicle.hasPreferredNumber === "yes" ? "あり" : "なし"}
                                                     </span>
                                                 )}
                                                 {vehicle.hasTireReplacement && (
-                                                    <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium bg-orange-100 text-orange-800 border border-orange-200">
+                                                    <span className="inline-flex items-center px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-md text-[10px] sm:text-xs font-medium bg-orange-100 text-orange-800 border border-orange-200">
                                                         タイヤ交換
                                                         {vehicle.hasTireReplacement === "summer"
                                                             ? "（夏タイヤ納車）"
@@ -728,43 +729,43 @@ export default function Vehicles() {
 
                                         {/* アクションボタン */}
                                         {user?.role === "admin" && (
-                                            <div className="flex flex-col gap-2 pt-2 border-t">
+                                            <div className="flex flex-col gap-1.5 sm:gap-2 pt-2 border-t">
                                                 {vehicle.status === "in_progress" && (
-                                                    <div className="flex gap-2">
+                                                    <div className="flex gap-1.5 sm:gap-2">
                                                         <Button
                                                             size="sm"
                                                             variant="outline"
-                                                            className="flex-1 text-xs sm:text-sm"
+                                                            className="flex-1 text-[10px] sm:text-xs md:text-sm h-7 sm:h-8"
                                                             onClick={() => {
                                                                 if (confirm("この車両を完成にしますか？")) {
                                                                     completeMutation.mutate({ id: vehicle.id });
                                                                 }
                                                             }}
                                                         >
-                                                            <Check className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
+                                                            <Check className="h-3 w-3 sm:h-4 sm:w-4 mr-0.5 sm:mr-1" />
                                                             完成
                                                         </Button>
                                                         <Button
                                                             size="sm"
                                                             variant="outline"
-                                                            className="flex-1 text-xs sm:text-sm"
+                                                            className="flex-1 text-[10px] sm:text-xs md:text-sm h-7 sm:h-8"
                                                             onClick={() => {
                                                                 if (confirm("この車両を保管にしますか？")) {
                                                                     archiveMutation.mutate({ id: vehicle.id });
                                                                 }
                                                             }}
                                                         >
-                                                            <Archive className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
+                                                            <Archive className="h-3 w-3 sm:h-4 sm:w-4 mr-0.5 sm:mr-1" />
                                                             保管
                                                         </Button>
                                                     </div>
                                                 )}
                                                 {vehicle.status === "completed" && (
-                                                    <div className="flex gap-2">
+                                                    <div className="flex gap-1.5 sm:gap-2">
                                                         <Button
                                                             size="sm"
                                                             variant="outline"
-                                                            className="flex-1"
+                                                            className="flex-1 text-[10px] sm:text-xs h-7 sm:h-8"
                                                             onClick={() => {
                                                                 if (confirm("この車両を作業中に戻しますか？")) {
                                                                     uncompleteMutation.mutate({ id: vehicle.id });
@@ -776,14 +777,14 @@ export default function Vehicles() {
                                                         <Button
                                                             size="sm"
                                                             variant="outline"
-                                                            className="flex-1"
+                                                            className="flex-1 text-[10px] sm:text-xs h-7 sm:h-8"
                                                             onClick={() => {
                                                                 if (confirm("この車両を保管にしますか？")) {
                                                                     archiveMutation.mutate({ id: vehicle.id });
                                                                 }
                                                             }}
                                                         >
-                                                            <Archive className="h-4 w-4 mr-1" />
+                                                            <Archive className="h-3 w-3 sm:h-4 sm:w-4 mr-0.5 sm:mr-1" />
                                                             保管
                                                         </Button>
                                                     </div>
@@ -792,7 +793,7 @@ export default function Vehicles() {
                                                     <Button
                                                         size="sm"
                                                         variant="outline"
-                                                        className="w-full"
+                                                        className="w-full text-[10px] sm:text-xs h-7 sm:h-8"
                                                         onClick={() => {
                                                             if (confirm("この車両を完成に戻しますか？")) {
                                                                 unarchiveMutation.mutate({ id: vehicle.id });

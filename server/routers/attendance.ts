@@ -599,14 +599,22 @@ export const attendanceRouter = createTRPCRouter({
             if (input.clockIn) {
                 updateData.clockIn = new Date(input.clockIn);
             }
-            if (input.clockOut) {
-                updateData.clockOut = new Date(input.clockOut);
+            // clockOutが明示的に送信された場合のみ更新（undefinedの場合は既存の値を保持）
+            if (input.clockOut !== undefined) {
+                if (input.clockOut) {
+                    updateData.clockOut = new Date(input.clockOut);
+                } else {
+                    // 空文字列の場合はnullに設定（出勤中に戻す）
+                    updateData.clockOut = null;
+                }
             }
 
             // 出勤時刻または退勤時刻が変更された場合、勤務時間を再計算
-            if (input.clockIn || input.clockOut) {
+            if (input.clockIn || input.clockOut !== undefined) {
                 const clockIn = input.clockIn ? new Date(input.clockIn) : record.clockIn;
-                const clockOut = input.clockOut ? new Date(input.clockOut) : record.clockOut;
+                const clockOut = input.clockOut !== undefined 
+                    ? (input.clockOut ? new Date(input.clockOut) : null)
+                    : record.clockOut;
 
                 if (clockOut) {
                     const totalMinutes = Math.floor(
@@ -614,6 +622,9 @@ export const attendanceRouter = createTRPCRouter({
                     );
                     const breakMinutes = await calculateBreakTimeMinutes(clockIn, clockOut, db);
                     updateData.workDuration = Math.max(0, totalMinutes - breakMinutes); // 負の値にならないようにする
+                } else {
+                    // clockOutがnullの場合（出勤中）、workDurationもnullに設定
+                    updateData.workDuration = null;
                 }
             }
 

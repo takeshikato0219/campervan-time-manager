@@ -135,15 +135,13 @@ function VehicleCheckCard({
     vehicle,
     onCheck,
     onRequestCheck,
-    onRecheckRequest,
     onCheckAll,
     isAdmin,
     pendingRequests,
 }: {
     vehicle: any;
-    onCheck: (vehicleId: number, itemId: number, currentStatus?: string) => void;
+    onCheck: (vehicleId: number, itemId: number, status: "checked" | "needs_recheck" | "unchecked", notes?: string) => void;
     onRequestCheck: (vehicleId: number, checkItemId?: number) => void;
-    onRecheckRequest: (vehicleId: number, checkItemId: number) => void;
     onCheckAll: (vehicleId: number, itemIds: number[]) => void;
     isAdmin: boolean;
     pendingRequests: any[];
@@ -256,11 +254,10 @@ function VehicleCheckCard({
                                             <div className="flex-1 min-w-0">
                                                 <div className="flex items-center gap-2 flex-wrap">
                                                     <p className="font-semibold text-sm sm:text-base">{status.checkItem.name}</p>
-                                                    <span className={`text-xs px-2 py-0.5 rounded ${
-                                                        status.status === "checked" ? "bg-green-100 text-green-800" :
+                                                    <span className={`text-xs px-2 py-0.5 rounded ${status.status === "checked" ? "bg-green-100 text-green-800" :
                                                         status.status === "needs_recheck" ? "bg-orange-100 text-orange-800" :
-                                                        "bg-gray-100 text-gray-800"
-                                                    }`}>
+                                                            "bg-gray-100 text-gray-800"
+                                                        }`}>
                                                         {getStatusLabel(status.status)}
                                                     </span>
                                                 </div>
@@ -285,24 +282,34 @@ function VehicleCheckCard({
                                                 )}
                                             </div>
                                         </div>
-                                        <div className="flex gap-2 flex-shrink-0">
+                                        <div className="flex flex-col sm:flex-row gap-1.5 sm:gap-2 flex-shrink-0 w-full sm:w-auto">
                                             <Button
                                                 size="sm"
-                                                onClick={() => onCheck(vehicle.id, status.checkItem.id, status.status)}
-                                                className="w-full sm:w-auto"
+                                                onClick={() => onCheck(vehicle.id, status.checkItem.id, "checked")}
+                                                className="w-full sm:w-auto text-[10px] sm:text-xs h-7 sm:h-8"
+                                                variant={status.status === "checked" ? "default" : "outline"}
                                             >
                                                 チェック
                                             </Button>
-                                            {isAdmin && (
-                                                <Button
-                                                    size="sm"
-                                                    variant="outline"
-                                                    onClick={() => onRecheckRequest(vehicle.id, status.checkItem.id)}
-                                                    className="w-full sm:w-auto"
-                                                >
-                                                    再チェック依頼
-                                                </Button>
-                                            )}
+                                            <Button
+                                                size="sm"
+                                                variant="outline"
+                                                onClick={() => onCheck(vehicle.id, status.checkItem.id, "needs_recheck")}
+                                                className={`w-full sm:w-auto text-[10px] sm:text-xs h-7 sm:h-8 ${status.status === "needs_recheck"
+                                                    ? "bg-orange-600 hover:bg-orange-700 text-white border-orange-600"
+                                                    : ""
+                                                    }`}
+                                            >
+                                                要再チェック
+                                            </Button>
+                                            <Button
+                                                size="sm"
+                                                variant="outline"
+                                                onClick={() => onRequestCheck(vehicle.id, status.checkItem.id)}
+                                                className="w-full sm:w-auto text-[10px] sm:text-xs h-7 sm:h-8"
+                                            >
+                                                チェック依頼する
+                                            </Button>
                                         </div>
                                     </div>
                                 </div>
@@ -345,8 +352,9 @@ export default function VehicleChecks() {
 
     const utils = trpc.useUtils();
     const checkMutation = trpc.checks.checkVehicle.useMutation({
-        onSuccess: () => {
-            toast.success("チェックを完了しました");
+        onSuccess: (_, variables) => {
+            const statusLabel = variables.status === "checked" ? "チェック済み" : variables.status === "needs_recheck" ? "要再チェック" : "未チェック";
+            toast.success(`${statusLabel}に更新しました`);
             setCheckingVehicleId(null);
             setCheckingItemId(null);
             setCheckStatus("checked");
@@ -375,18 +383,13 @@ export default function VehicleChecks() {
         },
     });
 
-    const handleCheck = (vehicleId: number, itemId: number, currentStatus?: string) => {
-        setCheckingVehicleId(vehicleId);
-        setCheckingItemId(itemId);
-        // 現在の状態に基づいてデフォルト値を設定
-        if (currentStatus === "needs_recheck") {
-            setCheckStatus("checked");
-        } else if (currentStatus === "checked") {
-            setCheckStatus("needs_recheck");
-        } else {
-            setCheckStatus("checked");
-        }
-        setCheckNotes("");
+    const handleCheck = (vehicleId: number, itemId: number, status: "checked" | "needs_recheck" | "unchecked", notes?: string) => {
+        checkMutation.mutate({
+            vehicleId,
+            checkItemId: itemId,
+            status,
+            notes: notes || undefined,
+        });
     };
 
     const handleSubmitCheck = () => {
@@ -401,13 +404,6 @@ export default function VehicleChecks() {
     };
 
     const handleRequestCheck = (vehicleId: number, checkItemId?: number) => {
-        setRequestingVehicleId(vehicleId);
-        setRequestingCheckItemId(checkItemId);
-        setRequestDueDate("");
-        setIsRequestDialogOpen(true);
-    };
-
-    const handleRecheckRequest = (vehicleId: number, checkItemId: number) => {
         setRequestingVehicleId(vehicleId);
         setRequestingCheckItemId(checkItemId);
         setRequestDueDate("");
@@ -522,7 +518,6 @@ export default function VehicleChecks() {
                                     vehicle={vehicle}
                                     onCheck={handleCheck}
                                     onRequestCheck={handleRequestCheck}
-                                    onRecheckRequest={handleRecheckRequest}
                                     onCheckAll={handleCheckAll}
                                     isAdmin={user?.role === "admin" || false}
                                     pendingRequests={pendingCheckRequests}
