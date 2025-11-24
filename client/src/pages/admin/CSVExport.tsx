@@ -29,12 +29,29 @@ export default function CSVExport() {
         return format(date, "yyyy-MM-dd");
     };
 
-    const [attendanceStartDate, setAttendanceStartDate] = useState(() => {
-        const date = new Date();
-        date.setDate(date.getDate() - 30);
-        return formatDateForInput(date);
-    });
-    const [attendanceEndDate, setAttendanceEndDate] = useState(() => formatDateForInput(new Date()));
+    // 20日始まりの1ヶ月期間を計算する関数
+    const getMonthPeriod20th = (date: Date) => {
+        const year = date.getFullYear();
+        const month = date.getMonth();
+        const day = date.getDate();
+
+        let startDate: Date;
+        let endDate: Date;
+
+        if (day >= 20) {
+            // 20日以降の場合、今月20日から来月19日まで
+            startDate = new Date(year, month, 20);
+            endDate = new Date(year, month + 1, 19);
+        } else {
+            // 20日未満の場合、先月20日から今月19日まで
+            startDate = new Date(year, month - 1, 20);
+            endDate = new Date(year, month, 19);
+        }
+
+        return { start: startDate, end: endDate };
+    };
+
+    const [attendanceBaseDate, setAttendanceBaseDate] = useState(() => formatDateForInput(new Date()));
 
     const [workRecordStartDate, setWorkRecordStartDate] = useState(() => {
         const date = new Date();
@@ -50,8 +67,9 @@ export default function CSVExport() {
             const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
             const url = URL.createObjectURL(blob);
             const link = document.createElement("a");
+            const period = getMonthPeriod20th(new Date(attendanceBaseDate));
+            link.download = `出退勤記録_${format(period.start, "yyyyMMdd")}_${format(period.end, "yyyyMMdd")}.csv`;
             link.href = url;
-            link.download = `出退勤記録_${attendanceStartDate}_${attendanceEndDate}.csv`;
             link.click();
             URL.revokeObjectURL(url);
             toast.success("CSVファイルをダウンロードしました");
@@ -109,32 +127,30 @@ export default function CSVExport() {
             {/* 出退勤記録 */}
             <Card>
                 <CardHeader>
-                    <CardTitle>出退勤記録</CardTitle>
+                    <CardTitle>出退勤記録（20日始まりの1ヶ月単位）</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
-                        <div>
-                            <label className="text-sm font-medium">開始日</label>
-                            <Input
-                                type="date"
-                                value={attendanceStartDate}
-                                onChange={(e) => setAttendanceStartDate(e.target.value)}
-                            />
-                        </div>
-                        <div>
-                            <label className="text-sm font-medium">終了日</label>
-                            <Input
-                                type="date"
-                                value={attendanceEndDate}
-                                onChange={(e) => setAttendanceEndDate(e.target.value)}
-                            />
-                        </div>
+                    <div>
+                        <label className="text-sm font-medium">基準日</label>
+                        <p className="text-xs text-[hsl(var(--muted-foreground))] mb-2">
+                            基準日を含む20日始まりの1ヶ月期間（例：1/20-2/19）で出力されます
+                        </p>
+                        <Input
+                            type="date"
+                            value={attendanceBaseDate}
+                            onChange={(e) => setAttendanceBaseDate(e.target.value)}
+                            className="max-w-xs"
+                        />
+                        {attendanceBaseDate && (
+                            <p className="text-xs text-[hsl(var(--muted-foreground))] mt-2">
+                                出力期間: {format(getMonthPeriod20th(new Date(attendanceBaseDate)).start, "yyyy年MM月dd日")} ～ {format(getMonthPeriod20th(new Date(attendanceBaseDate)).end, "yyyy年MM月dd日")}
+                            </p>
+                        )}
                     </div>
                     <Button
                         onClick={() =>
                             exportAttendanceMutation.mutate({
-                                startDate: attendanceStartDate,
-                                endDate: attendanceEndDate,
+                                date: attendanceBaseDate,
                             })
                         }
                         disabled={exportAttendanceMutation.isPending}
