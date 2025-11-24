@@ -142,7 +142,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
                 </aside>
 
                 {/* メインコンテンツ */}
-                <main className="flex-1 p-4 md:p-8">{children}</main>
+                <main className="flex-1 p-2 sm:p-4 md:p-6 lg:p-8">{children}</main>
             </div>
 
             {/* モバイルメニューのオーバーレイ */}

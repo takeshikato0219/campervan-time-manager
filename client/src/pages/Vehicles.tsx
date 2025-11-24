@@ -189,16 +189,16 @@ export default function Vehicles() {
 
                 <TabsContent value={activeTab} className="mt-4">
                     {filteredVehicles && filteredVehicles.length > 0 ? (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
                             {filteredVehicles.map((vehicle) => (
                                 <Card key={vehicle.id}>
-                                    <CardHeader>
-                                        <CardTitle className="text-lg">{vehicle.vehicleNumber}</CardTitle>
-                                        <CardDescription>
+                                    <CardHeader className="p-3 sm:p-6">
+                                        <CardTitle className="text-base sm:text-lg truncate">{vehicle.vehicleNumber}</CardTitle>
+                                        <CardDescription className="text-xs sm:text-sm">
                                             {vehicleTypes?.find((vt) => vt.id === vehicle.vehicleTypeId)?.name || "不明"}
                                         </CardDescription>
                                     </CardHeader>
-                                    <CardContent className="space-y-2">
+                                    <CardContent className="p-3 sm:p-6 space-y-2">
                                         {vehicle.customerName && (
                                             <p className="text-sm">
                                                 <span className="text-[hsl(var(--muted-foreground))]">お客様名:</span>{" "}
@@ -212,9 +212,9 @@ export default function Vehicles() {
                                             </p>
                                         )}
                                         <div className="flex flex-col gap-2 pt-2">
-                                            <div className="flex gap-2">
+                                            <div className="flex gap-1 sm:gap-2">
                                                 <Link href={`/vehicles/${vehicle.id}`}>
-                                                    <Button size="sm" variant="outline" className="flex-1">
+                                                    <Button size="sm" variant="outline" className="flex-1 text-xs sm:text-sm">
                                                         詳細
                                                     </Button>
                                                 </Link>
@@ -223,40 +223,41 @@ export default function Vehicles() {
                                                         size="sm"
                                                         variant="outline"
                                                         onClick={() => handleEdit(vehicle)}
+                                                        className="px-2 sm:px-3"
                                                     >
-                                                        <Edit className="h-4 w-4" />
+                                                        <Edit className="h-3 w-3 sm:h-4 sm:w-4" />
                                                     </Button>
                                                 )}
                                             </div>
                                             {/* 完成・保管ボタンは管理者のみ表示 */}
                                             {user?.role === "admin" && (
-                                                <div className="flex gap-2">
+                                                <div className="flex gap-1 sm:gap-2">
                                                     {vehicle.status === "in_progress" && (
                                                         <>
                                                             <Button
                                                                 size="sm"
                                                                 variant="outline"
-                                                                className="flex-1"
+                                                                className="flex-1 text-xs sm:text-sm"
                                                                 onClick={() => {
                                                                     if (confirm("この車両を完成にしますか？")) {
                                                                         completeMutation.mutate({ id: vehicle.id });
                                                                     }
                                                                 }}
                                                             >
-                                                                <Check className="h-4 w-4 mr-1" />
+                                                                <Check className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
                                                                 完成
                                                             </Button>
                                                             <Button
                                                                 size="sm"
                                                                 variant="outline"
-                                                                className="flex-1"
+                                                                className="flex-1 text-xs sm:text-sm"
                                                                 onClick={() => {
                                                                     if (confirm("この車両を保管にしますか？")) {
                                                                         archiveMutation.mutate({ id: vehicle.id });
                                                                     }
                                                                 }}
                                                             >
-                                                                <Archive className="h-4 w-4 mr-1" />
+                                                                <Archive className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
                                                                 保管
                                                             </Button>
                                                         </>

@@ -187,12 +187,12 @@ export default function AttendanceManagement() {
 
             {/* スタッフ一覧 */}
             <Card>
-                <CardHeader>
-                    <CardTitle>
+                <CardHeader className="p-4 sm:p-6">
+                    <CardTitle className="text-lg sm:text-xl">
                         {format(selectedDate, "yyyy年MM月dd日")}の出退勤状況
                     </CardTitle>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="p-2 sm:p-6">
                     <StaffAttendanceList selectedDate={selectedDate} />
                 </CardContent>
             </Card>

@@ -110,10 +110,10 @@ export default function Dashboard() {
 
             {/* 出退勤カード */}
             <Card>
-                <CardHeader>
-                    <CardTitle>出退勤</CardTitle>
+                <CardHeader className="p-4 sm:p-6">
+                    <CardTitle className="text-lg sm:text-xl">出退勤</CardTitle>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="p-4 sm:p-6">
                     {todayAttendance ? (
                         <div className="space-y-4">
                             <div>
@@ -150,10 +150,10 @@ export default function Dashboard() {
             {/* 現在の作業 */}
             {activeWork && activeWork.length > 0 && (
                 <Card>
-                    <CardHeader>
-                        <CardTitle>現在の作業</CardTitle>
+                    <CardHeader className="p-4 sm:p-6">
+                        <CardTitle className="text-lg sm:text-xl">現在の作業</CardTitle>
                     </CardHeader>
-                    <CardContent>
+                    <CardContent className="p-4 sm:p-6">
                         {activeWork.map((work) => (
                             <div key={work.id} className="space-y-2">
                                 <p className="font-semibold">{work.vehicleNumber}</p>
@@ -169,10 +169,10 @@ export default function Dashboard() {
             {/* タイムラインカレンダー */}
             {todayRecords && todayRecords.length > 0 && (
                 <Card>
-                    <CardHeader>
-                        <CardTitle>今日の作業タイムライン</CardTitle>
+                    <CardHeader className="p-4 sm:p-6">
+                        <CardTitle className="text-lg sm:text-xl">今日の作業タイムライン</CardTitle>
                     </CardHeader>
-                    <CardContent>
+                    <CardContent className="p-2 sm:p-6">
                         <TimelineCalendar
                             workRecords={todayRecords.map((r) => ({
                                 id: r.id,
@@ -194,26 +194,27 @@ export default function Dashboard() {
 
             {/* 今日の作業履歴 */}
             <Card>
-                <CardHeader>
-                    <div className="flex items-center justify-between">
-                        <CardTitle>今日の作業履歴</CardTitle>
+                <CardHeader className="p-4 sm:p-6">
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                        <CardTitle className="text-lg sm:text-xl">今日の作業履歴</CardTitle>
                         <Button
                             size="sm"
                             variant="outline"
                             onClick={() => setIsAddDialogOpen(true)}
+                            className="w-full sm:w-auto"
                         >
                             <Plus className="h-4 w-4 mr-2" />
                             作業追加
                         </Button>
                     </div>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="p-4 sm:p-6">
                     {todayRecords && todayRecords.length > 0 ? (
-                        <div className="space-y-3">
+                        <div className="space-y-2 sm:space-y-3">
                             {todayRecords.map((record) => (
                                 <div
                                     key={record.id}
-                                    className="flex items-center justify-between p-3 border border-[hsl(var(--border))] rounded-lg"
+                                    className="flex items-center justify-between p-2 sm:p-3 border border-[hsl(var(--border))] rounded-lg"
                                 >
                                     <div>
                                         <p className="font-semibold">{record.vehicleNumber}</p>
@@ -243,25 +244,26 @@ export default function Dashboard() {
 
             {/* 作業追加ダイアログ */}
             {isAddDialogOpen && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-                    <Card className="w-full max-w-md mx-4">
-                        <CardHeader>
-                            <CardTitle>作業記録を追加</CardTitle>
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-2 sm:p-4">
+                    <Card className="w-full max-w-md max-h-[90vh] overflow-y-auto">
+                        <CardHeader className="p-4 sm:p-6">
+                            <CardTitle className="text-lg sm:text-xl">作業記録を追加</CardTitle>
                         </CardHeader>
-                        <CardContent className="space-y-4">
+                        <CardContent className="p-4 sm:p-6 space-y-4">
                             <div>
                                 <label className="text-sm font-medium">日付</label>
                                 <Input
                                     type="date"
                                     value={workDate}
                                     onChange={(e) => setWorkDate(e.target.value)}
+                                    className="mt-1"
                                 />
                             </div>
                             <div>
                                 <label className="text-sm font-medium">車両</label>
                                 <select
                                     key={`vehicle-${selectedVehicleId}`}
-                                    className="flex h-10 w-full rounded-md border border-[hsl(var(--input))] bg-[hsl(var(--background))] px-3 py-2 text-sm"
+                                    className="flex h-10 w-full rounded-md border border-[hsl(var(--input))] bg-[hsl(var(--background))] px-3 py-2 text-sm mt-1"
                                     value={selectedVehicleId}
                                     onChange={(e) => {
                                         e.preventDefault();
@@ -271,7 +273,7 @@ export default function Dashboard() {
                                     <option value="">選択してください</option>
                                     {vehicles?.map((v) => (
                                         <option key={v.id} value={v.id}>
-                                            {v.vehicleNumber}
+                                            {v.vehicleNumber}{v.customerName ? ` - ${v.customerName}` : ''}
                                         </option>
                                     ))}
                                 </select>
@@ -280,7 +282,7 @@ export default function Dashboard() {
                                 <label className="text-sm font-medium">工程</label>
                                 <select
                                     key={`process-${selectedProcessId}`}
-                                    className="flex h-10 w-full rounded-md border border-[hsl(var(--input))] bg-[hsl(var(--background))] px-3 py-2 text-sm"
+                                    className="flex h-10 w-full rounded-md border border-[hsl(var(--input))] bg-[hsl(var(--background))] px-3 py-2 text-sm mt-1"
                                     value={selectedProcessId}
                                     onChange={(e) => {
                                         e.preventDefault();
@@ -302,17 +304,19 @@ export default function Dashboard() {
                                     value={startTime}
                                     onChange={(e) => setStartTime(e.target.value)}
                                     required
+                                    className="mt-1"
                                 />
                             </div>
                             <div>
-                                <label className="text-sm font-medium">終了時刻（任意）</label>
+                                <label className="text-sm font-medium">終了時刻</label>
                                 <Input
                                     type="time"
                                     value={endTime}
                                     onChange={(e) => setEndTime(e.target.value)}
+                                    className="mt-1"
                                 />
                             </div>
-                            <div className="flex gap-2">
+                            <div className="flex gap-2 pt-2">
                                 <Button
                                     className="flex-1"
                                     onClick={handleAddWork}

@@ -232,13 +232,13 @@ export default function StaffAttendanceList({ selectedDate }: StaffAttendanceLis
     }
 
     return (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-3">
             {staffList.map((staff) => (
                 <div key={staff.userId} className="contents">
                     <Card className="h-full">
-                        <CardContent className="p-4 space-y-3">
+                        <CardContent className="p-3 sm:p-4 space-y-2 sm:space-y-3">
                             <div>
-                                <p className="font-semibold text-base">{staff.userName}</p>
+                                <p className="font-semibold text-sm sm:text-base truncate">{staff.userName}</p>
                                 {staff.attendance ? (
                                     <div className="space-y-2">
                                         <div className="flex items-center gap-2">
@@ -276,10 +276,10 @@ export default function StaffAttendanceList({ selectedDate }: StaffAttendanceLis
                                                 <Button
                                                     size="sm"
                                                     variant="outline"
-                                                    className="w-full"
+                                                    className="w-full text-xs sm:text-sm"
                                                     onClick={() => handleAdminClockOut(staff.userId)}
                                                 >
-                                                    <Plus className="h-4 w-4 mr-1" />
+                                                    <Plus className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
                                                     退勤
                                                 </Button>
                                             </div>
@@ -291,16 +291,16 @@ export default function StaffAttendanceList({ selectedDate }: StaffAttendanceLis
                                         <Button
                                             size="sm"
                                             variant="outline"
-                                            className="w-full"
+                                            className="w-full text-xs sm:text-sm"
                                             onClick={() => handleAdminClockIn(staff.userId)}
                                         >
-                                            <Plus className="h-4 w-4 mr-1" />
+                                            <Plus className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
                                             出勤
                                         </Button>
                                     </div>
                                 )}
                             </div>
-                            <div className="flex flex-wrap gap-2 pt-2 border-t border-[hsl(var(--border))]">
+                            <div className="flex flex-wrap gap-1 sm:gap-2 pt-2 border-t border-[hsl(var(--border))]">
                                 {staff.attendance ? (
                                     <>
                                         {editingId === staff.attendance.id ? (
@@ -319,10 +319,10 @@ export default function StaffAttendanceList({ selectedDate }: StaffAttendanceLis
                                                     className="w-full"
                                                     placeholder="退勤時刻"
                                                 />
-                                                <div className="flex gap-2">
+                                                <div className="flex gap-1 sm:gap-2">
                                                     <Button
                                                         size="sm"
-                                                        className="flex-1"
+                                                        className="flex-1 text-xs sm:text-sm"
                                                         onClick={() => handleSave(staff.attendance!.id)}
                                                         disabled={updateMutation.isPending}
                                                     >
@@ -331,7 +331,7 @@ export default function StaffAttendanceList({ selectedDate }: StaffAttendanceLis
                                                     <Button
                                                         size="sm"
                                                         variant="outline"
-                                                        className="flex-1"
+                                                        className="flex-1 text-xs sm:text-sm"
                                                         onClick={() => setEditingId(null)}
                                                     >
                                                         キャンセル
@@ -339,10 +339,10 @@ export default function StaffAttendanceList({ selectedDate }: StaffAttendanceLis
                                                     <Button
                                                         size="sm"
                                                         variant="destructive"
-                                                        className="flex-1"
+                                                        className="flex-1 text-xs sm:text-sm"
                                                         onClick={() => handleDelete(staff.attendance!.id)}
                                                     >
-                                                        <Trash2 className="h-4 w-4 mr-1" />
+                                                        <Trash2 className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
                                                         削除
                                                     </Button>
                                                 </div>
@@ -352,16 +352,16 @@ export default function StaffAttendanceList({ selectedDate }: StaffAttendanceLis
                                                 <Button
                                                     size="sm"
                                                     variant="outline"
-                                                    className="flex-1"
+                                                    className="flex-1 text-xs sm:text-sm"
                                                     onClick={() => handleEdit(staff.attendance!)}
                                                 >
-                                                    <Edit className="h-4 w-4 mr-1" />
+                                                    <Edit className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
                                                     編集
                                                 </Button>
                                                 <Button
                                                     size="sm"
                                                     variant="outline"
-                                                    className="flex-1"
+                                                    className="flex-1 text-xs sm:text-sm"
                                                     onClick={() =>
                                                         setShowEditLogs(
                                                             showEditLogs === staff.attendance!.id
@@ -370,7 +370,7 @@ export default function StaffAttendanceList({ selectedDate }: StaffAttendanceLis
                                                         )
                                                     }
                                                 >
-                                                    <History className="h-4 w-4 mr-1" />
+                                                    <History className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
                                                     履歴
                                                 </Button>
                                             </>

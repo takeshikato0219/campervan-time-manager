@@ -162,16 +162,16 @@ export default function WorkRecords() {
             </div>
 
             <Card>
-                <CardHeader>
-                    <CardTitle>今日の作業記録</CardTitle>
+                <CardHeader className="p-4 sm:p-6">
+                    <CardTitle className="text-lg sm:text-xl">今日の作業記録</CardTitle>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="p-4 sm:p-6">
                     {workRecords && workRecords.length > 0 ? (
-                        <div className="space-y-3">
+                        <div className="space-y-2 sm:space-y-3">
                             {workRecords.map((record) => (
                                 <div
                                     key={record.id}
-                                    className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-3 border border-[hsl(var(--border))] rounded-lg"
+                                    className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3 p-2 sm:p-3 border border-[hsl(var(--border))] rounded-lg"
                                 >
                                     <div className="flex-1">
                                         <p className="font-semibold text-base">{record.vehicleNumber}</p>
@@ -183,11 +183,11 @@ export default function WorkRecords() {
                                             {record.endTime ? ` - ${formatTime(record.endTime)}` : " (作業中)"}
                                         </p>
                                     </div>
-                                    <div className="flex items-center justify-between sm:justify-end gap-4">
+                                    <div className="flex items-center justify-between sm:justify-end gap-2 sm:gap-4">
                                         <div className="text-right sm:text-left">
-                                            <p className="font-semibold">{formatDuration(record.durationMinutes)}</p>
+                                            <p className="font-semibold text-sm sm:text-base">{formatDuration(record.durationMinutes)}</p>
                                         </div>
-                                        <div className="flex gap-2">
+                                        <div className="flex gap-1 sm:gap-2">
                                             <Button
                                                 size="sm"
                                                 variant="outline"
@@ -218,12 +218,12 @@ export default function WorkRecords() {
 
             {/* 作業編集ダイアログ */}
             {isEditDialogOpen && editingRecord && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-                    <Card className="w-full max-w-md mx-4">
-                        <CardHeader>
-                            <CardTitle>作業記録を編集</CardTitle>
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-2 sm:p-4">
+                    <Card className="w-full max-w-md max-h-[90vh] overflow-y-auto">
+                        <CardHeader className="p-4 sm:p-6">
+                            <CardTitle className="text-lg sm:text-xl">作業記録を編集</CardTitle>
                         </CardHeader>
-                        <CardContent className="space-y-4">
+                        <CardContent className="p-4 sm:p-6 space-y-4">
                             <div>
                                 <label className="text-sm font-medium">日付</label>
                                 <Input
@@ -232,13 +232,14 @@ export default function WorkRecords() {
                                     onChange={(e) =>
                                         setEditingRecord({ ...editingRecord, workDate: e.target.value })
                                     }
+                                    className="mt-1"
                                 />
                             </div>
                             <div>
                                 <label className="text-sm font-medium">車両</label>
                                 <select
                                     key={`edit-vehicle-${editingRecord.vehicleId}`}
-                                    className="flex h-10 w-full rounded-md border border-[hsl(var(--input))] bg-[hsl(var(--background))] px-3 py-2 text-sm"
+                                    className="flex h-10 w-full rounded-md border border-[hsl(var(--input))] bg-[hsl(var(--background))] px-3 py-2 text-sm mt-1"
                                     value={editingRecord.vehicleId}
                                     onChange={(e) => {
                                         e.preventDefault();
@@ -248,7 +249,7 @@ export default function WorkRecords() {
                                     <option value="">選択してください</option>
                                     {vehicles?.map((v) => (
                                         <option key={v.id} value={v.id}>
-                                            {v.vehicleNumber}
+                                            {v.vehicleNumber}{v.customerName ? ` - ${v.customerName}` : ''}
                                         </option>
                                     ))}
                                 </select>
@@ -257,7 +258,7 @@ export default function WorkRecords() {
                                 <label className="text-sm font-medium">工程</label>
                                 <select
                                     key={`edit-process-${editingRecord.processId}`}
-                                    className="flex h-10 w-full rounded-md border border-[hsl(var(--input))] bg-[hsl(var(--background))] px-3 py-2 text-sm"
+                                    className="flex h-10 w-full rounded-md border border-[hsl(var(--input))] bg-[hsl(var(--background))] px-3 py-2 text-sm mt-1"
                                     value={editingRecord.processId}
                                     onChange={(e) => {
                                         e.preventDefault();
@@ -281,16 +282,18 @@ export default function WorkRecords() {
                                         setEditingRecord({ ...editingRecord, startTime: e.target.value })
                                     }
                                     required
+                                    className="mt-1"
                                 />
                             </div>
                             <div>
-                                <label className="text-sm font-medium">終了時刻（任意）</label>
+                                <label className="text-sm font-medium">終了時刻</label>
                                 <Input
                                     type="time"
                                     value={editingRecord.endTime}
                                     onChange={(e) =>
                                         setEditingRecord({ ...editingRecord, endTime: e.target.value })
                                     }
+                                    className="mt-1"
                                 />
                             </div>
                             <div>
@@ -302,9 +305,10 @@ export default function WorkRecords() {
                                         setEditingRecord({ ...editingRecord, workDescription: e.target.value })
                                     }
                                     placeholder="作業内容を入力"
+                                    className="mt-1"
                                 />
                             </div>
-                            <div className="flex gap-2">
+                            <div className="flex gap-2 pt-2">
                                 <Button
                                     className="flex-1"
                                     onClick={handleSaveEdit}
@@ -330,25 +334,26 @@ export default function WorkRecords() {
 
             {/* 作業追加ダイアログ */}
             {isAddDialogOpen && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-                    <Card className="w-full max-w-md mx-4">
-                        <CardHeader>
-                            <CardTitle>作業記録を追加</CardTitle>
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-2 sm:p-4">
+                    <Card className="w-full max-w-md max-h-[90vh] overflow-y-auto">
+                        <CardHeader className="p-4 sm:p-6">
+                            <CardTitle className="text-lg sm:text-xl">作業記録を追加</CardTitle>
                         </CardHeader>
-                        <CardContent className="space-y-4">
+                        <CardContent className="p-4 sm:p-6 space-y-4">
                             <div>
                                 <label className="text-sm font-medium">日付</label>
                                 <Input
                                     type="date"
                                     value={workDate}
                                     onChange={(e) => setWorkDate(e.target.value)}
+                                    className="mt-1"
                                 />
                             </div>
                             <div>
                                 <label className="text-sm font-medium">車両</label>
                                 <select
                                     key={`vehicle-${selectedVehicleId}`}
-                                    className="flex h-10 w-full rounded-md border border-[hsl(var(--input))] bg-[hsl(var(--background))] px-3 py-2 text-sm"
+                                    className="flex h-10 w-full rounded-md border border-[hsl(var(--input))] bg-[hsl(var(--background))] px-3 py-2 text-sm mt-1"
                                     value={selectedVehicleId}
                                     onChange={(e) => {
                                         e.preventDefault();
@@ -358,7 +363,7 @@ export default function WorkRecords() {
                                     <option value="">選択してください</option>
                                     {vehicles?.map((v) => (
                                         <option key={v.id} value={v.id}>
-                                            {v.vehicleNumber}
+                                            {v.vehicleNumber}{v.customerName ? ` - ${v.customerName}` : ''}
                                         </option>
                                     ))}
                                 </select>
@@ -367,7 +372,7 @@ export default function WorkRecords() {
                                 <label className="text-sm font-medium">工程</label>
                                 <select
                                     key={`process-${selectedProcessId}`}
-                                    className="flex h-10 w-full rounded-md border border-[hsl(var(--input))] bg-[hsl(var(--background))] px-3 py-2 text-sm"
+                                    className="flex h-10 w-full rounded-md border border-[hsl(var(--input))] bg-[hsl(var(--background))] px-3 py-2 text-sm mt-1"
                                     value={selectedProcessId}
                                     onChange={(e) => {
                                         e.preventDefault();
@@ -389,17 +394,19 @@ export default function WorkRecords() {
                                     value={startTime}
                                     onChange={(e) => setStartTime(e.target.value)}
                                     required
+                                    className="mt-1"
                                 />
                             </div>
                             <div>
-                                <label className="text-sm font-medium">終了時刻（任意）</label>
+                                <label className="text-sm font-medium">終了時刻</label>
                                 <Input
                                     type="time"
                                     value={endTime}
                                     onChange={(e) => setEndTime(e.target.value)}
+                                    className="mt-1"
                                 />
                             </div>
-                            <div className="flex gap-2">
+                            <div className="flex gap-2 pt-2">
                                 <Button
                                     className="flex-1"
                                     onClick={handleAddWork}

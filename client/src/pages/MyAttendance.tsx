@@ -31,10 +31,10 @@ export default function MyAttendance() {
             </div>
 
             <Card>
-                <CardHeader>
-                    <CardTitle>今日の出退勤</CardTitle>
+                <CardHeader className="p-4 sm:p-6">
+                    <CardTitle className="text-lg sm:text-xl">今日の出退勤</CardTitle>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="p-4 sm:p-6">
                     {todayAttendance ? (
                         <div className="space-y-4">
                             <div>
