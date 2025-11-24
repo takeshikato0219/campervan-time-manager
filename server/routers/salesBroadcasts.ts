@@ -73,9 +73,19 @@ export const salesBroadcastsRouter = createTRPCRouter({
 
         let vehicles: any[] = [];
         let users: any[] = [];
+        let vehicleTypes: any[] = [];
         if (vehicleIds.length > 0) {
             const { inArray } = await import("drizzle-orm");
             vehicles = await db.select().from(schema.vehicles).where(inArray(schema.vehicles.id, vehicleIds));
+            
+            // 車種情報を取得
+            const vehicleTypeIds = [...new Set(vehicles.map((v) => v.vehicleTypeId))];
+            if (vehicleTypeIds.length > 0) {
+                vehicleTypes = await db
+                    .select()
+                    .from(schema.vehicleTypes)
+                    .where(inArray(schema.vehicleTypes.id, vehicleTypeIds));
+            }
         }
         if (userIds.length > 0) {
             const { inArray } = await import("drizzle-orm");
@@ -84,12 +94,17 @@ export const salesBroadcastsRouter = createTRPCRouter({
 
         const vehicleMap = new Map(vehicles.map((v) => [v.id, v]));
         const userMap = new Map(users.map((u) => [u.id, u]));
+        const vehicleTypeMap = new Map(vehicleTypes.map((vt) => [vt.id, vt]));
 
-        return unreadBroadcasts.map((broadcast) => ({
-            ...broadcast,
-            vehicle: vehicleMap.get(broadcast.vehicleId),
-            createdByUser: userMap.get(broadcast.createdBy),
-        }));
+        return unreadBroadcasts.map((broadcast) => {
+            const vehicle = vehicleMap.get(broadcast.vehicleId);
+            const vehicleType = vehicle ? vehicleTypeMap.get(vehicle.vehicleTypeId) : null;
+            return {
+                ...broadcast,
+                vehicle: vehicle ? { ...vehicle, vehicleType } : null,
+                createdByUser: userMap.get(broadcast.createdBy),
+            };
+        });
     }),
 
     // 拡散を既読にする

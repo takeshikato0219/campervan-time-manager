@@ -74,10 +74,10 @@ export const csvRouter = createTRPCRouter({
             // 各ユーザーごとにセクションを作成
             users.forEach((user) => {
                 const userName = user.name || user.username || "不明";
-                
+
                 // ユーザー名のヘッダー行
                 csvRows.push([`${userName} (${user.id})`]);
-                
+
                 // カラムヘッダー
                 csvRows.push(["日付", "出勤時刻", "退勤時刻", "勤務時間（分）", "出勤デバイス", "退勤デバイス"]);
 

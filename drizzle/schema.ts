@@ -66,7 +66,11 @@ export const vehicles = mysqlTable("vehicles", {
     hasCoating: mysqlEnum("hasCoating", ["yes", "no"]), // コーティングありなし
     hasLine: mysqlEnum("hasLine", ["yes", "no"]), // ラインありなし
     hasPreferredNumber: mysqlEnum("hasPreferredNumber", ["yes", "no"]), // 希望ナンバーありなし
-    hasTireReplacement: mysqlEnum("hasTireReplacement", ["yes", "no"]), // タイヤ交換ありなし
+    hasTireReplacement: mysqlEnum("hasTireReplacement", ["summer", "winter", "no"]), // タイヤ交換: 夏タイヤ納車/冬タイヤ納車/なし
+    instructionSheetUrl: text("instructionSheetUrl"), // 指示書ファイルURL（PDF/JPG）
+    outsourcingDestination: varchar("outsourcingDestination", { length: 255 }), // 外注先
+    outsourcingStartDate: date("outsourcingStartDate"), // 外注開始日
+    outsourcingEndDate: date("outsourcingEndDate"), // 外注終了日
     completionDate: date("completionDate"),
     status: mysqlEnum("status", ["in_progress", "completed", "archived"])
         .default("in_progress")
@@ -224,5 +228,15 @@ export const salesBroadcastReads = mysqlTable("salesBroadcastReads", {
     userId: int("userId").notNull(), // 読んだユーザーID
     readAt: timestamp("readAt").defaultNow().notNull(),
     createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+// 19. vehicleAttentionPoints: 車両注意ポイント
+export const vehicleAttentionPoints = mysqlTable("vehicleAttentionPoints", {
+    id: int("id").autoincrement().primaryKey(),
+    vehicleId: int("vehicleId").notNull(),
+    userId: int("userId").notNull(), // 注意ポイントを追加したユーザーID
+    content: text("content").notNull(), // 注意ポイントの内容
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
 

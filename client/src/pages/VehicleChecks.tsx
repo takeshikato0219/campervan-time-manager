@@ -12,17 +12,139 @@ import { Link } from "wouter";
 
 const CATEGORIES = ["一般", "キャンパー", "中古", "修理", "クレーム"] as const;
 
+// チェック依頼ダイアログコンポーネント
+function CheckRequestDialog({
+    vehicleId,
+    checkItemId,
+    users,
+    requestedToUserId,
+    setRequestedToUserId,
+    requestDueDate,
+    setRequestDueDate,
+    requestMessage,
+    setRequestMessage,
+    onSubmit,
+    onCancel,
+    isPending,
+}: {
+    vehicleId: number;
+    checkItemId?: number;
+    users: any[];
+    requestedToUserId: string;
+    setRequestedToUserId: (value: string) => void;
+    requestDueDate: string;
+    setRequestDueDate: (value: string) => void;
+    requestMessage: string;
+    setRequestMessage: (value: string) => void;
+    onSubmit: (selectedCheckItemId?: number) => void;
+    onCancel: () => void;
+    isPending: boolean;
+}) {
+    const { data: checkData } = trpc.checks.getVehicleChecks.useQuery({
+        vehicleId,
+    });
+
+    const checkItems = checkData?.checkStatus?.map((s: any) => s.checkItem) || [];
+    const [selectedCheckItemId, setSelectedCheckItemId] = useState<string>(
+        checkItemId ? checkItemId.toString() : ""
+    );
+
+    return (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-2 sm:p-4 overflow-y-auto">
+            <Card className="w-full max-w-md min-w-0 my-auto">
+                <CardHeader className="p-3 sm:p-4 md:p-6">
+                    <CardTitle className="text-base sm:text-lg md:text-xl">チェック依頼</CardTitle>
+                </CardHeader>
+                <CardContent className="p-3 sm:p-4 md:p-6 space-y-3 sm:space-y-4">
+                    <div className="min-w-0">
+                        <label className="text-sm font-medium block mb-1">チェック項目 *</label>
+                        <select
+                            className="flex h-10 w-full min-w-0 rounded-md border border-[hsl(var(--input))] bg-[hsl(var(--background))] px-2 sm:px-3 py-2 text-sm"
+                            value={selectedCheckItemId}
+                            onChange={(e) => setSelectedCheckItemId(e.target.value)}
+                            disabled={!!checkItemId}
+                        >
+                            <option value="">選択してください</option>
+                            {checkItems.map((item: any) => (
+                                <option key={item.id} value={item.id}>
+                                    {item.name}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+                    <div className="min-w-0">
+                        <label className="text-sm font-medium block mb-1">依頼先ユーザー *</label>
+                        <select
+                            className="flex h-10 w-full min-w-0 rounded-md border border-[hsl(var(--input))] bg-[hsl(var(--background))] px-2 sm:px-3 py-2 text-sm"
+                            value={requestedToUserId}
+                            onChange={(e) => setRequestedToUserId(e.target.value)}
+                        >
+                            <option value="">選択してください</option>
+                            {users.map((u) => (
+                                <option key={u.id} value={u.id}>
+                                    {u.name || u.username}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+                    <div className="min-w-0">
+                        <label className="text-sm font-medium block mb-1">期限日（任意）</label>
+                        <Input
+                            type="date"
+                            value={requestDueDate}
+                            onChange={(e) => setRequestDueDate(e.target.value)}
+                            className="w-full min-w-0"
+                        />
+                    </div>
+                    <div className="min-w-0">
+                        <label className="text-sm font-medium block mb-1">メッセージ（任意）</label>
+                        <Input
+                            value={requestMessage}
+                            onChange={(e) => setRequestMessage(e.target.value)}
+                            placeholder="依頼メッセージを入力"
+                            className="w-full min-w-0"
+                        />
+                    </div>
+                    <div className="flex flex-col sm:flex-row gap-2 pt-2">
+                        <Button
+                            className="flex-1 w-full sm:w-auto"
+                            onClick={() => {
+                                const itemIdToUse = checkItemId || (selectedCheckItemId ? parseInt(selectedCheckItemId) : undefined);
+                                if (!itemIdToUse) {
+                                    toast.error("チェック項目を選択してください");
+                                    return;
+                                }
+                                onSubmit(itemIdToUse);
+                            }}
+                            disabled={isPending}
+                        >
+                            依頼送信
+                        </Button>
+                        <Button variant="outline" className="flex-1 w-full sm:w-auto" onClick={onCancel}>
+                            キャンセル
+                        </Button>
+                    </div>
+                </CardContent>
+            </Card>
+        </div>
+    );
+}
+
 // 車両チェックカードコンポーネント
 function VehicleCheckCard({
     vehicle,
     onCheck,
     onRequestCheck,
+    onRecheckRequest,
+    onCheckAll,
     isAdmin,
     pendingRequests,
 }: {
     vehicle: any;
     onCheck: (vehicleId: number, itemId: number) => void;
-    onRequestCheck: (vehicleId: number) => void;
+    onRequestCheck: (vehicleId: number, checkItemId?: number) => void;
+    onRecheckRequest: (vehicleId: number, checkItemId: number) => void;
+    onCheckAll: (vehicleId: number, itemIds: number[]) => void;
     isAdmin: boolean;
     pendingRequests: any[];
 }) {
@@ -31,6 +153,11 @@ function VehicleCheckCard({
     });
 
     const pendingRequestsForVehicle = pendingRequests.filter((req) => req.vehicleId === vehicle.id);
+
+    // 未チェック項目のIDリスト
+    const uncheckedItemIds = checkData?.checkStatus
+        ?.filter((s: any) => !s.checked)
+        .map((s: any) => s.checkItem.id) || [];
 
     return (
         <Card>
@@ -51,12 +178,25 @@ function VehicleCheckCard({
                             )}
                         </div>
                     </div>
-                    {isAdmin && (
-                        <Button size="sm" variant="outline" onClick={() => onRequestCheck(vehicle.id)}>
-                            <UserPlus className="h-4 w-4 mr-2" />
-                            依頼
-                        </Button>
-                    )}
+                    <div className="flex flex-wrap gap-2">
+                        {uncheckedItemIds.length > 0 && (
+                            <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => onCheckAll(vehicle.id, uncheckedItemIds)}
+                            >
+                                車両にチェック
+                            </Button>
+                        )}
+                        {isAdmin && (
+                            <>
+                                <Button size="sm" variant="outline" onClick={() => onRequestCheck(vehicle.id)}>
+                                    <UserPlus className="h-4 w-4 mr-2" />
+                                    依頼
+                                </Button>
+                            </>
+                        )}
+                    </div>
                 </div>
                 {pendingRequestsForVehicle.length > 0 && (
                     <div className="flex items-center gap-2 text-orange-600 text-xs sm:text-sm mt-2">
@@ -71,9 +211,8 @@ function VehicleCheckCard({
                         {checkData.checkStatus.map((status: any) => (
                             <div
                                 key={status.checkItem.id}
-                                className={`p-2 sm:p-3 border rounded-lg ${
-                                    status.checked ? "bg-green-50 border-green-200" : "bg-gray-50 border-gray-200"
-                                }`}
+                                className={`p-2 sm:p-3 border rounded-lg ${status.checked ? "bg-green-50 border-green-200" : "bg-gray-50 border-gray-200"
+                                    }`}
                             >
                                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                                     <div className="flex items-start gap-2 flex-1 min-w-0">
@@ -105,15 +244,25 @@ function VehicleCheckCard({
                                             )}
                                         </div>
                                     </div>
-                                    {!status.checked && (
+                                    <div className="flex gap-2 flex-shrink-0">
                                         <Button
                                             size="sm"
                                             onClick={() => onCheck(vehicle.id, status.checkItem.id)}
-                                            className="w-full sm:w-auto flex-shrink-0"
+                                            className="w-full sm:w-auto"
                                         >
-                                            チェック
+                                            {status.checked ? "再チェック" : "チェック"}
                                         </Button>
-                                    )}
+                                        {isAdmin && status.checked && (
+                                            <Button
+                                                size="sm"
+                                                variant="outline"
+                                                onClick={() => onRecheckRequest(vehicle.id, status.checkItem.id)}
+                                                className="w-full sm:w-auto"
+                                            >
+                                                再チェック依頼
+                                            </Button>
+                                        )}
+                                    </div>
                                 </div>
                             </div>
                         ))}
@@ -136,8 +285,10 @@ export default function VehicleChecks() {
     const [checkNotes, setCheckNotes] = useState("");
     const [isRequestDialogOpen, setIsRequestDialogOpen] = useState(false);
     const [requestingVehicleId, setRequestingVehicleId] = useState<number | null>(null);
+    const [requestingCheckItemId, setRequestingCheckItemId] = useState<number | undefined>(undefined);
     const [requestedToUserId, setRequestedToUserId] = useState("");
     const [requestMessage, setRequestMessage] = useState("");
+    const [requestDueDate, setRequestDueDate] = useState("");
 
     const { data: vehicles } = trpc.vehicles.list.useQuery({});
     const { data: users } = trpc.users.list.useQuery(undefined, { enabled: user?.role === "admin" });
@@ -169,8 +320,11 @@ export default function VehicleChecks() {
             toast.success("チェック依頼を送信しました");
             setIsRequestDialogOpen(false);
             setRequestingVehicleId(null);
+            setRequestingCheckItemId(undefined);
             setRequestedToUserId("");
             setRequestMessage("");
+            setRequestDueDate("");
+            utils.checks.getMyCheckRequests.invalidate();
         },
         onError: (error) => {
             toast.error(error.message || "チェック依頼の送信に失敗しました");
@@ -193,20 +347,58 @@ export default function VehicleChecks() {
         });
     };
 
-    const handleRequestCheck = (vehicleId: number) => {
+    const handleRequestCheck = (vehicleId: number, checkItemId?: number) => {
         setRequestingVehicleId(vehicleId);
+        setRequestingCheckItemId(checkItemId);
+        setRequestDueDate("");
         setIsRequestDialogOpen(true);
     };
 
-    const handleSubmitRequest = () => {
+    const handleRecheckRequest = (vehicleId: number, checkItemId: number) => {
+        setRequestingVehicleId(vehicleId);
+        setRequestingCheckItemId(checkItemId);
+        setRequestDueDate("");
+        setIsRequestDialogOpen(true);
+    };
+
+    const handleCheckAll = async (vehicleId: number, itemIds: number[]) => {
+        if (itemIds.length === 0) {
+            toast.info("チェックする項目がありません");
+            return;
+        }
+
+        // 全ての未チェック項目を順番にチェック
+        for (const itemId of itemIds) {
+            try {
+                await checkMutation.mutateAsync({
+                    vehicleId,
+                    checkItemId: itemId,
+                    notes: undefined,
+                });
+            } catch (error) {
+                console.error("チェックエラー:", error);
+            }
+        }
+        toast.success(`${itemIds.length}件のチェックを完了しました`);
+    };
+
+    const handleSubmitRequest = (selectedCheckItemId?: number) => {
         if (!requestingVehicleId || !requestedToUserId) {
             toast.error("依頼先ユーザーを選択してください");
             return;
         }
 
+        const checkItemIdToUse = selectedCheckItemId || requestingCheckItemId;
+        if (!checkItemIdToUse) {
+            toast.error("チェック項目を選択してください");
+            return;
+        }
+
         requestCheckMutation.mutate({
             vehicleId: requestingVehicleId,
+            checkItemId: checkItemIdToUse,
             requestedTo: parseInt(requestedToUserId),
+            dueDate: requestDueDate ? new Date(requestDueDate) : undefined,
             message: requestMessage || undefined,
         });
     };
@@ -259,10 +451,10 @@ export default function VehicleChecks() {
 
             {/* カテゴリタブ */}
             <Tabs value={selectedCategory} onValueChange={(v) => setSelectedCategory(v as any)}>
-                <TabsList className="grid w-full grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-1 sm:gap-2">
-                    <TabsTrigger value="all" className="text-xs sm:text-sm px-2 sm:px-3">全て</TabsTrigger>
+                <TabsList className="grid w-full grid-cols-3 sm:grid-cols-3 md:grid-cols-6 gap-1 sm:gap-2 overflow-x-auto">
+                    <TabsTrigger value="all" className="text-xs sm:text-sm px-2 sm:px-3 whitespace-nowrap">全て</TabsTrigger>
                     {CATEGORIES.map((cat) => (
-                        <TabsTrigger key={cat} value={cat} className="text-xs sm:text-sm px-2 sm:px-3">
+                        <TabsTrigger key={cat} value={cat} className="text-xs sm:text-sm px-2 sm:px-3 whitespace-nowrap">
                             {cat}
                         </TabsTrigger>
                     ))}
@@ -277,6 +469,8 @@ export default function VehicleChecks() {
                                     vehicle={vehicle}
                                     onCheck={handleCheck}
                                     onRequestCheck={handleRequestCheck}
+                                    onRecheckRequest={handleRecheckRequest}
+                                    onCheckAll={handleCheckAll}
                                     isAdmin={user?.role === "admin" || false}
                                     pendingRequests={pendingCheckRequests}
                                 />
@@ -336,60 +530,27 @@ export default function VehicleChecks() {
 
             {/* チェック依頼ダイアログ */}
             {isRequestDialogOpen && requestingVehicleId && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-2 sm:p-4 overflow-y-auto">
-                    <Card className="w-full max-w-md min-w-0 my-auto">
-                        <CardHeader className="p-3 sm:p-4 md:p-6">
-                            <CardTitle className="text-base sm:text-lg md:text-xl">チェック依頼</CardTitle>
-                        </CardHeader>
-                        <CardContent className="p-3 sm:p-4 md:p-6 space-y-3 sm:space-y-4">
-                            <div className="min-w-0">
-                                <label className="text-sm font-medium block mb-1">依頼先ユーザー *</label>
-                                <select
-                                    className="flex h-10 w-full min-w-0 rounded-md border border-[hsl(var(--input))] bg-[hsl(var(--background))] px-2 sm:px-3 py-2 text-sm"
-                                    value={requestedToUserId}
-                                    onChange={(e) => setRequestedToUserId(e.target.value)}
-                                >
-                                    <option value="">選択してください</option>
-                                    {users?.map((u) => (
-                                        <option key={u.id} value={u.id}>
-                                            {u.name || u.username}
-                                        </option>
-                                    ))}
-                                </select>
-                            </div>
-                            <div className="min-w-0">
-                                <label className="text-sm font-medium block mb-1">メッセージ（任意）</label>
-                                <Input
-                                    value={requestMessage}
-                                    onChange={(e) => setRequestMessage(e.target.value)}
-                                    placeholder="依頼メッセージを入力"
-                                    className="w-full min-w-0"
-                                />
-                            </div>
-                            <div className="flex flex-col sm:flex-row gap-2 pt-2">
-                                <Button
-                                    className="flex-1 w-full sm:w-auto"
-                                    onClick={handleSubmitRequest}
-                                    disabled={requestCheckMutation.isPending}
-                                >
-                                    依頼送信
-                                </Button>
-                                <Button
-                                    variant="outline"
-                                    className="flex-1 w-full sm:w-auto"
-                                    onClick={() => {
-                                        setIsRequestDialogOpen(false);
-                                        setRequestingVehicleId(null);
-                                        setRequestedToUserId("");
-                                        setRequestMessage("");
-                                    }}
-                                >
-                                    キャンセル
-                                </Button>
-                            </div>
-                        </CardContent>
-                    </Card>
-                </div>
+                <CheckRequestDialog
+                    vehicleId={requestingVehicleId}
+                    checkItemId={requestingCheckItemId}
+                    users={users || []}
+                    requestedToUserId={requestedToUserId}
+                    setRequestedToUserId={setRequestedToUserId}
+                    requestDueDate={requestDueDate}
+                    setRequestDueDate={setRequestDueDate}
+                    requestMessage={requestMessage}
+                    setRequestMessage={setRequestMessage}
+                    onSubmit={handleSubmitRequest}
+                    onCancel={() => {
+                        setIsRequestDialogOpen(false);
+                        setRequestingVehicleId(null);
+                        setRequestingCheckItemId(undefined);
+                        setRequestedToUserId("");
+                        setRequestMessage("");
+                        setRequestDueDate("");
+                    }}
+                    isPending={requestCheckMutation.isPending}
+                />
             )}
         </div>
     );

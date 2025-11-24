@@ -243,9 +243,9 @@ export default function CheckItemManagement() {
             </div>
 
             <Tabs value={selectedCategory} onValueChange={(v) => setSelectedCategory(v as any)}>
-                <TabsList className="grid w-full grid-cols-2 sm:grid-cols-5">
+                <TabsList className="grid w-full grid-cols-3 sm:grid-cols-5 gap-1 sm:gap-2 overflow-x-auto">
                     {CATEGORIES.map((cat) => (
-                        <TabsTrigger key={cat} value={cat} className="text-xs sm:text-sm">
+                        <TabsTrigger key={cat} value={cat} className="text-xs sm:text-sm whitespace-nowrap">
                             {cat}
                         </TabsTrigger>
                     ))}

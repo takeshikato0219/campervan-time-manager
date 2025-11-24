@@ -7,16 +7,16 @@ import * as schema from "../drizzle/schema";
 let _db: ReturnType<typeof drizzle<typeof schema>> | null = null;
 
 export async function getDb() {
-    if (!_db && ENV.databaseUrl) {
-        try {
-            const connection = await createConnection(ENV.databaseUrl);
+  if (!_db && ENV.databaseUrl) {
+    try {
+      const connection = await createConnection(ENV.databaseUrl);
             _db = drizzle(connection, { schema, mode: "default" });
-        } catch (error) {
-            console.warn("[Database] Failed to connect:", error);
-            _db = null;
-        }
+    } catch (error) {
+      console.warn("[Database] Failed to connect:", error);
+      _db = null;
     }
-    return _db;
+  }
+  return _db;
 }
 
 export async function getUserByUsername(username: string) {
@@ -39,11 +39,11 @@ export async function getUserByOpenId(openId: string) {
 }
 
 export async function initializeDefaultBreakTimes() {
-    const db = await getDb();
-    if (!db) {
-        console.warn("[Database] Cannot initialize break times: database not available");
-        return;
-    }
+  const db = await getDb();
+  if (!db) {
+    console.warn("[Database] Cannot initialize break times: database not available");
+    return;
+  }
 
     try {
         // 既存の休憩時間を確認
@@ -65,7 +65,7 @@ export async function initializeDefaultBreakTimes() {
         console.log("[Database] Default break times initialized");
     } catch (error) {
         console.warn("[Database] Failed to initialize break times:", error);
-    }
+}
 }
 
 // スキーマをエクスポート

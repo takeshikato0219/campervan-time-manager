@@ -34,6 +34,8 @@ export default function Dashboard() {
     const { data: todayAttendance } = trpc.attendance.getTodayStatus.useQuery();
     const { data: myCheckRequests } = trpc.checks.getMyCheckRequests.useQuery();
     const { data: unreadBroadcasts, refetch: refetchBroadcasts } = trpc.salesBroadcasts.getUnread.useQuery();
+    const { data: vehicleTypes } = trpc.vehicleTypes.list.useQuery();
+    const [selectedVehicleTypeFilter, setSelectedVehicleTypeFilter] = useState<number | "all">("all");
 
     // 未完了のチェック依頼を取得
     const pendingCheckRequests = myCheckRequests?.filter((req) => req.status === "pending") || [];
@@ -125,45 +127,87 @@ export default function Dashboard() {
                 <Card className="border-blue-200 bg-blue-50">
                     <CardContent className="p-4">
                         <div className="space-y-3">
-                            <div className="flex items-start gap-3">
-                                <AlertCircle className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />
-                                <div className="flex-1 min-w-0">
-                                    <p className="font-semibold text-blue-900 text-sm sm:text-base">
-                                        営業からの拡散が{unreadBroadcasts.length}件あります
-                                    </p>
+                            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                                <div className="flex items-start gap-3">
+                                    <AlertCircle className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />
+                                    <div className="flex-1 min-w-0">
+                                        <p className="font-semibold text-blue-900 text-sm sm:text-base">
+                                            営業からの拡散が{unreadBroadcasts.length}件あります
+                                        </p>
+                                    </div>
                                 </div>
+                                {vehicleTypes && vehicleTypes.length > 0 && (
+                                    <div className="flex items-center gap-2">
+                                        <label className="text-xs sm:text-sm text-blue-900 font-medium">車種で絞り込み:</label>
+                                        <select
+                                            className="flex h-8 sm:h-10 text-xs sm:text-sm rounded-md border border-blue-300 bg-white px-2 sm:px-3 py-1 sm:py-2"
+                                            value={selectedVehicleTypeFilter}
+                                            onChange={(e) =>
+                                                setSelectedVehicleTypeFilter(
+                                                    e.target.value === "all" ? "all" : parseInt(e.target.value)
+                                                )
+                                            }
+                                        >
+                                            <option value="all">全て</option>
+                                            {vehicleTypes.map((vt) => (
+                                                <option key={vt.id} value={vt.id}>
+                                                    {vt.name}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                )}
                             </div>
                             <div className="space-y-2">
-                                {unreadBroadcasts.map((broadcast) => (
-                                    <div
-                                        key={broadcast.id}
-                                        className="p-3 bg-white rounded-lg border border-blue-200"
-                                    >
-                                        <div className="flex items-start justify-between gap-2">
-                                            <div className="flex-1 min-w-0">
-                                                <p className="font-semibold text-sm sm:text-base text-blue-900">
-                                                    {broadcast.vehicle?.vehicleNumber || "車両ID: " + broadcast.vehicleId}
-                                                </p>
-                                                <p className="text-xs text-blue-700 mt-1">
-                                                    {broadcast.createdByUser?.name || broadcast.createdByUser?.username || "不明"}さんから
-                                                </p>
-                                                <p className="text-sm text-blue-800 mt-2 whitespace-pre-wrap">
-                                                    {broadcast.message}
-                                                </p>
+                                {unreadBroadcasts
+                                    .filter((broadcast) => {
+                                        if (selectedVehicleTypeFilter === "all") return true;
+                                        return (
+                                            broadcast.vehicle?.vehicleTypeId === selectedVehicleTypeFilter
+                                        );
+                                    })
+                                    .map((broadcast) => (
+                                        <div
+                                            key={broadcast.id}
+                                            className="p-3 bg-white rounded-lg border border-blue-200"
+                                        >
+                                            <div className="flex items-start justify-between gap-2">
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="flex flex-wrap items-center gap-2">
+                                                        <p className="font-semibold text-sm sm:text-base text-blue-900">
+                                                            {broadcast.vehicle?.vehicleNumber || "車両ID: " + broadcast.vehicleId}
+                                                        </p>
+                                                        {broadcast.vehicle?.customerName && (
+                                                            <p className="text-xs sm:text-sm text-blue-700">
+                                                                ({broadcast.vehicle.customerName})
+                                                            </p>
+                                                        )}
+                                                        {broadcast.vehicle?.vehicleType && (
+                                                            <span className="px-2 py-0.5 text-xs bg-blue-100 text-blue-800 rounded">
+                                                                {broadcast.vehicle.vehicleType.name}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    <p className="text-xs text-blue-700 mt-1">
+                                                        {broadcast.createdByUser?.name || broadcast.createdByUser?.username || "不明"}さんから
+                                                    </p>
+                                                    <p className="text-sm text-blue-800 mt-2 whitespace-pre-wrap">
+                                                        {broadcast.message}
+                                                    </p>
+                                                </div>
+                                                <Button
+                                                    size="sm"
+                                                    variant="outline"
+                                                    onClick={() => {
+                                                        markBroadcastAsReadMutation.mutate({ broadcastId: broadcast.id });
+                                                    }}
+                                                    className="flex-shrink-0"
+                                                >
+                                                    確認
+                                                </Button>
                                             </div>
-                                            <Button
-                                                size="sm"
-                                                variant="outline"
-                                                onClick={() => {
-                                                    markBroadcastAsReadMutation.mutate({ broadcastId: broadcast.id });
-                                                }}
-                                                className="flex-shrink-0"
-                                            >
-                                                確認
-                                            </Button>
                                         </div>
-                                    </div>
-                                ))}
+                                    ))}
                             </div>
                         </div>
                     </CardContent>
