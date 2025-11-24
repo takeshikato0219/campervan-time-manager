@@ -1,69 +1,103 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { useRoute } from "wouter";
 import { useAuth } from "../hooks/useAuth";
 import { trpc } from "../lib/trpc";
 import { Button } from "../components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { Input } from "../components/ui/input";
-import { ArrowLeft, Play, Square, Plus } from "lucide-react";
-import { toast } from "sonner";
+import { ArrowLeft, Check, UserPlus, AlertCircle } from "lucide-react";
 import { format } from "date-fns";
 import { Link } from "wouter";
+import { toast } from "sonner";
 
 export default function VehicleDetail() {
     const [, params] = useRoute("/vehicles/:id");
     const vehicleId = params ? parseInt(params.id) : 0;
     const { user } = useAuth();
 
-    const { data: vehicle, refetch } = trpc.vehicles.get.useQuery({ id: vehicleId });
-    const { data: processes } = trpc.processes.list.useQuery();
-    const { data: activeWork, refetch: refetchActiveWork } = trpc.workRecords.getActive.useQuery();
+    const [checkingItemId, setCheckingItemId] = useState<number | null>(null);
+    const [checkNotes, setCheckNotes] = useState("");
+    const [isRequestDialogOpen, setIsRequestDialogOpen] = useState(false);
+    const [requestedToUserId, setRequestedToUserId] = useState("");
+    const [requestMessage, setRequestMessage] = useState("");
 
-    const [isWorkDialogOpen, setIsWorkDialogOpen] = useState(false);
-    const [selectedProcessId, setSelectedProcessId] = useState<number | null>(null);
-    const [workDescription, setWorkDescription] = useState("");
+    const { data: vehicle } = trpc.vehicles.get.useQuery({ id: vehicleId });
+    const { data: checkData, refetch: refetchChecks } = trpc.checks.getVehicleChecks.useQuery(
+        { vehicleId },
+        { enabled: !!vehicleId }
+    );
+    const { data: users } = trpc.users.list.useQuery(undefined, { enabled: user?.role === "admin" });
+    const { data: myCheckRequests, refetch: refetchRequests } = trpc.checks.getMyCheckRequests.useQuery();
 
-    const startWorkMutation = trpc.workRecords.start.useMutation({
+    const checkMutation = trpc.checks.checkVehicle.useMutation({
         onSuccess: () => {
-            toast.success("作業を開始しました");
-            setIsWorkDialogOpen(false);
-            setSelectedProcessId(null);
-            setWorkDescription("");
-            refetch();
-            refetchActiveWork();
+            toast.success("チェックを完了しました");
+            setCheckingItemId(null);
+            setCheckNotes("");
+            refetchChecks();
+            refetchRequests();
         },
         onError: (error) => {
-            toast.error(error.message || "作業開始に失敗しました");
+            toast.error(error.message || "チェックの実行に失敗しました");
         },
     });
 
-    const stopWorkMutation = trpc.workRecords.stop.useMutation({
+    const requestCheckMutation = trpc.checks.requestCheck.useMutation({
         onSuccess: () => {
-            toast.success("作業を終了しました");
-            refetch();
-            refetchActiveWork();
+            toast.success("チェック依頼を送信しました");
+            setIsRequestDialogOpen(false);
+            setRequestedToUserId("");
+            setRequestMessage("");
+            refetchRequests();
         },
         onError: (error) => {
-            toast.error(error.message || "作業終了に失敗しました");
+            toast.error(error.message || "チェック依頼の送信に失敗しました");
         },
     });
 
-    const handleStartWork = () => {
-        if (!selectedProcessId) {
-            toast.error("工程を選択してください");
-            return;
-        }
+    const completeRequestMutation = trpc.checks.completeCheckRequest.useMutation({
+        onSuccess: () => {
+            toast.success("チェック依頼を完了しました");
+            refetchChecks();
+            refetchRequests();
+        },
+        onError: (error) => {
+            toast.error(error.message || "チェック依頼の完了に失敗しました");
+        },
+    });
 
-        startWorkMutation.mutate({
+    const handleCheck = (itemId: number) => {
+        setCheckingItemId(itemId);
+        setCheckNotes("");
+    };
+
+    const handleSubmitCheck = () => {
+        if (!checkingItemId) return;
+
+        checkMutation.mutate({
             vehicleId,
-            processId: selectedProcessId,
-            workDescription: workDescription.trim() || undefined,
+            checkItemId: checkingItemId,
+            notes: checkNotes || undefined,
         });
     };
 
-    const handleStopWork = (workRecordId: number) => {
-        stopWorkMutation.mutate({ id: workRecordId });
+    const handleRequestCheck = () => {
+        if (!requestedToUserId) {
+            toast.error("依頼先ユーザーを選択してください");
+            return;
+        }
+
+        requestCheckMutation.mutate({
+            vehicleId,
+            requestedTo: parseInt(requestedToUserId),
+            message: requestMessage || undefined,
+        });
     };
+
+    // この車両に対する未完了のチェック依頼を取得
+    const pendingRequestsForThisVehicle = myCheckRequests?.filter(
+        (req) => req.vehicleId === vehicleId && req.status === "pending"
+    ) || [];
 
     const formatDuration = (minutes: number | null) => {
         if (!minutes) return "0分";
@@ -80,9 +114,6 @@ export default function VehicleDetail() {
         );
     }
 
-    // 作業中の記録を取得
-    const activeWorkForVehicle = activeWork?.filter((w) => w.vehicleId === vehicleId) || [];
-
     return (
         <div className="space-y-6">
             <div className="flex items-center gap-4">
@@ -93,10 +124,17 @@ export default function VehicleDetail() {
                     </Button>
                 </Link>
                 <div>
-                    <h1 className="text-3xl font-bold">{vehicle.vehicleNumber}</h1>
-                    <p className="text-[hsl(var(--muted-foreground))] mt-1">
-                        {vehicle.customerName || "お客様名未設定"}
-                    </p>
+                    <h1 className="text-2xl sm:text-3xl font-bold">{vehicle.vehicleNumber}</h1>
+                    <div className="flex flex-wrap items-center gap-2 mt-1">
+                        {vehicle.category && (
+                            <span className="inline-block px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded">
+                                {vehicle.category}
+                            </span>
+                        )}
+                        <p className="text-sm sm:text-base text-[hsl(var(--muted-foreground))]">
+                            {vehicle.customerName || "お客様名未設定"}
+                        </p>
+                    </div>
                 </div>
             </div>
 
@@ -126,56 +164,6 @@ export default function VehicleDetail() {
                             </div>
                         )}
                     </div>
-                </CardContent>
-            </Card>
-
-            {/* 工程別作業時間 */}
-            <Card>
-                <CardHeader>
-                    <CardTitle>工程別作業時間</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                    {processes?.map((process) => {
-                        const processTime = vehicle.processTime?.find((p) => p.processId === process.id);
-                        const actualMinutes = processTime?.minutes || 0;
-                        const isWorking = activeWorkForVehicle.some((w) => w.processId === process.id);
-
-                        return (
-                            <div key={process.id} className="space-y-2">
-                                <div className="flex justify-between items-center">
-                                    <span className="font-medium">{process.name}</span>
-                                    <span className="text-sm text-[hsl(var(--muted-foreground))]">
-                                        {formatDuration(actualMinutes)}
-                                    </span>
-                                </div>
-                                {isWorking ? (
-                                    <Button
-                                        size="sm"
-                                        variant="destructive"
-                                        onClick={() =>
-                                            handleStopWork(
-                                                activeWorkForVehicle.find((w) => w.processId === process.id)!.id
-                                            )
-                                        }
-                                    >
-                                        <Square className="h-4 w-4 mr-2" />
-                                        作業終了
-                                    </Button>
-                                ) : (
-                                    <Button
-                                        size="sm"
-                                        onClick={() => {
-                                            setSelectedProcessId(process.id);
-                                            setIsWorkDialogOpen(true);
-                                        }}
-                                    >
-                                        <Play className="h-4 w-4 mr-2" />
-                                        作業開始
-                                    </Button>
-                                )}
-                            </div>
-                        );
-                    })}
                 </CardContent>
             </Card>
 
@@ -215,12 +203,124 @@ export default function VehicleDetail() {
                 </CardContent>
             </Card>
 
+            {/* チェック項目 */}
+            {checkData && (
+                <Card>
+                    <CardHeader className="p-4 sm:p-6">
+                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                            <CardTitle className="text-lg sm:text-xl">チェック項目</CardTitle>
+                            {pendingRequestsForThisVehicle.length > 0 && (
+                                <div className="flex items-center gap-2 text-orange-600 text-sm">
+                                    <AlertCircle className="h-4 w-4" />
+                                    <span>チェック依頼が{pendingRequestsForThisVehicle.length}件あります</span>
+                                </div>
+                            )}
+                            {user?.role === "admin" && (
+                                <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => setIsRequestDialogOpen(true)}
+                                >
+                                    <UserPlus className="h-4 w-4 mr-2" />
+                                    チェック依頼
+                                </Button>
+                            )}
+                        </div>
+                    </CardHeader>
+                    <CardContent className="p-4 sm:p-6">
+                        {checkData.checkStatus && checkData.checkStatus.length > 0 ? (
+                            <div className="space-y-3">
+                                {checkData.checkStatus.map((status: any) => (
+                                    <div
+                                        key={status.checkItem.id}
+                                        className={`p-3 border rounded-lg ${status.checked
+                                                ? "bg-green-50 border-green-200"
+                                                : "bg-gray-50 border-gray-200"
+                                            }`}
+                                    >
+                                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                                            <div className="flex-1">
+                                                <div className="flex items-center gap-2">
+                                                    {status.checked ? (
+                                                        <Check className="h-5 w-5 text-green-600" />
+                                                    ) : (
+                                                        <div className="h-5 w-5 border-2 border-gray-300 rounded" />
+                                                    )}
+                                                    <div>
+                                                        <p className="font-semibold text-sm sm:text-base">
+                                                            {status.checkItem.name}
+                                                        </p>
+                                                        {status.checkItem.description && (
+                                                            <p className="text-xs sm:text-sm text-[hsl(var(--muted-foreground))] mt-1">
+                                                                {status.checkItem.description}
+                                                            </p>
+                                                        )}
+                                                        {status.checked && status.checkedBy && (
+                                                            <p className="text-xs text-[hsl(var(--muted-foreground))] mt-1">
+                                                                チェック済み: {status.checkedBy.name || status.checkedBy.username} (
+                                                                {status.checkedAt
+                                                                    ? format(new Date(status.checkedAt), "yyyy-MM-dd HH:mm")
+                                                                    : ""}
+                                                                )
+                                                            </p>
+                                                        )}
+                                                        {status.notes && (
+                                                            <p className="text-xs text-[hsl(var(--muted-foreground))] mt-1">
+                                                                メモ: {status.notes}
+                                                            </p>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div className="flex gap-2">
+                                                {!status.checked && (
+                                                    <Button
+                                                        size="sm"
+                                                        onClick={() => handleCheck(status.checkItem.id)}
+                                                        className="w-full sm:w-auto"
+                                                    >
+                                                        チェック
+                                                    </Button>
+                                                )}
+                                                {/* チェック依頼がある場合、完了ボタンを表示 */}
+                                                {pendingRequestsForThisVehicle.length > 0 &&
+                                                    !status.checked && (
+                                                        <Button
+                                                            size="sm"
+                                                            variant="outline"
+                                                            onClick={() => {
+                                                                const request = pendingRequestsForThisVehicle[0];
+                                                                if (request) {
+                                                                    completeRequestMutation.mutate({
+                                                                        requestId: request.id,
+                                                                    });
+                                                                }
+                                                            }}
+                                                            className="w-full sm:w-auto"
+                                                        >
+                                                            依頼完了
+                                                        </Button>
+                                                    )}
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : (
+                            <p className="text-center py-4 text-[hsl(var(--muted-foreground))]">
+                                チェック項目が設定されていません
+                            </p>
+                        )}
+                    </CardContent>
+                </Card>
+            )}
+
             {/* メモ */}
             <Card>
-                <CardHeader>
-                    <CardTitle>メモ</CardTitle>
+                <CardHeader className="p-4 sm:p-6">
+                    <CardTitle className="text-lg sm:text-xl">メモ</CardTitle>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="p-4 sm:p-6">
                     {vehicle.memos && vehicle.memos.length > 0 ? (
                         <div className="space-y-2">
                             {vehicle.memos.map((memo) => (
@@ -243,53 +343,94 @@ export default function VehicleDetail() {
                 </CardContent>
             </Card>
 
-            {/* 作業開始ダイアログ */}
-            {isWorkDialogOpen && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-                    <Card className="w-full max-w-md mx-4">
-                        <CardHeader>
-                            <CardTitle>作業を開始</CardTitle>
+            {/* チェック実行ダイアログ */}
+            {checkingItemId && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-2 sm:p-4 overflow-y-auto">
+                    <Card className="w-full max-w-md min-w-0 my-auto">
+                        <CardHeader className="p-3 sm:p-4 md:p-6">
+                            <CardTitle className="text-base sm:text-lg md:text-xl">チェックを実行</CardTitle>
                         </CardHeader>
-                        <CardContent className="space-y-4">
-                            <div>
-                                <label className="text-sm font-medium">工程</label>
+                        <CardContent className="p-3 sm:p-4 md:p-6 space-y-3 sm:space-y-4">
+                            <div className="min-w-0">
+                                <label className="text-sm font-medium block mb-1">メモ（任意）</label>
+                                <Input
+                                    value={checkNotes}
+                                    onChange={(e) => setCheckNotes(e.target.value)}
+                                    placeholder="メモを入力"
+                                    className="w-full min-w-0"
+                                />
+                            </div>
+                            <div className="flex flex-col sm:flex-row gap-2 pt-2">
+                                <Button
+                                    className="flex-1 w-full sm:w-auto"
+                                    onClick={handleSubmitCheck}
+                                    disabled={checkMutation.isPending}
+                                >
+                                    チェック完了
+                                </Button>
+                                <Button
+                                    variant="outline"
+                                    className="flex-1 w-full sm:w-auto"
+                                    onClick={() => {
+                                        setCheckingItemId(null);
+                                        setCheckNotes("");
+                                    }}
+                                >
+                                    キャンセル
+                                </Button>
+                            </div>
+                        </CardContent>
+                    </Card>
+                </div>
+            )}
+
+            {/* チェック依頼ダイアログ */}
+            {isRequestDialogOpen && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-2 sm:p-4 overflow-y-auto">
+                    <Card className="w-full max-w-md min-w-0 my-auto">
+                        <CardHeader className="p-3 sm:p-4 md:p-6">
+                            <CardTitle className="text-base sm:text-lg md:text-xl">チェック依頼</CardTitle>
+                        </CardHeader>
+                        <CardContent className="p-3 sm:p-4 md:p-6 space-y-3 sm:space-y-4">
+                            <div className="min-w-0">
+                                <label className="text-sm font-medium block mb-1">依頼先ユーザー *</label>
                                 <select
-                                    className="flex h-10 w-full rounded-md border border-[hsl(var(--input))] bg-[hsl(var(--background))] px-3 py-2 text-sm"
-                                    value={selectedProcessId || ""}
-                                    onChange={(e) => setSelectedProcessId(parseInt(e.target.value))}
+                                    className="flex h-10 w-full min-w-0 rounded-md border border-[hsl(var(--input))] bg-[hsl(var(--background))] px-2 sm:px-3 py-2 text-sm"
+                                    value={requestedToUserId}
+                                    onChange={(e) => setRequestedToUserId(e.target.value)}
                                 >
                                     <option value="">選択してください</option>
-                                    {processes?.map((p) => (
-                                        <option key={p.id} value={p.id}>
-                                            {p.name}
+                                    {users?.map((u) => (
+                                        <option key={u.id} value={u.id}>
+                                            {u.name || u.username}
                                         </option>
                                     ))}
                                 </select>
                             </div>
-                            <div>
-                                <label className="text-sm font-medium">作業内容（任意）</label>
-                                <textarea
-                                    className="flex min-h-[80px] w-full rounded-md border border-[hsl(var(--input))] bg-[hsl(var(--background))] px-3 py-2 text-sm"
-                                    value={workDescription}
-                                    onChange={(e) => setWorkDescription(e.target.value)}
-                                    placeholder="作業内容を入力..."
+                            <div className="min-w-0">
+                                <label className="text-sm font-medium block mb-1">メッセージ（任意）</label>
+                                <Input
+                                    value={requestMessage}
+                                    onChange={(e) => setRequestMessage(e.target.value)}
+                                    placeholder="依頼メッセージを入力"
+                                    className="w-full min-w-0"
                                 />
                             </div>
-                            <div className="flex gap-2">
+                            <div className="flex flex-col sm:flex-row gap-2 pt-2">
                                 <Button
-                                    className="flex-1"
-                                    onClick={handleStartWork}
-                                    disabled={startWorkMutation.isPending || !selectedProcessId}
+                                    className="flex-1 w-full sm:w-auto"
+                                    onClick={handleRequestCheck}
+                                    disabled={requestCheckMutation.isPending}
                                 >
-                                    開始
+                                    依頼送信
                                 </Button>
                                 <Button
                                     variant="outline"
-                                    className="flex-1"
+                                    className="flex-1 w-full sm:w-auto"
                                     onClick={() => {
-                                        setIsWorkDialogOpen(false);
-                                        setSelectedProcessId(null);
-                                        setWorkDescription("");
+                                        setIsRequestDialogOpen(false);
+                                        setRequestedToUserId("");
+                                        setRequestMessage("");
                                     }}
                                 >
                                     キャンセル

@@ -5,7 +5,8 @@ import { Button } from "../components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { Input } from "../components/ui/input";
 import TimelineCalendar from "../components/TimelineCalendar";
-import { Plus } from "lucide-react";
+import { Plus, AlertCircle } from "lucide-react";
+import { Link } from "wouter";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { useDateChangeDetector } from "../hooks/useDateChangeDetector";
@@ -31,6 +32,10 @@ export default function Dashboard() {
     const { data: vehicles } = trpc.vehicles.list.useQuery({});
     const { data: processes } = trpc.processes.list.useQuery();
     const { data: todayAttendance } = trpc.attendance.getTodayStatus.useQuery();
+    const { data: myCheckRequests } = trpc.checks.getMyCheckRequests.useQuery();
+
+    // 未完了のチェック依頼を取得
+    const pendingCheckRequests = myCheckRequests?.filter((req) => req.status === "pending") || [];
 
     // データ更新用のコールバック
     const refreshData = useCallback(() => {
@@ -107,6 +112,40 @@ export default function Dashboard() {
                     こんにちは、{user?.name || user?.username}さん
                 </p>
             </div>
+
+            {/* チェック依頼通知 */}
+            {pendingCheckRequests.length > 0 && (
+                <Card className="border-orange-200 bg-orange-50">
+                    <CardContent className="p-4">
+                        <div className="flex items-start gap-3">
+                            <AlertCircle className="h-5 w-5 text-orange-600 flex-shrink-0 mt-0.5" />
+                            <div className="flex-1 min-w-0">
+                                <p className="font-semibold text-orange-900 text-sm sm:text-base">
+                                    チェック依頼が{pendingCheckRequests.length}件あります
+                                </p>
+                                <div className="mt-2 space-y-1">
+                                    {pendingCheckRequests.slice(0, 3).map((request) => (
+                                        <Link
+                                            key={request.id}
+                                            href={`/vehicles/${request.vehicleId}`}
+                                            className="block text-xs sm:text-sm text-orange-800 hover:text-orange-900 underline"
+                                        >
+                                            {request.vehicle?.vehicleNumber || "車両ID: " + request.vehicleId} -{" "}
+                                            {request.requestedByUser?.name || request.requestedByUser?.username || "不明"}
+                                            さんから依頼
+                                        </Link>
+                                    ))}
+                                    {pendingCheckRequests.length > 3 && (
+                                        <p className="text-xs text-orange-700">
+                                            他{pendingCheckRequests.length - 3}件の依頼があります
+                                        </p>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    </CardContent>
+                </Card>
+            )}
 
             {/* 出退勤カード */}
             <Card>
@@ -244,26 +283,26 @@ export default function Dashboard() {
 
             {/* 作業追加ダイアログ */}
             {isAddDialogOpen && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-2 sm:p-4">
-                    <Card className="w-full max-w-md max-h-[90vh] overflow-y-auto">
-                        <CardHeader className="p-4 sm:p-6">
-                            <CardTitle className="text-lg sm:text-xl">作業記録を追加</CardTitle>
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-2 sm:p-4 overflow-y-auto">
+                    <Card className="w-full max-w-md min-w-0 my-auto">
+                        <CardHeader className="p-3 sm:p-4 md:p-6">
+                            <CardTitle className="text-base sm:text-lg md:text-xl">作業記録を追加</CardTitle>
                         </CardHeader>
-                        <CardContent className="p-4 sm:p-6 space-y-4">
-                            <div>
-                                <label className="text-sm font-medium">日付</label>
+                        <CardContent className="p-3 sm:p-4 md:p-6 space-y-3 sm:space-y-4">
+                            <div className="min-w-0">
+                                <label className="text-sm font-medium block mb-1">日付</label>
                                 <Input
                                     type="date"
                                     value={workDate}
                                     onChange={(e) => setWorkDate(e.target.value)}
-                                    className="mt-1"
+                                    className="w-full min-w-0"
                                 />
                             </div>
-                            <div>
-                                <label className="text-sm font-medium">車両</label>
+                            <div className="min-w-0">
+                                <label className="text-sm font-medium block mb-1">車両</label>
                                 <select
                                     key={`vehicle-${selectedVehicleId}`}
-                                    className="flex h-10 w-full rounded-md border border-[hsl(var(--input))] bg-[hsl(var(--background))] px-3 py-2 text-sm mt-1"
+                                    className="flex h-10 w-full min-w-0 rounded-md border border-[hsl(var(--input))] bg-[hsl(var(--background))] px-2 sm:px-3 py-2 text-sm"
                                     value={selectedVehicleId}
                                     onChange={(e) => {
                                         e.preventDefault();
@@ -278,11 +317,11 @@ export default function Dashboard() {
                                     ))}
                                 </select>
                             </div>
-                            <div>
-                                <label className="text-sm font-medium">工程</label>
+                            <div className="min-w-0">
+                                <label className="text-sm font-medium block mb-1">工程</label>
                                 <select
                                     key={`process-${selectedProcessId}`}
-                                    className="flex h-10 w-full rounded-md border border-[hsl(var(--input))] bg-[hsl(var(--background))] px-3 py-2 text-sm mt-1"
+                                    className="flex h-10 w-full min-w-0 rounded-md border border-[hsl(var(--input))] bg-[hsl(var(--background))] px-2 sm:px-3 py-2 text-sm"
                                     value={selectedProcessId}
                                     onChange={(e) => {
                                         e.preventDefault();
@@ -297,28 +336,28 @@ export default function Dashboard() {
                                     ))}
                                 </select>
                             </div>
-                            <div>
-                                <label className="text-sm font-medium">開始時刻</label>
+                            <div className="min-w-0">
+                                <label className="text-sm font-medium block mb-1">開始時刻</label>
                                 <Input
                                     type="time"
                                     value={startTime}
                                     onChange={(e) => setStartTime(e.target.value)}
                                     required
-                                    className="mt-1"
+                                    className="w-full min-w-0"
                                 />
                             </div>
-                            <div>
-                                <label className="text-sm font-medium">終了時刻</label>
+                            <div className="min-w-0">
+                                <label className="text-sm font-medium block mb-1">終了時刻</label>
                                 <Input
                                     type="time"
                                     value={endTime}
                                     onChange={(e) => setEndTime(e.target.value)}
-                                    className="mt-1"
+                                    className="w-full min-w-0"
                                 />
                             </div>
-                            <div className="flex gap-2 pt-2">
+                            <div className="flex flex-col sm:flex-row gap-2 pt-2">
                                 <Button
-                                    className="flex-1"
+                                    className="flex-1 w-full sm:w-auto"
                                     onClick={handleAddWork}
                                     disabled={createWorkRecordMutation.isPending}
                                 >
@@ -326,7 +365,7 @@ export default function Dashboard() {
                                 </Button>
                                 <Button
                                     variant="outline"
-                                    className="flex-1"
+                                    className="flex-1 w-full sm:w-auto"
                                     onClick={() => setIsAddDialogOpen(false)}
                                 >
                                     キャンセル

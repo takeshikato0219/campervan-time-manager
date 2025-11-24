@@ -15,6 +15,7 @@ import {
     Download,
     Settings,
     Users,
+    CheckSquare,
 } from "lucide-react";
 
 interface AppLayoutProps {
@@ -46,6 +47,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
         { icon: Download, label: "CSV出力", path: "/admin/csv-export", admin: true },
         { icon: Settings, label: "工程管理", path: "/admin/processes", admin: true },
         { icon: Car, label: "車種管理", path: "/admin/vehicle-types", admin: true },
+        { icon: CheckSquare, label: "チェック項目管理", path: "/admin/check-items", admin: true },
         { icon: Users, label: "ユーザー管理", path: "/admin/users", admin: true },
     ];
 

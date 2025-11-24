@@ -19,6 +19,7 @@ export default function Vehicles() {
     const [editingVehicle, setEditingVehicle] = useState<any>(null);
     const [vehicleNumber, setVehicleNumber] = useState("");
     const [vehicleTypeId, setVehicleTypeId] = useState("");
+    const [category, setCategory] = useState<"一般" | "キャンパー" | "中古" | "修理" | "クレーム">("一般");
     const [customerName, setCustomerName] = useState("");
     const [desiredDeliveryDate, setDesiredDeliveryDate] = useState("");
 
@@ -33,6 +34,7 @@ export default function Vehicles() {
             setIsRegisterDialogOpen(false);
             setVehicleNumber("");
             setVehicleTypeId("");
+            setCategory("一般");
             setCustomerName("");
             setDesiredDeliveryDate("");
             refetch();
@@ -118,6 +120,7 @@ export default function Vehicles() {
         registerMutation.mutate({
             vehicleNumber,
             vehicleTypeId: parseInt(vehicleTypeId),
+            category,
             customerName: customerName || undefined,
             desiredDeliveryDate: desiredDeliveryDate ? new Date(desiredDeliveryDate) : undefined,
         });
@@ -127,6 +130,7 @@ export default function Vehicles() {
         setEditingVehicle(vehicle);
         setVehicleNumber(vehicle.vehicleNumber);
         setVehicleTypeId(vehicle.vehicleTypeId.toString());
+        setCategory(vehicle.category || "一般");
         setCustomerName(vehicle.customerName || "");
         setDesiredDeliveryDate(
             vehicle.desiredDeliveryDate
@@ -146,6 +150,7 @@ export default function Vehicles() {
             id: editingVehicle.id,
             vehicleNumber,
             vehicleTypeId: parseInt(vehicleTypeId),
+            category,
             customerName: customerName || undefined,
             desiredDeliveryDate: desiredDeliveryDate ? new Date(desiredDeliveryDate) : undefined,
         });
@@ -199,6 +204,12 @@ export default function Vehicles() {
                                         </CardDescription>
                                     </CardHeader>
                                     <CardContent className="p-3 sm:p-6 space-y-2">
+                                        {vehicle.category && (
+                                            <p className="text-sm">
+                                                <span className="text-[hsl(var(--muted-foreground))]">区分:</span>{" "}
+                                                <span className="font-medium">{vehicle.category}</span>
+                                            </p>
+                                        )}
                                         {vehicle.customerName && (
                                             <p className="text-sm">
                                                 <span className="text-[hsl(var(--muted-foreground))]">お客様名:</span>{" "}
@@ -384,6 +395,7 @@ export default function Vehicles() {
                                         setIsRegisterDialogOpen(false);
                                         setVehicleNumber("");
                                         setVehicleTypeId("");
+                                        setCategory("一般");
                                         setCustomerName("");
                                         setDesiredDeliveryDate("");
                                     }}
@@ -427,6 +439,21 @@ export default function Vehicles() {
                                             {vt.name}
                                         </option>
                                     ))}
+                                </select>
+                            </div>
+                            <div>
+                                <label className="text-sm font-medium">区分 *</label>
+                                <select
+                                    className="flex h-10 w-full rounded-md border border-[hsl(var(--input))] bg-[hsl(var(--background))] px-3 py-2 text-sm"
+                                    value={category}
+                                    onChange={(e) => setCategory(e.target.value as any)}
+                                    required
+                                >
+                                    <option value="一般">一般</option>
+                                    <option value="キャンパー">キャンパー</option>
+                                    <option value="中古">中古</option>
+                                    <option value="修理">修理</option>
+                                    <option value="クレーム">クレーム</option>
                                 </select>
                             </div>
                             <div>

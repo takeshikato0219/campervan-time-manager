@@ -55,6 +55,9 @@ export const vehicles = mysqlTable("vehicles", {
     id: int("id").autoincrement().primaryKey(),
     vehicleNumber: varchar("vehicleNumber", { length: 100 }).notNull(),
     vehicleTypeId: int("vehicleTypeId").notNull(),
+    category: mysqlEnum("category", ["一般", "キャンパー", "中古", "修理", "クレーム"])
+        .default("一般")
+        .notNull(),
     customerName: varchar("customerName", { length: 255 }),
     desiredDeliveryDate: date("desiredDeliveryDate"),
     completionDate: date("completionDate"),
@@ -149,5 +152,43 @@ export const notifications = mysqlTable("notifications", {
     type: mysqlEnum("type", ["info", "warning", "error"]).default("info").notNull(),
     isRead: mysqlEnum("isRead", ["true", "false"]).default("false").notNull(),
     createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+// 14. checkItems: チェック項目マスタ
+export const checkItems = mysqlTable("checkItems", {
+    id: int("id").autoincrement().primaryKey(),
+    category: mysqlEnum("category", ["一般", "キャンパー", "中古", "修理", "クレーム"]).notNull(),
+    name: varchar("name", { length: 255 }).notNull(),
+    description: text("description"),
+    displayOrder: int("displayOrder").default(0),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+// 15. vehicleChecks: 車両チェック記録
+export const vehicleChecks = mysqlTable("vehicleChecks", {
+    id: int("id").autoincrement().primaryKey(),
+    vehicleId: int("vehicleId").notNull(),
+    checkItemId: int("checkItemId").notNull(),
+    checkedBy: int("checkedBy").notNull(), // チェックしたユーザーID
+    checkedAt: timestamp("checkedAt").defaultNow().notNull(),
+    notes: text("notes"), // チェック時のメモ
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+// 16. checkRequests: チェック依頼
+export const checkRequests = mysqlTable("checkRequests", {
+    id: int("id").autoincrement().primaryKey(),
+    vehicleId: int("vehicleId").notNull(),
+    requestedBy: int("requestedBy").notNull(), // 依頼したユーザーID
+    requestedTo: int("requestedTo").notNull(), // 依頼されたユーザーID
+    status: mysqlEnum("status", ["pending", "completed", "cancelled"])
+        .default("pending")
+        .notNull(),
+    message: text("message"), // 依頼メッセージ
+    completedAt: timestamp("completedAt"), // 完了日時
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
 

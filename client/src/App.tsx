@@ -15,6 +15,7 @@ import CSVExport from "./pages/admin/CSVExport";
 import ProcessManagement from "./pages/admin/ProcessManagement";
 import VehicleTypeManagement from "./pages/admin/VehicleTypeManagement";
 import UserManagement from "./pages/admin/UserManagement";
+import CheckItemManagement from "./pages/admin/CheckItemManagement";
 import AppLayout from "./components/AppLayout";
 
 function ProtectedRoute({ component: Component }: { component: React.ComponentType }) {
@@ -81,6 +82,9 @@ export default function App() {
                 </Route>
                 <Route path="/admin/users">
                     {() => <ProtectedRoute component={UserManagement} />}
+                </Route>
+                <Route path="/admin/check-items">
+                    {() => <ProtectedRoute component={CheckItemManagement} />}
                 </Route>
                 <Route>
                     <div className="min-h-screen flex items-center justify-center">

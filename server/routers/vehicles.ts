@@ -33,6 +33,7 @@ export const vehiclesRouter = createTRPCRouter({
                 id: v.id,
                 vehicleNumber: v.vehicleNumber,
                 vehicleTypeId: v.vehicleTypeId,
+                category: v.category,
                 customerName: v.customerName,
                 desiredDeliveryDate: v.desiredDeliveryDate,
                 completionDate: v.completionDate,
@@ -43,12 +44,13 @@ export const vehiclesRouter = createTRPCRouter({
             }));
         }),
 
-    // 車両を作成（管理者専用）
-    create: adminProcedure
+    // 車両を作成（全ユーザー可）
+    create: protectedProcedure
         .input(
             z.object({
                 vehicleNumber: z.string(),
                 vehicleTypeId: z.number(),
+                category: z.enum(["一般", "キャンパー", "中古", "修理", "クレーム"]).default("一般"),
                 customerName: z.string().optional(),
                 desiredDeliveryDate: z.date().optional(),
                 targetTotalMinutes: z.number().optional(),
@@ -66,6 +68,7 @@ export const vehiclesRouter = createTRPCRouter({
             await db.insert(schema.vehicles).values({
                 vehicleNumber: input.vehicleNumber,
                 vehicleTypeId: input.vehicleTypeId,
+                category: input.category,
                 customerName: input.customerName,
                 desiredDeliveryDate: input.desiredDeliveryDate,
                 targetTotalMinutes: input.targetTotalMinutes,
@@ -90,6 +93,7 @@ export const vehiclesRouter = createTRPCRouter({
                 id: z.number(),
                 vehicleNumber: z.string().optional(),
                 vehicleTypeId: z.number().optional(),
+                category: z.enum(["一般", "キャンパー", "中古", "修理", "クレーム"]).optional(),
                 customerName: z.string().optional(),
                 desiredDeliveryDate: z.date().optional(),
                 targetTotalMinutes: z.number().optional(),
@@ -107,6 +111,7 @@ export const vehiclesRouter = createTRPCRouter({
             const updateData: any = {};
             if (input.vehicleNumber !== undefined) updateData.vehicleNumber = input.vehicleNumber;
             if (input.vehicleTypeId !== undefined) updateData.vehicleTypeId = input.vehicleTypeId;
+            if (input.category !== undefined) updateData.category = input.category;
             if (input.customerName !== undefined) updateData.customerName = input.customerName;
             if (input.desiredDeliveryDate !== undefined)
                 updateData.desiredDeliveryDate = input.desiredDeliveryDate;

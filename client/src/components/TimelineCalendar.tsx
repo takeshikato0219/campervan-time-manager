@@ -33,8 +33,57 @@ export default function TimelineCalendar({ workRecords, date }: TimelineCalendar
         return hours > 0 ? `${hours}時間${mins}分` : `${mins}分`;
     };
 
-    return (
-        <div className="w-full overflow-x-auto">
+    const formatTime = (time: Date) => {
+        return format(time, "HH:mm");
+    };
+
+    // スマホ用の縦表示
+    const VerticalView = () => (
+        <div className="space-y-3 sm:hidden">
+            {workRecords.length === 0 ? (
+                <p className="text-center text-sm text-[hsl(var(--muted-foreground))] py-4">
+                    作業記録がありません
+                </p>
+            ) : (
+                workRecords.map((record) => {
+                    const startDate = new Date(record.startTime);
+                    const endDate = record.endTime ? new Date(record.endTime) : new Date();
+
+                    return (
+                        <div
+                            key={record.id}
+                            className={`p-3 rounded-lg border ${record.endTime ? "bg-blue-50 border-blue-200" : "bg-green-50 border-green-200 animate-pulse"
+                                }`}
+                        >
+                            <div className="flex items-start justify-between gap-2">
+                                <div className="flex-1 min-w-0">
+                                    <p className="font-semibold text-sm truncate">
+                                        {record.vehicleNumber}
+                                    </p>
+                                    <p className="text-xs text-[hsl(var(--muted-foreground))] truncate">
+                                        {record.processName}
+                                    </p>
+                                </div>
+                                <div className="text-right flex-shrink-0">
+                                    <p className="text-xs font-medium">
+                                        {formatTime(startDate)}
+                                        {record.endTime ? ` - ${formatTime(endDate)}` : " (作業中)"}
+                                    </p>
+                                    <p className="text-xs text-[hsl(var(--muted-foreground))]">
+                                        {formatDuration(record.durationMinutes)}
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    );
+                })
+            )}
+        </div>
+    );
+
+    // PC用の横表示
+    const HorizontalView = () => (
+        <div className="w-full overflow-x-auto hidden sm:block">
             <div className="min-w-[800px]">
                 {/* 時間軸 */}
                 <div className="flex border-b border-[hsl(var(--border))] mb-2">
@@ -79,6 +128,13 @@ export default function TimelineCalendar({ workRecords, date }: TimelineCalendar
                     })}
                 </div>
             </div>
+        </div>
+    );
+
+    return (
+        <div className="w-full">
+            <VerticalView />
+            <HorizontalView />
         </div>
     );
 }

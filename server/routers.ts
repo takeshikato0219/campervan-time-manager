@@ -8,6 +8,7 @@ import { vehicleTypesRouter } from "./routers/vehicleTypes";
 import { usersRouter } from "./routers/users";
 import { analyticsRouter } from "./routers/analytics";
 import { csvRouter } from "./routers/csv";
+import { checksRouter } from "./routers/checks";
 
 export const appRouter = createTRPCRouter({
     auth: authRouter,
@@ -19,6 +20,7 @@ export const appRouter = createTRPCRouter({
     users: usersRouter,
     analytics: analyticsRouter,
     csv: csvRouter,
+    checks: checksRouter,
 });
 
 export type AppRouter = typeof appRouter;
