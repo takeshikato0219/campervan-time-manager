@@ -1,4 +1,4 @@
-import { createTRPCRouter, adminProcedure } from "../_core/trpc";
+import { createTRPCRouter, adminProcedure, subAdminProcedure } from "../_core/trpc";
 import { getDb, schema } from "../db";
 import { eq, gte, lte, and } from "drizzle-orm";
 import { startOfDay, endOfDay, format, addDays, eachDayOfInterval } from "date-fns";
@@ -30,7 +30,7 @@ function getMonthPeriod20th(date: Date): { start: Date; end: Date } {
 }
 
 export const csvRouter = createTRPCRouter({
-    exportAttendance: adminProcedure
+    exportAttendance: subAdminProcedure
         .input(
             z.object({
                 date: z.string().optional(), // 基準日（省略時は今日）
@@ -46,8 +46,11 @@ export const csvRouter = createTRPCRouter({
             const baseDate = input.date ? new Date(input.date) : new Date();
             const { start, end } = getMonthPeriod20th(baseDate);
 
-            // 期間内の全ユーザーを取得
-            const users = await db.select().from(schema.users).orderBy(schema.users.id);
+            // 期間内の全ユーザーを取得（nameやcategoryカラムが存在しない場合に対応）
+            const { selectUsersSafely } = await import("../db");
+            const users = await selectUsersSafely(db);
+            // 手動でソート（id順）
+            users.sort((a, b) => a.id - b.id);
             const userMap = new Map(users.map((u) => [u.id, u]));
 
             // 期間内の出退勤記録を取得
@@ -78,34 +81,85 @@ export const csvRouter = createTRPCRouter({
                 // ユーザー名のヘッダー行
                 csvRows.push([`${userName} (${user.id})`]);
 
-                // カラムヘッダー
-                csvRows.push(["日付", "出勤時刻", "退勤時刻", "勤務時間（分）", "出勤デバイス", "退勤デバイス"]);
+                // 日付ヘッダー行（横に並ぶ）
+                const dateHeaderRow = ["項目"];
+                allDates.forEach((date) => {
+                    dateHeaderRow.push(format(date, "MM/dd"));
+                });
+                csvRows.push(dateHeaderRow);
 
-                // 各日付のデータ
+                // 各項目の行を作成（横に伸びる）
+                // 出勤時刻行
+                const clockInRow = ["出勤時刻"];
                 allDates.forEach((date) => {
                     const dateStr = format(date, "yyyy-MM-dd");
                     const key = `${user.id}_${dateStr}`;
                     const record = recordsByUserAndDate.get(key);
-
                     if (record) {
                         const clockInDate = new Date(record.clockIn);
-                        const clockOutDate = record.clockOut ? new Date(record.clockOut) : null;
-
-                        csvRows.push([
-                            dateStr,
-                            clockInDate.toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit" }),
-                            clockOutDate
-                                ? clockOutDate.toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit" })
-                                : "",
-                            record.workDuration?.toString() || "",
-                            record.clockInDevice || "",
-                            record.clockOutDevice || "",
-                        ]);
+                        clockInRow.push(clockInDate.toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit" }));
                     } else {
-                        // 出勤がない日は空欄
-                        csvRows.push([dateStr, "", "", "", "", ""]);
+                        clockInRow.push("");
                     }
                 });
+                csvRows.push(clockInRow);
+
+                // 退勤時刻行
+                const clockOutRow = ["退勤時刻"];
+                allDates.forEach((date) => {
+                    const dateStr = format(date, "yyyy-MM-dd");
+                    const key = `${user.id}_${dateStr}`;
+                    const record = recordsByUserAndDate.get(key);
+                    if (record && record.clockOut) {
+                        const clockOutDate = new Date(record.clockOut);
+                        clockOutRow.push(clockOutDate.toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit" }));
+                    } else {
+                        clockOutRow.push("");
+                    }
+                });
+                csvRows.push(clockOutRow);
+
+                // 勤務時間行
+                const workDurationRow = ["勤務時間（分）"];
+                allDates.forEach((date) => {
+                    const dateStr = format(date, "yyyy-MM-dd");
+                    const key = `${user.id}_${dateStr}`;
+                    const record = recordsByUserAndDate.get(key);
+                    if (record) {
+                        workDurationRow.push(record.workDuration?.toString() || "");
+                    } else {
+                        workDurationRow.push("");
+                    }
+                });
+                csvRows.push(workDurationRow);
+
+                // 出勤デバイス行
+                const clockInDeviceRow = ["出勤デバイス"];
+                allDates.forEach((date) => {
+                    const dateStr = format(date, "yyyy-MM-dd");
+                    const key = `${user.id}_${dateStr}`;
+                    const record = recordsByUserAndDate.get(key);
+                    if (record) {
+                        clockInDeviceRow.push(record.clockInDevice || "");
+                    } else {
+                        clockInDeviceRow.push("");
+                    }
+                });
+                csvRows.push(clockInDeviceRow);
+
+                // 退勤デバイス行
+                const clockOutDeviceRow = ["退勤デバイス"];
+                allDates.forEach((date) => {
+                    const dateStr = format(date, "yyyy-MM-dd");
+                    const key = `${user.id}_${dateStr}`;
+                    const record = recordsByUserAndDate.get(key);
+                    if (record) {
+                        clockOutDeviceRow.push(record.clockOutDevice || "");
+                    } else {
+                        clockOutDeviceRow.push("");
+                    }
+                });
+                csvRows.push(clockOutDeviceRow);
 
                 // ユーザー間の区切り行（空行）
                 csvRows.push([]);
@@ -128,7 +182,7 @@ export const csvRouter = createTRPCRouter({
             return { csv };
         }),
 
-    exportWorkRecords: adminProcedure
+    exportWorkRecords: subAdminProcedure
         .input(
             z.object({
                 startDate: z.string(),
@@ -151,7 +205,8 @@ export const csvRouter = createTRPCRouter({
                     and(gte(schema.workRecords.startTime, start), lte(schema.workRecords.startTime, end))
                 );
 
-            const users = await db.select().from(schema.users);
+            const { selectUsersSafely } = await import("../db");
+            const users = await selectUsersSafely(db);
             const vehicles = await db.select().from(schema.vehicles);
             const processes = await db.select().from(schema.processes);
             const vehicleTypes = await db.select().from(schema.vehicleTypes);
@@ -215,7 +270,7 @@ export const csvRouter = createTRPCRouter({
             return { csv };
         }),
 
-    exportVehicles: adminProcedure.mutation(async () => {
+    exportVehicles: subAdminProcedure.mutation(async () => {
         const db = await getDb();
         if (!db) {
             throw new Error("データベースに接続できません");

@@ -1,8 +1,8 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { createTRPCRouter, protectedProcedure, adminProcedure } from "../_core/trpc";
+import { createTRPCRouter, protectedProcedure, adminProcedure, subAdminProcedure } from "../_core/trpc";
 import { getDb, schema } from "../db";
-import { eq, and, isNull, gte, lte } from "drizzle-orm";
+import { eq, and, isNull, gte, lte, desc } from "drizzle-orm";
 import { startOfDay, endOfDay } from "date-fns";
 
 export const workRecordsRouter = createTRPCRouter({
@@ -41,16 +41,21 @@ export const workRecordsRouter = createTRPCRouter({
         }));
     }),
 
-    // 今日の作業記録を取得
+    // 今日の作業記録を取得（昨日と今日の両方を取得して、フロントエンドでフィルタリング）
     getTodayRecords: protectedProcedure.query(async ({ ctx }) => {
         const db = await getDb();
         if (!db) {
             return [];
         }
 
-        const today = new Date();
-        const start = startOfDay(today);
-        const end = endOfDay(today);
+        // 昨日と今日の範囲を取得（タイムゾーンを考慮）
+        const now = new Date();
+        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        const yesterday = new Date(today);
+        yesterday.setDate(yesterday.getDate() - 1);
+
+        const start = startOfDay(yesterday); // 昨日の開始
+        const end = endOfDay(today); // 今日の終了
 
         const records = await db
             .select()
@@ -113,29 +118,61 @@ export const workRecordsRouter = createTRPCRouter({
             }
 
             // 管理者のみ他のユーザーの記録を作成可能
-            if (input.userId !== ctx.user!.id && ctx.user!.role !== "admin") {
+            if (input.userId !== ctx.user!.id && ctx.user!.role !== "admin" && ctx.user!.role !== "sub_admin") {
                 throw new TRPCError({
                     code: "FORBIDDEN",
                     message: "権限がありません",
                 });
             }
 
-            const [result] = await db.insert(schema.workRecords).values({
-                userId: input.userId,
-                vehicleId: input.vehicleId,
-                processId: input.processId,
-                startTime: new Date(input.startTime),
-                endTime: input.endTime ? new Date(input.endTime) : null,
-                workDescription: input.workDescription,
-            });
+            try {
+                await db.insert(schema.workRecords).values({
+                    userId: input.userId,
+                    vehicleId: input.vehicleId,
+                    processId: input.processId,
+                    startTime: new Date(input.startTime),
+                    endTime: input.endTime ? new Date(input.endTime) : null,
+                    workDescription: input.workDescription,
+                });
 
-            return {
-                id: result.insertId,
-            };
+                // 挿入されたレコードを取得（最新のレコードを取得）
+                const [inserted] = await db
+                    .select()
+                    .from(schema.workRecords)
+                    .where(
+                        and(
+                            eq(schema.workRecords.userId, input.userId),
+                            eq(schema.workRecords.vehicleId, input.vehicleId),
+                            eq(schema.workRecords.processId, input.processId)
+                        )
+                    )
+                    .orderBy(desc(schema.workRecords.id))
+                    .limit(1);
+
+                if (!inserted) {
+                    console.error(`[workRecords.create] 警告: 挿入した作業記録が見つかりません`);
+                    throw new TRPCError({
+                        code: "INTERNAL_SERVER_ERROR",
+                        message: "作業記録の作成に成功しましたが、データの確認に失敗しました",
+                    });
+                }
+
+                console.log(`[workRecords.create] 作業記録を作成しました: ユーザーID=${input.userId}, 車両ID=${input.vehicleId}, 記録ID=${inserted.id}`);
+
+                return {
+                    id: inserted.id,
+                };
+            } catch (error: any) {
+                console.error(`[workRecords.create] エラー: 作業記録作成に失敗しました`, error);
+                throw new TRPCError({
+                    code: "INTERNAL_SERVER_ERROR",
+                    message: error.message || "作業記録の作成に失敗しました",
+                });
+            }
         }),
 
-    // 全スタッフの作業記録を取得（管理者専用）
-    getAllRecords: adminProcedure.query(async () => {
+    // 全スタッフの作業記録を取得（準管理者以上）
+    getAllRecords: subAdminProcedure.query(async () => {
         const db = await getDb();
         if (!db) {
             return [];
@@ -146,8 +183,9 @@ export const workRecordsRouter = createTRPCRouter({
             .from(schema.workRecords)
             .orderBy(schema.workRecords.startTime);
 
-        // ユーザー、車両、工程情報を取得
-        const users = await db.select().from(schema.users);
+        // ユーザー、車両、工程情報を取得（nameやcategoryカラムが存在しない場合に対応）
+        const { selectUsersSafely } = await import("../db");
+        const users = await selectUsersSafely(db);
         const vehicles = await db.select().from(schema.vehicles);
         const processes = await db.select().from(schema.processes);
 
@@ -178,8 +216,8 @@ export const workRecordsRouter = createTRPCRouter({
         });
     }),
 
-    // 作業記録を更新（管理者専用）
-    update: adminProcedure
+    // 作業記録を更新（準管理者以上）
+    update: subAdminProcedure
         .input(
             z.object({
                 id: z.number(),
@@ -268,11 +306,28 @@ export const workRecordsRouter = createTRPCRouter({
                 .set(updateData)
                 .where(eq(schema.workRecords.id, input.id));
 
+            console.log(`[workRecords.updateMyRecord] 作業記録を更新しました: ID=${input.id}, 更新項目=${Object.keys(updateData).join(", ")}`);
+
+            // 更新後のデータを確認
+            const [updated] = await db
+                .select()
+                .from(schema.workRecords)
+                .where(eq(schema.workRecords.id, input.id))
+                .limit(1);
+
+            if (!updated) {
+                console.error(`[workRecords.updateMyRecord] 警告: 更新した作業記録が見つかりません: ID=${input.id}`);
+                throw new TRPCError({
+                    code: "INTERNAL_SERVER_ERROR",
+                    message: "作業記録の更新に成功しましたが、データの確認に失敗しました",
+                });
+            }
+
             return { success: true };
         }),
 
-    // 作業記録を削除（管理者専用）
-    delete: adminProcedure
+    // 作業記録を削除（準管理者以上）
+    delete: subAdminProcedure
         .input(z.object({ id: z.number() }))
         .mutation(async ({ input }) => {
             const db = await getDb();
@@ -283,7 +338,25 @@ export const workRecordsRouter = createTRPCRouter({
                 });
             }
 
+            // 削除前にデータを確認
+            const [record] = await db
+                .select()
+                .from(schema.workRecords)
+                .where(eq(schema.workRecords.id, input.id))
+                .limit(1);
+
+            if (!record) {
+                throw new TRPCError({
+                    code: "NOT_FOUND",
+                    message: "作業記録が見つかりません",
+                });
+            }
+
+            console.log(`[workRecords.delete] 作業記録を削除します: ID=${input.id}, ユーザーID=${record.userId}, 車両ID=${record.vehicleId}`);
+
             await db.delete(schema.workRecords).where(eq(schema.workRecords.id, input.id));
+
+            console.log(`[workRecords.delete] 作業記録を削除しました: ID=${input.id}`);
 
             return { success: true };
         }),
@@ -321,7 +394,11 @@ export const workRecordsRouter = createTRPCRouter({
                 });
             }
 
+            console.log(`[workRecords.deleteMyRecord] 作業記録を削除します: ID=${input.id}, ユーザーID=${record.userId}, 車両ID=${record.vehicleId}`);
+
             await db.delete(schema.workRecords).where(eq(schema.workRecords.id, input.id));
+
+            console.log(`[workRecords.deleteMyRecord] 作業記録を削除しました: ID=${input.id}`);
 
             return { success: true };
         }),
@@ -362,7 +439,7 @@ export const workRecordsRouter = createTRPCRouter({
                 });
             }
 
-            const [result] = await db.insert(schema.workRecords).values({
+            await db.insert(schema.workRecords).values({
                 userId: ctx.user!.id,
                 vehicleId: input.vehicleId,
                 processId: input.processId,
@@ -371,11 +448,27 @@ export const workRecordsRouter = createTRPCRouter({
                 workDescription: input.workDescription,
             });
 
+            // 挿入されたレコードを取得（最新のレコードを取得）
             const [inserted] = await db
                 .select()
                 .from(schema.workRecords)
-                .where(eq(schema.workRecords.id, result.insertId))
+                .where(
+                    and(
+                        eq(schema.workRecords.userId, ctx.user!.id),
+                        eq(schema.workRecords.vehicleId, input.vehicleId),
+                        eq(schema.workRecords.processId, input.processId),
+                        isNull(schema.workRecords.endTime)
+                    )
+                )
+                .orderBy(schema.workRecords.id)
                 .limit(1);
+
+            if (!inserted) {
+                throw new TRPCError({
+                    code: "INTERNAL_SERVER_ERROR",
+                    message: "作業記録の作成に成功しましたが、データの確認に失敗しました",
+                });
+            }
 
             return {
                 id: inserted.id,
@@ -410,7 +503,7 @@ export const workRecordsRouter = createTRPCRouter({
             }
 
             // 自分の記録か、管理者か確認
-            if (record.userId !== ctx.user!.id && ctx.user!.role !== "admin") {
+            if (record.userId !== ctx.user!.id && ctx.user!.role !== "admin" && ctx.user!.role !== "sub_admin") {
                 throw new TRPCError({
                     code: "FORBIDDEN",
                     message: "権限がありません",

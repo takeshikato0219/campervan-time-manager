@@ -349,7 +349,7 @@ export default function VehicleChecks() {
     const [requestDueDate, setRequestDueDate] = useState("");
 
     const { data: vehicles } = trpc.vehicles.list.useQuery({});
-    const { data: users } = trpc.users.list.useQuery(undefined, { enabled: user?.role === "admin" });
+    const { data: users } = trpc.users.list.useQuery(undefined, { enabled: user?.role === "admin" || user?.role === "sub_admin" });
     const { data: myCheckRequests } = trpc.checks.getMyCheckRequests.useQuery();
 
     // カテゴリでフィルタリング
@@ -527,7 +527,7 @@ export default function VehicleChecks() {
                                     onCheck={handleCheck}
                                     onRequestCheck={handleRequestCheck}
                                     onCheckAll={handleCheckAll}
-                                    isAdmin={user?.role === "admin" || false}
+                                    isAdmin={(user?.role === "admin" || user?.role === "sub_admin") || false}
                                     pendingRequests={pendingCheckRequests}
                                 />
                             ))}

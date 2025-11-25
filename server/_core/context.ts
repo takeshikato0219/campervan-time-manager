@@ -19,7 +19,8 @@ export async function createContext({ req, res }: CreateExpressContextOptions) {
         res,
         userId: user?.id,
         user,
-        isAdmin: user?.role === "admin" || user?.username === ENV.ownerOpenId,
+        isAdmin: user?.role === "admin" || user?.role === "sub_admin" || user?.username === ENV.ownerOpenId,
+        isSuperAdmin: user?.role === "admin" || user?.username === ENV.ownerOpenId,
     };
 }
 

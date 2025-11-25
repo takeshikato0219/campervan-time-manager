@@ -1,4 +1,4 @@
-import { createTRPCRouter, adminProcedure, protectedProcedure } from "../_core/trpc";
+import { createTRPCRouter, adminProcedure, subAdminProcedure, protectedProcedure } from "../_core/trpc";
 import { getDb, schema } from "../db";
 import { eq, and, gt } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
@@ -7,7 +7,7 @@ import { addDays } from "date-fns";
 
 export const salesBroadcastsRouter = createTRPCRouter({
     // 営業からの拡散を作成（管理者のみ）
-    create: adminProcedure
+    create: subAdminProcedure
         .input(
             z.object({
                 vehicleId: z.number(),
@@ -77,7 +77,7 @@ export const salesBroadcastsRouter = createTRPCRouter({
         if (vehicleIds.length > 0) {
             const { inArray } = await import("drizzle-orm");
             vehicles = await db.select().from(schema.vehicles).where(inArray(schema.vehicles.id, vehicleIds));
-            
+
             // 車種情報を取得
             const vehicleTypeIds = [...new Set(vehicles.map((v) => v.vehicleTypeId))];
             if (vehicleTypeIds.length > 0) {
@@ -89,7 +89,8 @@ export const salesBroadcastsRouter = createTRPCRouter({
         }
         if (userIds.length > 0) {
             const { inArray } = await import("drizzle-orm");
-            users = await db.select().from(schema.users).where(inArray(schema.users.id, userIds));
+            const { selectUsersSafely } = await import("../db");
+            users = await selectUsersSafely(db, inArray(schema.users.id, userIds));
         }
 
         const vehicleMap = new Map(vehicles.map((v) => [v.id, v]));
@@ -141,7 +142,7 @@ export const salesBroadcastsRouter = createTRPCRouter({
         }),
 
     // 期限切れの拡散を削除（定期実行用、管理者のみ）
-    deleteExpired: adminProcedure.mutation(async () => {
+    deleteExpired: subAdminProcedure.mutation(async () => {
         const db = await getDb();
         if (!db) {
             throw new TRPCError({

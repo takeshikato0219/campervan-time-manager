@@ -128,7 +128,12 @@ export default function StaffAttendanceList({ selectedDate }: StaffAttendanceLis
     const handleSave = (attendanceId: number) => {
         const dateStr = format(selectedDate, "yyyy-MM-dd");
         const clockInDateTime = editClockIn ? `${dateStr}T${editClockIn}:00+09:00` : undefined;
-        const clockOutDateTime = editClockOut ? `${dateStr}T${editClockOut}:00+09:00` : undefined;
+        // editClockOutが空文字列の場合はnullを送信（出勤中に戻す）
+        const clockOutDateTime = editClockOut === "" 
+            ? null 
+            : editClockOut 
+                ? `${dateStr}T${editClockOut}:00+09:00` 
+                : undefined;
 
         updateMutation.mutate({
             attendanceId,
@@ -276,8 +281,12 @@ export default function StaffAttendanceList({ selectedDate }: StaffAttendanceLis
                                                 <Button
                                                     size="sm"
                                                     variant="outline"
-                                                    className="w-full text-xs sm:text-sm"
-                                                    onClick={() => handleAdminClockOut(staff.userId)}
+                                                    className="w-full text-xs sm:text-sm min-h-[44px]"
+                                                    onClick={(e) => {
+                                                        e.preventDefault();
+                                                        e.stopPropagation();
+                                                        handleAdminClockOut(staff.userId);
+                                                    }}
                                                 >
                                                     <Plus className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
                                                     退勤
@@ -291,8 +300,12 @@ export default function StaffAttendanceList({ selectedDate }: StaffAttendanceLis
                                         <Button
                                             size="sm"
                                             variant="outline"
-                                            className="w-full text-xs sm:text-sm"
-                                            onClick={() => handleAdminClockIn(staff.userId)}
+                                            className="w-full text-xs sm:text-sm min-h-[44px]"
+                                            onClick={(e) => {
+                                                e.preventDefault();
+                                                e.stopPropagation();
+                                                handleAdminClockIn(staff.userId);
+                                            }}
                                         >
                                             <Plus className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
                                             出勤
@@ -322,8 +335,12 @@ export default function StaffAttendanceList({ selectedDate }: StaffAttendanceLis
                                                 <div className="flex gap-1 sm:gap-2">
                                                     <Button
                                                         size="sm"
-                                                        className="flex-1 text-xs sm:text-sm"
-                                                        onClick={() => handleSave(staff.attendance!.id)}
+                                                        className="flex-1 text-xs sm:text-sm min-h-[44px]"
+                                                        onClick={(e) => {
+                                                            e.preventDefault();
+                                                            e.stopPropagation();
+                                                            handleSave(staff.attendance!.id);
+                                                        }}
                                                         disabled={updateMutation.isPending}
                                                     >
                                                         保存
@@ -331,16 +348,24 @@ export default function StaffAttendanceList({ selectedDate }: StaffAttendanceLis
                                                     <Button
                                                         size="sm"
                                                         variant="outline"
-                                                        className="flex-1 text-xs sm:text-sm"
-                                                        onClick={() => setEditingId(null)}
+                                                        className="flex-1 text-xs sm:text-sm min-h-[44px]"
+                                                        onClick={(e) => {
+                                                            e.preventDefault();
+                                                            e.stopPropagation();
+                                                            setEditingId(null);
+                                                        }}
                                                     >
                                                         キャンセル
                                                     </Button>
                                                     <Button
                                                         size="sm"
                                                         variant="destructive"
-                                                        className="flex-1 text-xs sm:text-sm"
-                                                        onClick={() => handleDelete(staff.attendance!.id)}
+                                                        className="flex-1 text-xs sm:text-sm min-h-[44px]"
+                                                        onClick={(e) => {
+                                                            e.preventDefault();
+                                                            e.stopPropagation();
+                                                            handleDelete(staff.attendance!.id);
+                                                        }}
                                                     >
                                                         <Trash2 className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
                                                         削除
@@ -352,8 +377,12 @@ export default function StaffAttendanceList({ selectedDate }: StaffAttendanceLis
                                                 <Button
                                                     size="sm"
                                                     variant="outline"
-                                                    className="flex-1 text-xs sm:text-sm"
-                                                    onClick={() => handleEdit(staff.attendance!)}
+                                                    className="flex-1 text-xs sm:text-sm min-h-[44px]"
+                                                    onClick={(e) => {
+                                                        e.preventDefault();
+                                                        e.stopPropagation();
+                                                        handleEdit(staff.attendance!);
+                                                    }}
                                                 >
                                                     <Edit className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
                                                     編集
@@ -361,14 +390,16 @@ export default function StaffAttendanceList({ selectedDate }: StaffAttendanceLis
                                                 <Button
                                                     size="sm"
                                                     variant="outline"
-                                                    className="flex-1 text-xs sm:text-sm"
-                                                    onClick={() =>
+                                                    className="flex-1 text-xs sm:text-sm min-h-[44px]"
+                                                    onClick={(e) => {
+                                                        e.preventDefault();
+                                                        e.stopPropagation();
                                                         setShowEditLogs(
                                                             showEditLogs === staff.attendance!.id
                                                                 ? null
                                                                 : staff.attendance!.id
-                                                        )
-                                                    }
+                                                        );
+                                                    }}
                                                 >
                                                     <History className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
                                                     履歴

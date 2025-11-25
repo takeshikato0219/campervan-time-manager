@@ -1,6 +1,6 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { createTRPCRouter, protectedProcedure, adminProcedure } from "../_core/trpc";
+import { createTRPCRouter, protectedProcedure, adminProcedure, subAdminProcedure } from "../_core/trpc";
 import { getDb, schema } from "../db";
 import { eq } from "drizzle-orm";
 
@@ -21,7 +21,7 @@ export const processesRouter = createTRPCRouter({
     }),
 
     // 工程を作成（管理者専用）
-    create: adminProcedure
+    create: subAdminProcedure
         .input(
             z.object({
                 name: z.string(),
@@ -52,7 +52,7 @@ export const processesRouter = createTRPCRouter({
         }),
 
     // 工程を更新（管理者専用）
-    update: adminProcedure
+    update: subAdminProcedure
         .input(
             z.object({
                 id: z.number(),
@@ -85,7 +85,7 @@ export const processesRouter = createTRPCRouter({
         }),
 
     // 工程を削除（管理者専用）
-    delete: adminProcedure
+    delete: subAdminProcedure
         .input(z.object({ id: z.number() }))
         .mutation(async ({ input }) => {
             const db = await getDb();

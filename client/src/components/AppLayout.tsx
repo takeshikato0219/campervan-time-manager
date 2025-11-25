@@ -17,6 +17,9 @@ import {
     Users,
     CheckSquare,
     ClipboardCheck,
+    Coffee,
+    CalendarDays,
+    Database,
 } from "lucide-react";
 
 interface AppLayoutProps {
@@ -40,6 +43,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
         { icon: Clock, label: "作業記録管理", path: "/work-records", admin: false },
         { icon: Car, label: "車両管理", path: "/vehicles", admin: false },
         { icon: ClipboardCheck, label: "車両チェック", path: "/vehicle-checks", admin: false },
+        { icon: CalendarDays, label: "スタッフ休み予定一覧", path: "/staff-schedule", admin: false },
         { icon: BarChart3, label: "統計・分析", path: "/analytics", admin: false },
     ];
 
@@ -50,7 +54,10 @@ export default function AppLayout({ children }: AppLayoutProps) {
         { icon: Settings, label: "工程管理", path: "/admin/processes", admin: true },
         { icon: Car, label: "車種管理", path: "/admin/vehicle-types", admin: true },
         { icon: CheckSquare, label: "チェック項目管理", path: "/admin/check-items", admin: true },
+        { icon: Coffee, label: "休憩時間管理", path: "/admin/break-times", admin: true },
+        { icon: CalendarDays, label: "スタッフ休み予定一覧（管理）", path: "/admin/staff-schedule", admin: true },
         { icon: Users, label: "ユーザー管理", path: "/admin/users", admin: true },
+        { icon: Database, label: "バックアップ管理", path: "/admin/backup", admin: true },
     ];
 
     const handleLogout = () => {
@@ -115,7 +122,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
                             );
                         })}
 
-                        {user?.role === "admin" && (
+                        {(user?.role === "admin" || user?.role === "sub_admin") && (
                             <>
                                 <div className="pt-4 mt-4 border-t border-[hsl(var(--border))]">
                                     <p className="px-3 text-xs font-semibold text-[hsl(var(--muted-foreground))] uppercase">

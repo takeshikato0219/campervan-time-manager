@@ -1,6 +1,6 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { createTRPCRouter, protectedProcedure, adminProcedure, publicProcedure } from "../_core/trpc";
+import { createTRPCRouter, protectedProcedure, subAdminProcedure, publicProcedure } from "../_core/trpc";
 import { getDb, schema } from "../db";
 import { eq, and, gte, lte, isNull, inArray } from "drizzle-orm";
 import { startOfDay, endOfDay } from "date-fns";
@@ -8,7 +8,7 @@ import { startOfDay, endOfDay } from "date-fns";
 /**
  * 出勤時刻と退勤時刻の間に含まれる休憩時間の合計を計算
  */
-async function calculateBreakTimeMinutes(
+export async function calculateBreakTimeMinutes(
     clockIn: Date,
     clockOut: Date,
     db: Awaited<ReturnType<typeof getDb>>
@@ -139,8 +139,8 @@ export const attendanceRouter = createTRPCRouter({
         };
     }),
 
-    // 出勤打刻（管理者専用）
-    clockIn: adminProcedure
+    // 出勤打刻（準管理者以上）
+    clockIn: subAdminProcedure
         .input(
             z.object({
                 deviceType: z.enum(["pc", "mobile"]).optional().default("pc"),
@@ -188,13 +188,20 @@ export const attendanceRouter = createTRPCRouter({
                 });
 
             // 挿入されたレコードを取得（最新のものを取得）
-            const allRecords = await db
+            const { desc } = await import("drizzle-orm");
+            const [inserted] = await db
                 .select()
                 .from(schema.attendanceRecords)
                 .where(eq(schema.attendanceRecords.userId, ctx.user!.id))
-                .orderBy(schema.attendanceRecords.clockIn);
+                .orderBy(desc(schema.attendanceRecords.id))
+                .limit(1);
 
-            const inserted = allRecords[allRecords.length - 1];
+            if (!inserted) {
+                throw new TRPCError({
+                    code: "INTERNAL_SERVER_ERROR",
+                    message: "出勤記録の作成に失敗しました",
+                });
+            }
 
             return {
                 id: inserted.id,
@@ -254,8 +261,8 @@ export const attendanceRouter = createTRPCRouter({
         };
     }),
 
-    // 全スタッフの今日の出退勤状況を取得（管理者専用）
-    getAllStaffToday: adminProcedure.query(async () => {
+    // 全スタッフの今日の出退勤状況を取得（準管理者以上）
+    getAllStaffToday: subAdminProcedure.query(async () => {
         try {
             const db = await getDb();
             if (!db) {
@@ -269,8 +276,9 @@ export const attendanceRouter = createTRPCRouter({
             const start = startOfDay(today);
             const end = endOfDay(today);
 
-            // 全ユーザーを取得
-            const allUsers = await db.select().from(schema.users);
+            // 全ユーザーを取得（nameやcategoryカラムが存在しない場合に対応）
+            const { selectUsersSafely } = await import("../db");
+            const allUsers = await selectUsersSafely(db);
 
             // 各ユーザーの出退勤記録を取得
             const result = await Promise.all(
@@ -344,8 +352,8 @@ export const attendanceRouter = createTRPCRouter({
         }
     }),
 
-    // 特定日の全スタッフの出退勤状況を取得（管理者専用）
-    getAllStaffByDate: adminProcedure
+    // 特定日の全スタッフの出退勤状況を取得（準管理者以上）
+    getAllStaffByDate: subAdminProcedure
         .input(z.object({ date: z.string() }))
         .query(async ({ input }) => {
             try {
@@ -362,8 +370,9 @@ export const attendanceRouter = createTRPCRouter({
                 const start = startOfDay(targetDate);
                 const end = endOfDay(targetDate);
 
-                // 全ユーザーを取得
-                const allUsers = await db.select().from(schema.users);
+                // 全ユーザーを取得（nameやcategoryカラムが存在しない場合に対応）
+                const { selectUsersSafely } = await import("../db");
+                const allUsers = await selectUsersSafely(db);
 
                 // 各ユーザーの出退勤記録を取得（指定日の出勤記録のみ）
                 const result = await Promise.all(
@@ -438,8 +447,8 @@ export const attendanceRouter = createTRPCRouter({
             }
         }),
 
-    // 管理者が代理で出勤打刻（管理者専用）
-    adminClockIn: adminProcedure
+    // 管理者が代理で出勤打刻（準管理者以上）
+    adminClockIn: subAdminProcedure
         .input(
             z.object({
                 userId: z.number(),
@@ -498,8 +507,8 @@ export const attendanceRouter = createTRPCRouter({
             };
         }),
 
-    // 管理者が代理で退勤打刻（管理者専用）
-    adminClockOut: adminProcedure
+    // 管理者が代理で退勤打刻（準管理者以上）
+    adminClockOut: subAdminProcedure
         .input(
             z.object({
                 userId: z.number(),
@@ -536,6 +545,18 @@ export const attendanceRouter = createTRPCRouter({
             }
 
             const clockOutTime = new Date(input.clockOut);
+
+            // 出勤日の23:59:59を超えないように制限
+            const maxClockOut = new Date(record.clockIn);
+            maxClockOut.setHours(23, 59, 59, 0);
+
+            if (clockOutTime > maxClockOut) {
+                throw new TRPCError({
+                    code: "BAD_REQUEST",
+                    message: "退勤時刻は23:59:59を超えることはできません（夜勤はありません）",
+                });
+            }
+
             const totalMinutes = Math.floor(
                 (clockOutTime.getTime() - record.clockIn.getTime()) / 1000 / 60
             );
@@ -563,8 +584,8 @@ export const attendanceRouter = createTRPCRouter({
             };
         }),
 
-    // 出退勤記録を更新（管理者専用）
-    updateAttendance: adminProcedure
+    // 出退勤記録を更新（準管理者以上）
+    updateAttendance: subAdminProcedure
         .input(
             z.object({
                 attendanceId: z.number(),
@@ -602,7 +623,21 @@ export const attendanceRouter = createTRPCRouter({
             // clockOutが明示的に送信された場合のみ更新（undefinedの場合は既存の値を保持）
             if (input.clockOut !== undefined) {
                 if (input.clockOut) {
-                    updateData.clockOut = new Date(input.clockOut);
+                    const clockOutTime = new Date(input.clockOut);
+                    const clockInTime = input.clockIn ? new Date(input.clockIn) : record.clockIn;
+
+                    // 出勤日の23:59:59を超えないように制限
+                    const maxClockOut = new Date(clockInTime);
+                    maxClockOut.setHours(23, 59, 59, 0);
+
+                    if (clockOutTime > maxClockOut) {
+                        throw new TRPCError({
+                            code: "BAD_REQUEST",
+                            message: "退勤時刻は23:59:59を超えることはできません（夜勤はありません）",
+                        });
+                    }
+
+                    updateData.clockOut = clockOutTime;
                 } else {
                     // 空文字列の場合はnullに設定（出勤中に戻す）
                     updateData.clockOut = null;
@@ -612,7 +647,7 @@ export const attendanceRouter = createTRPCRouter({
             // 出勤時刻または退勤時刻が変更された場合、勤務時間を再計算
             if (input.clockIn || input.clockOut !== undefined) {
                 const clockIn = input.clockIn ? new Date(input.clockIn) : record.clockIn;
-                const clockOut = input.clockOut !== undefined 
+                const clockOut = input.clockOut !== undefined
                     ? (input.clockOut ? new Date(input.clockOut) : null)
                     : record.clockOut;
 
@@ -633,6 +668,20 @@ export const attendanceRouter = createTRPCRouter({
                 .set(updateData)
                 .where(eq(schema.attendanceRecords.id, input.attendanceId));
 
+            // 更新後のデータを取得して確認
+            const [updatedRecord] = await db
+                .select()
+                .from(schema.attendanceRecords)
+                .where(eq(schema.attendanceRecords.id, input.attendanceId))
+                .limit(1);
+
+            if (!updatedRecord) {
+                throw new TRPCError({
+                    code: "INTERNAL_SERVER_ERROR",
+                    message: "更新後のデータを取得できませんでした",
+                });
+            }
+
             // 編集履歴を記録（更新前の値を使用）
             if (input.clockIn) {
                 await db.insert(schema.attendanceEditLogs).values({
@@ -643,17 +692,25 @@ export const attendanceRouter = createTRPCRouter({
                     newValue: new Date(input.clockIn),
                 });
             }
-            if (input.clockOut) {
+            if (input.clockOut !== undefined) {
                 await db.insert(schema.attendanceEditLogs).values({
                     attendanceId: input.attendanceId,
                     editorId: ctx.user!.id,
                     fieldName: "clockOut",
                     oldValue: record.clockOut,
-                    newValue: new Date(input.clockOut),
+                    newValue: input.clockOut ? new Date(input.clockOut) : null,
                 });
             }
 
-            return { success: true };
+            return {
+                success: true,
+                attendance: {
+                    id: updatedRecord.id,
+                    clockIn: updatedRecord.clockIn,
+                    clockOut: updatedRecord.clockOut,
+                    workDuration: updatedRecord.workDuration,
+                }
+            };
         }),
 
     // 今日の未退勤記録を23:59に自動退勤（自動実行用、publicProcedureで実行可能）
@@ -723,8 +780,8 @@ export const attendanceRouter = createTRPCRouter({
         }
     }),
 
-    // 出退勤記録を削除（管理者専用）
-    deleteAttendance: adminProcedure
+    // 出退勤記録を削除（準管理者以上）
+    deleteAttendance: subAdminProcedure
         .input(z.object({ attendanceId: z.number() }))
         .mutation(async ({ input }) => {
             const db = await getDb();
@@ -742,8 +799,8 @@ export const attendanceRouter = createTRPCRouter({
             return { success: true };
         }),
 
-    // 編集履歴を取得（管理者専用）
-    getEditLogs: adminProcedure
+    // 編集履歴を取得（準管理者以上）
+    getEditLogs: subAdminProcedure
         .input(
             z.object({
                 attendanceId: z.number().optional(),
@@ -774,8 +831,9 @@ export const attendanceRouter = createTRPCRouter({
                     .orderBy(schema.attendanceEditLogs.createdAt);
             }
 
-            // ユーザー情報を取得
-            const users = await db.select().from(schema.users);
+            // ユーザー情報を取得（nameやcategoryカラムが存在しない場合に対応）
+            const { selectUsersSafely } = await import("../db");
+            const users = await selectUsersSafely(db);
             const userMap = new Map(users.map((u) => [u.id, u]));
 
             // 出退勤記録情報を取得

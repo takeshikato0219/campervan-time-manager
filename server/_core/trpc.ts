@@ -17,7 +17,15 @@ export const protectedProcedure = publicProcedure.use(({ ctx, next }) => {
     return next({ ctx: { ...ctx, user: ctx.user } });
 });
 
-// 管理者専用の手続き
+// 準管理者専用の手続き（旧管理者）
+export const subAdminProcedure = protectedProcedure.use(({ ctx, next }) => {
+    if (ctx.user.role !== "sub_admin" && ctx.user.role !== "admin") {
+        throw new TRPCError({ code: "FORBIDDEN" });
+    }
+    return next({ ctx });
+});
+
+// 管理者専用の手続き（新管理者）
 export const adminProcedure = protectedProcedure.use(({ ctx, next }) => {
     if (ctx.user.role !== "admin") {
         throw new TRPCError({ code: "FORBIDDEN" });

@@ -11,16 +11,16 @@ import { toast } from "sonner";
 import { format } from "date-fns";
 
 // 車両詳細コンテンツコンポーネント
-function VehicleDetailContent({ 
-    vehicleId, 
-    user, 
-    vehicleStatus, 
-    completeMutation, 
-    archiveMutation, 
-    uncompleteMutation, 
-    unarchiveMutation 
-}: { 
-    vehicleId: number; 
+function VehicleDetailContent({
+    vehicleId,
+    user,
+    vehicleStatus,
+    completeMutation,
+    archiveMutation,
+    uncompleteMutation,
+    unarchiveMutation
+}: {
+    vehicleId: number;
     user: any;
     vehicleStatus?: "in_progress" | "completed" | "archived";
     completeMutation?: any;
@@ -123,7 +123,7 @@ function VehicleDetailContent({
                                             <p className="text-[10px] sm:text-xs text-[hsl(var(--muted-foreground))]">
                                                 {format(new Date(ap.createdAt), "yyyy-MM-dd HH:mm")} - {ap.userName}
                                             </p>
-                                            {user?.role === "admin" && (
+                                            {(user?.role === "admin" || user?.role === "sub_admin") && (
                                                 <Button
                                                     size="sm"
                                                     variant="ghost"
@@ -179,7 +179,7 @@ function VehicleDetailContent({
             </Card>
 
             {/* アクションボタン（一番下） */}
-            {user?.role === "admin" && vehicleStatus && completeMutation && archiveMutation && uncompleteMutation && unarchiveMutation && (
+            {(user?.role === "admin" || user?.role === "sub_admin") && vehicleStatus && completeMutation && archiveMutation && uncompleteMutation && unarchiveMutation && (
                 <div className="flex flex-col gap-1.5 sm:gap-2 pt-2 border-t">
                     {vehicleStatus === "in_progress" && (
                         <div className="flex gap-1.5 sm:gap-2">
@@ -717,7 +717,7 @@ export default function Vehicles() {
                                                         チェック
                                                     </Button>
                                                 </Link>
-                                                {user?.role === "admin" && (
+                                                {(user?.role === "admin" || user?.role === "sub_admin") && (
                                                     <>
                                                         <Button
                                                             size="sm"
@@ -866,8 +866,8 @@ export default function Vehicles() {
                                         )}
 
                                     </CardContent>
-                                    <VehicleDetailContent 
-                                        vehicleId={vehicle.id} 
+                                    <VehicleDetailContent
+                                        vehicleId={vehicle.id}
                                         user={user}
                                         vehicleStatus={vehicle.status}
                                         completeMutation={completeMutation}

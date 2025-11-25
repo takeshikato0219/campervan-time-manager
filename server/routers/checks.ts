@@ -1,4 +1,4 @@
-import { createTRPCRouter, adminProcedure, protectedProcedure } from "../_core/trpc";
+import { createTRPCRouter, adminProcedure, subAdminProcedure, protectedProcedure } from "../_core/trpc";
 import { getDb, schema } from "../db";
 import { eq, and } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
@@ -35,7 +35,7 @@ export const checksRouter = createTRPCRouter({
         }),
 
     // チェック項目作成（管理者のみ）
-    createCheckItem: adminProcedure
+    createCheckItem: subAdminProcedure
         .input(
             z.object({
                 category: z.enum(["一般", "キャンパー", "中古", "修理", "クレーム"]),
@@ -60,7 +60,7 @@ export const checksRouter = createTRPCRouter({
         }),
 
     // チェック項目更新（管理者のみ）
-    updateCheckItem: adminProcedure
+    updateCheckItem: subAdminProcedure
         .input(
             z.object({
                 id: z.number(),
@@ -86,7 +86,7 @@ export const checksRouter = createTRPCRouter({
         }),
 
     // CSVインポート（管理者のみ）
-    importFromCSV: adminProcedure
+    importFromCSV: subAdminProcedure
         .input(
             z.object({
                 items: z.array(
@@ -126,7 +126,7 @@ export const checksRouter = createTRPCRouter({
         }),
 
     // チェック項目削除（管理者のみ）
-    deleteCheckItem: adminProcedure
+    deleteCheckItem: subAdminProcedure
         .input(z.object({ id: z.number() }))
         .mutation(async ({ input }) => {
             const db = await getDb();
@@ -191,7 +191,8 @@ export const checksRouter = createTRPCRouter({
             let users: any[] = [];
             if (userIds.length > 0) {
                 const { inArray } = await import("drizzle-orm");
-                users = await db.select().from(schema.users).where(inArray(schema.users.id, userIds));
+                const { selectUsersSafely } = await import("../db");
+                users = await selectUsersSafely(db, inArray(schema.users.id, userIds));
             }
 
             const userMap = new Map(users.map((u) => [u.id, u]));

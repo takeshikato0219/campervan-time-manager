@@ -39,7 +39,8 @@ export default function UserManagement() {
         username: string;
         password: string;
         name: string;
-        role: "user" | "admin";
+        role: "field_worker" | "sales_office" | "sub_admin" | "admin";
+        category: "elephant" | "squirrel" | null;
     } | null>(null);
 
     const createMutation = trpc.users.create.useMutation({
@@ -82,7 +83,8 @@ export default function UserManagement() {
             username: userData.username || "",
             password: "",
             name: userData.name || "",
-            role: userData.role || "user",
+            role: userData.role || "field_worker",
+            category: userData.category || null,
         });
         setIsDialogOpen(true);
     };
@@ -105,6 +107,7 @@ export default function UserManagement() {
                 password: editingUser.password || undefined,
                 name: editingUser.name || undefined,
                 role: editingUser.role,
+                category: editingUser.category,
             });
         } else {
             createMutation.mutate({
@@ -112,6 +115,7 @@ export default function UserManagement() {
                 password: editingUser.password,
                 name: editingUser.name || undefined,
                 role: editingUser.role,
+                category: editingUser.category || undefined,
             });
         }
     };
@@ -137,7 +141,8 @@ export default function UserManagement() {
                             username: "",
                             password: "",
                             name: "",
-                            role: "user",
+                            role: "field_worker",
+                            category: null,
                         });
                         setIsDialogOpen(true);
                     }}
@@ -160,6 +165,7 @@ export default function UserManagement() {
                                     <TableHead>ユーザー名</TableHead>
                                     <TableHead>表示名</TableHead>
                                     <TableHead>ロール</TableHead>
+                                    <TableHead>分類</TableHead>
                                     <TableHead>作成日</TableHead>
                                     <TableHead>操作</TableHead>
                                 </TableRow>
@@ -172,13 +178,31 @@ export default function UserManagement() {
                                         <TableCell>{userData.name || "-"}</TableCell>
                                         <TableCell>
                                             <span
-                                                className={`px-2 py-1 rounded text-xs ${userData.role === "admin"
-                                                    ? "bg-blue-100 text-blue-800"
-                                                    : "bg-gray-100 text-gray-800"
-                                                    }`}
+                                                className={`px-2 py-1 rounded text-xs ${
+                                                    userData.role === "admin"
+                                                        ? "bg-purple-100 text-purple-800"
+                                                        : userData.role === "sub_admin"
+                                                        ? "bg-blue-100 text-blue-800"
+                                                        : userData.role === "sales_office"
+                                                        ? "bg-green-100 text-green-800"
+                                                        : "bg-gray-100 text-gray-800"
+                                                }`}
                                             >
-                                                {userData.role === "admin" ? "管理者" : "一般"}
+                                                {userData.role === "admin"
+                                                    ? "管理者"
+                                                    : userData.role === "sub_admin"
+                                                    ? "準管理者"
+                                                    : userData.role === "sales_office"
+                                                    ? "営業事務"
+                                                    : "現場"}
                                             </span>
+                                        </TableCell>
+                                        <TableCell>
+                                            {userData.category === "elephant"
+                                                ? "ゾウ"
+                                                : userData.category === "squirrel"
+                                                ? "リス"
+                                                : "-"}
                                         </TableCell>
                                         <TableCell>
                                             {new Date(userData.createdAt).toLocaleDateString("ja-JP")}
@@ -262,12 +286,31 @@ export default function UserManagement() {
                                     onChange={(e) =>
                                         setEditingUser({
                                             ...editingUser,
-                                            role: e.target.value as "user" | "admin",
+                                            role: e.target.value as "field_worker" | "sales_office" | "sub_admin" | "admin",
                                         })
                                     }
                                 >
-                                    <option value="user">一般</option>
+                                    <option value="field_worker">現場</option>
+                                    <option value="sales_office">営業事務</option>
+                                    <option value="sub_admin">準管理者</option>
                                     <option value="admin">管理者</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label className="text-sm font-medium">分類</label>
+                                <select
+                                    className="flex h-10 w-full rounded-md border border-[hsl(var(--input))] bg-[hsl(var(--background))] px-3 py-2 text-sm"
+                                    value={editingUser.category || ""}
+                                    onChange={(e) =>
+                                        setEditingUser({
+                                            ...editingUser,
+                                            category: e.target.value === "" ? null : (e.target.value as "elephant" | "squirrel" | null),
+                                        })
+                                    }
+                                >
+                                    <option value="">未設定</option>
+                                    <option value="elephant">ゾウ</option>
+                                    <option value="squirrel">リス</option>
                                 </select>
                             </div>
                             <div className="flex gap-2">

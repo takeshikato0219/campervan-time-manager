@@ -8,7 +8,7 @@ import TimelineCalendar from "../components/TimelineCalendar";
 import { Plus, AlertCircle } from "lucide-react";
 import { Link } from "wouter";
 import { toast } from "sonner";
-import { format } from "date-fns";
+import { format, startOfDay, endOfDay, isSameDay, subDays } from "date-fns";
 import { useDateChangeDetector } from "../hooks/useDateChangeDetector";
 import { useAutoRefresh } from "../hooks/useAutoRefresh";
 import { usePageVisibility } from "../hooks/usePageVisibility";
@@ -112,6 +112,18 @@ export default function Dashboard() {
         const d = typeof date === "string" ? new Date(date) : date;
         return format(d, "HH:mm");
     };
+
+    // 今日と昨日の作業記録を分ける
+    const today = new Date();
+    const yesterday = subDays(today, 1);
+    const todayRecordsFiltered = todayRecords?.filter((record) => {
+        const recordDate = typeof record.startTime === "string" ? new Date(record.startTime) : record.startTime;
+        return isSameDay(recordDate, today);
+    }) || [];
+    const yesterdayRecords = todayRecords?.filter((record) => {
+        const recordDate = typeof record.startTime === "string" ? new Date(record.startTime) : record.startTime;
+        return isSameDay(recordDate, yesterday);
+    }) || [];
 
     return (
         <div className="space-y-6">
@@ -307,14 +319,14 @@ export default function Dashboard() {
             )}
 
             {/* タイムラインカレンダー */}
-            {todayRecords && todayRecords.length > 0 && (
+            {todayRecordsFiltered && todayRecordsFiltered.length > 0 && (
                 <Card>
                     <CardHeader className="p-4 sm:p-6">
                         <CardTitle className="text-lg sm:text-xl">今日の作業タイムライン</CardTitle>
                     </CardHeader>
                     <CardContent className="p-2 sm:p-6">
                         <TimelineCalendar
-                            workRecords={todayRecords.map((r) => ({
+                            workRecords={todayRecordsFiltered.map((r) => ({
                                 id: r.id,
                                 startTime: typeof r.startTime === "string" ? r.startTime : r.startTime.toISOString(),
                                 endTime: r.endTime
@@ -328,6 +340,41 @@ export default function Dashboard() {
                             }))}
                             date={new Date()}
                         />
+                    </CardContent>
+                </Card>
+            )}
+
+            {/* 昨日の作業履歴 */}
+            {yesterdayRecords && yesterdayRecords.length > 0 && (
+                <Card>
+                    <CardHeader className="p-4 sm:p-6">
+                        <CardTitle className="text-lg sm:text-xl">昨日の作業履歴</CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-4 sm:p-6">
+                        <div className="space-y-2 sm:space-y-3">
+                            {yesterdayRecords.map((record) => (
+                                <div
+                                    key={record.id}
+                                    className="flex items-center justify-between p-2 sm:p-3 border border-[hsl(var(--border))] rounded-lg bg-gray-50"
+                                >
+                                    <div>
+                                        <p className="font-semibold">{record.vehicleNumber}</p>
+                                        <p className="text-sm text-[hsl(var(--muted-foreground))]">
+                                            {record.processName}
+                                        </p>
+                                        <p className="text-xs text-[hsl(var(--muted-foreground))]">
+                                            {formatTime(record.startTime)}
+                                            {record.endTime ? ` - ${formatTime(record.endTime)}` : " (作業中)"}
+                                        </p>
+                                    </div>
+                                    <div className="text-right">
+                                        <p className="font-semibold">
+                                            {formatDuration(record.durationMinutes)}
+                                        </p>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
                     </CardContent>
                 </Card>
             )}
@@ -349,9 +396,9 @@ export default function Dashboard() {
                     </div>
                 </CardHeader>
                 <CardContent className="p-4 sm:p-6">
-                    {todayRecords && todayRecords.length > 0 ? (
+                    {todayRecordsFiltered && todayRecordsFiltered.length > 0 ? (
                         <div className="space-y-2 sm:space-y-3">
-                            {todayRecords.map((record) => (
+                            {todayRecordsFiltered.map((record) => (
                                 <div
                                     key={record.id}
                                     className="flex items-center justify-between p-2 sm:p-3 border border-[hsl(var(--border))] rounded-lg"

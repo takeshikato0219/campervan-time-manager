@@ -86,122 +86,151 @@ async function startServer() {
   // 起動時にも実行
   deleteExpiredBroadcasts();
 
+  // 自動バックアップ処理（毎日午前3時に実行）
+  const scheduleAutoBackup = async () => {
+    try {
+      // バックアップ作成関数を直接呼び出し
+      const { createBackup } = await import("../routers/backup");
+      const result = await createBackup();
+      console.log(`[自動バックアップ] バックアップを作成しました: ${result.fileName}`);
+      console.log(`[自動バックアップ] 記録数:`, result.recordCount);
+    } catch (error) {
+      console.error("[自動バックアップ] バックアップ作成エラー:", error);
+      // エラーが発生してもサーバーは継続して動作する
+    }
+  };
+
+  // 自動バックアップを毎日午前3時に実行
+  const scheduleNextBackup = () => {
+    const now = new Date();
+    const nextBackup = new Date(now);
+    nextBackup.setHours(3, 0, 0, 0);
+
+    // 今日の3時が既に過ぎている場合は、明日の3時を設定
+    if (nextBackup <= now) {
+      nextBackup.setDate(nextBackup.getDate() + 1);
+    }
+
+    const msUntilBackup = nextBackup.getTime() - now.getTime();
+
+    setTimeout(async () => {
+      await scheduleAutoBackup();
+      // 次回のスケジュールを設定（毎日3時に実行）
+      scheduleNextBackup();
+    }, msUntilBackup);
+
+    console.log(`[Server] 次回の自動バックアップを ${nextBackup.toLocaleString("ja-JP")} にスケジュールしました`);
+  };
+
+  // 初回実行（起動時にもバックアップを作成）
+  scheduleAutoBackup();
+  // 毎日3時に実行されるようにスケジュール
+  scheduleNextBackup();
+
   // 23:59での自動退勤処理を設定
   const scheduleAutoClose = async () => {
     try {
       const { getDb, schema } = await import("../db");
       const { eq, and, gte, lte, isNull } = await import("drizzle-orm");
       const { startOfDay, endOfDay } = await import("date-fns");
+      const { calculateBreakTimeMinutes } = await import("../routers/attendance");
 
       const db = await getDb();
       if (!db) return;
 
-      // 現在時刻を確認
       const now = new Date();
-      const hours = now.getHours();
-      const minutes = now.getMinutes();
+      const today = new Date(now);
+      const start = startOfDay(today);
+      const end = endOfDay(today);
 
-      // 23:59以降の場合、自動退勤処理を実行
-      if (hours === 23 && minutes >= 59) {
-        const today = new Date(now);
-        const start = startOfDay(today);
-        const end = endOfDay(today);
+      // 今日の未退勤記録を取得
+      const unclosedRecords = await db
+        .select()
+        .from(schema.attendanceRecords)
+        .where(
+          and(
+            gte(schema.attendanceRecords.clockIn, start),
+            lte(schema.attendanceRecords.clockIn, end),
+            isNull(schema.attendanceRecords.clockOut)
+          )
+        );
 
-        // 今日の未退勤記録を取得
-        const unclosedRecords = await db
-          .select()
-          .from(schema.attendanceRecords)
-          .where(
-            and(
-              gte(schema.attendanceRecords.clockIn, start),
-              lte(schema.attendanceRecords.clockIn, end),
-              isNull(schema.attendanceRecords.clockOut)
-            )
-          );
+      if (unclosedRecords.length === 0) return;
 
-        let count = 0;
+      let count = 0;
 
-        for (const record of unclosedRecords) {
-          // 出勤日の23:59:59に設定
-          const clockOutTime = new Date(record.clockIn);
-          clockOutTime.setHours(23, 59, 59, 0);
+      for (const record of unclosedRecords) {
+        // 出勤日の23:59:59に設定
+        const clockOutTime = new Date(record.clockIn);
+        clockOutTime.setHours(23, 59, 59, 0);
 
-          // 勤務時間を計算（休憩時間を考慮）
-          const totalMinutes = Math.floor(
-            (clockOutTime.getTime() - record.clockIn.getTime()) / 1000 / 60
-          );
+        // 勤務時間を計算（休憩時間を考慮）
+        const totalMinutes = Math.floor(
+          (clockOutTime.getTime() - record.clockIn.getTime()) / 1000 / 60
+        );
 
-          // 休憩時間を計算（calculateBreakTimeMinutes関数を使用）
-          let breakMinutes = 0;
-          try {
-            const allBreakTimes = await db
-              .select()
-              .from(schema.breakTimes);
-            const activeBreakTimes = allBreakTimes.filter(bt => bt.isActive === "true");
+        // 休憩時間を計算
+        const breakMinutes = await calculateBreakTimeMinutes(record.clockIn, clockOutTime, db);
+        const workDuration = Math.max(0, totalMinutes - breakMinutes);
 
-            const clockInDate = new Date(record.clockIn);
-            const clockOutDate = new Date(clockOutTime);
+        await db
+          .update(schema.attendanceRecords)
+          .set({
+            clockOut: clockOutTime,
+            clockOutDevice: "auto-23:59",
+            workDuration,
+          })
+          .where(eq(schema.attendanceRecords.id, record.id));
 
-            for (const breakTime of activeBreakTimes) {
-              const [breakStartHour, breakStartMinute] = breakTime.startTime.split(":").map(Number);
-              const [breakEndHour, breakEndMinute] = breakTime.endTime.split(":").map(Number);
+        count++;
+      }
 
-              const breakStart = new Date(clockInDate);
-              breakStart.setHours(breakStartHour, breakStartMinute, 0, 0);
-
-              const breakEnd = new Date(clockInDate);
-              breakEnd.setHours(breakEndHour, breakEndMinute, 0, 0);
-
-              if (breakEnd < breakStart) {
-                breakEnd.setDate(breakEnd.getDate() + 1);
-              }
-
-              if (clockInDate < breakEnd && clockOutDate > breakStart) {
-                const overlapStart = clockInDate > breakStart ? clockInDate : breakStart;
-                const overlapEnd = clockOutDate < breakEnd ? clockOutDate : breakEnd;
-
-                if (overlapStart < overlapEnd) {
-                  const overlapMinutes = Math.floor(
-                    (overlapEnd.getTime() - overlapStart.getTime()) / 1000 / 60
-                  );
-                  if (overlapMinutes > 0) {
-                    breakMinutes += overlapMinutes;
-                  }
-                }
-              }
-            }
-          } catch (error) {
-            console.warn("[自動退勤] 休憩時間計算エラー:", error);
-          }
-
-          const workDuration = Math.max(0, totalMinutes - breakMinutes);
-
-          await db
-            .update(schema.attendanceRecords)
-            .set({
-              clockOut: clockOutTime,
-              clockOutDevice: "auto-23:59",
-              workDuration,
-            })
-            .where(eq(schema.attendanceRecords.id, record.id));
-
-          count++;
-        }
-
-        if (count > 0) {
-          console.log(`[Server] ${count}件の未退勤記録を23:59に自動退勤処理しました`);
-        }
+      if (count > 0) {
+        console.log(`[Server] ${count}件の未退勤記録を23:59に自動退勤処理しました`);
       }
     } catch (error) {
       console.error("[Server] 自動退勤スケジュールエラー:", error);
     }
   };
 
-  // 初回実行
+  // 23:59:00に正確に実行するためのスケジュール関数
+  const scheduleNextAutoClose = () => {
+    const now = new Date();
+    const next2359 = new Date(now);
+    next2359.setHours(23, 59, 0, 0);
+
+    // 今日の23:59が既に過ぎている場合は、明日の23:59を設定
+    if (next2359 <= now) {
+      next2359.setDate(next2359.getDate() + 1);
+    }
+
+    const msUntil2359 = next2359.getTime() - now.getTime();
+
+    setTimeout(() => {
+      scheduleAutoClose();
+      // 次回のスケジュールを設定（毎日23:59:00に実行）
+      scheduleNextAutoClose();
+    }, msUntil2359);
+
+    console.log(`[Server] 次回の自動退勤処理を ${next2359.toLocaleString("ja-JP")} にスケジュールしました`);
+  };
+
+  // 初回実行（起動時に未退勤記録があれば処理）
   scheduleAutoClose();
 
-  // 1分ごとにチェック
-  setInterval(scheduleAutoClose, 60 * 1000);
+  // 23:59:00に正確に実行されるようにスケジュール
+  scheduleNextAutoClose();
+
+  // 念のため、1分ごとにもチェック（バックアップ）
+  setInterval(() => {
+    const now = new Date();
+    const hours = now.getHours();
+    const minutes = now.getMinutes();
+    // 23:59以降の場合、自動退勤処理を実行
+    if (hours === 23 && minutes >= 59) {
+      scheduleAutoClose();
+    }
+  }, 60 * 1000);
 
   const app = express();
   const server = createServer(app);

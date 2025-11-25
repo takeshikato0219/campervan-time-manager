@@ -1,8 +1,8 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { createTRPCRouter, protectedProcedure, adminProcedure } from "../_core/trpc";
+import { createTRPCRouter, protectedProcedure, adminProcedure, subAdminProcedure } from "../_core/trpc";
 import { getDb, schema } from "../db";
-import { eq } from "drizzle-orm";
+import { eq, desc } from "drizzle-orm";
 import fs from "fs";
 import path from "path";
 import { nanoid } from "nanoid";
@@ -117,40 +117,59 @@ export const vehiclesRouter = createTRPCRouter({
                 });
             }
 
-            await db.insert(schema.vehicles).values({
-                vehicleNumber: input.vehicleNumber,
-                vehicleTypeId: input.vehicleTypeId,
-                category: input.category,
-                customerName: input.customerName,
-                desiredDeliveryDate: input.desiredDeliveryDate,
-                checkDueDate: input.checkDueDate,
-                reserveDate: input.reserveDate,
-                reserveRound: input.reserveRound,
-                hasCoating: input.hasCoating,
-                hasLine: input.hasLine,
-                hasPreferredNumber: input.hasPreferredNumber,
-                hasTireReplacement: input.hasTireReplacement,
-                instructionSheetUrl: input.instructionSheetUrl,
-                outsourcingDestination: input.outsourcingDestination,
-                outsourcingStartDate: input.outsourcingStartDate,
-                outsourcingEndDate: input.outsourcingEndDate,
-                targetTotalMinutes: input.targetTotalMinutes,
-            });
+            try {
+                await db.insert(schema.vehicles).values({
+                    vehicleNumber: input.vehicleNumber,
+                    vehicleTypeId: input.vehicleTypeId,
+                    category: input.category,
+                    customerName: input.customerName,
+                    desiredDeliveryDate: input.desiredDeliveryDate,
+                    checkDueDate: input.checkDueDate,
+                    reserveDate: input.reserveDate,
+                    reserveRound: input.reserveRound,
+                    hasCoating: input.hasCoating,
+                    hasLine: input.hasLine,
+                    hasPreferredNumber: input.hasPreferredNumber,
+                    hasTireReplacement: input.hasTireReplacement,
+                    instructionSheetUrl: input.instructionSheetUrl,
+                    outsourcingDestination: input.outsourcingDestination,
+                    outsourcingStartDate: input.outsourcingStartDate,
+                    outsourcingEndDate: input.outsourcingEndDate,
+                    targetTotalMinutes: input.targetTotalMinutes,
+                });
 
-            // 挿入されたレコードを取得
-            const [inserted] = await db
-                .select()
-                .from(schema.vehicles)
-                .where(eq(schema.vehicles.vehicleNumber, input.vehicleNumber))
-                .limit(1);
+                // 挿入されたレコードを取得（車両番号で検索）
+                const [inserted] = await db
+                    .select()
+                    .from(schema.vehicles)
+                    .where(eq(schema.vehicles.vehicleNumber, input.vehicleNumber))
+                    .orderBy(desc(schema.vehicles.id))
+                    .limit(1);
 
-            return {
-                id: inserted.id,
-            };
+                if (!inserted) {
+                    console.error(`[vehicles.create] 警告: 挿入した車両が見つかりません: ${input.vehicleNumber}`);
+                    throw new TRPCError({
+                        code: "INTERNAL_SERVER_ERROR",
+                        message: "車両の作成に成功しましたが、データの確認に失敗しました",
+                    });
+                }
+
+                console.log(`[vehicles.create] 車両を作成しました: ${input.vehicleNumber} (ID: ${inserted.id})`);
+
+                return {
+                    id: inserted.id,
+                };
+            } catch (error: any) {
+                console.error(`[vehicles.create] エラー: 車両作成に失敗しました: ${input.vehicleNumber}`, error);
+                throw new TRPCError({
+                    code: "INTERNAL_SERVER_ERROR",
+                    message: error.message || "車両の作成に失敗しました",
+                });
+            }
         }),
 
-    // 車両を更新（管理者専用）
-    update: adminProcedure
+    // 車両を更新（準管理者以上）
+    update: subAdminProcedure
         .input(
             z.object({
                 id: z.number(),
@@ -235,6 +254,23 @@ export const vehiclesRouter = createTRPCRouter({
 
                 await db.update(schema.vehicles).set(updateData).where(eq(schema.vehicles.id, input.id));
 
+                console.log(`[vehicles.update] 車両を更新しました: ID=${input.id}, 更新項目=${Object.keys(updateData).join(", ")}`);
+
+                // 更新後のデータを確認
+                const [updated] = await db
+                    .select()
+                    .from(schema.vehicles)
+                    .where(eq(schema.vehicles.id, input.id))
+                    .limit(1);
+
+                if (!updated) {
+                    console.error(`[vehicles.update] 警告: 更新した車両が見つかりません: ID=${input.id}`);
+                    throw new TRPCError({
+                        code: "INTERNAL_SERVER_ERROR",
+                        message: "車両の更新に成功しましたが、データの確認に失敗しました",
+                    });
+                }
+
                 return { success: true };
             } catch (error: any) {
                 console.error("[vehicles.update] Error:", error);
@@ -277,8 +313,9 @@ export const vehiclesRouter = createTRPCRouter({
                 .where(eq(schema.workRecords.vehicleId, input.id))
                 .orderBy(schema.workRecords.startTime);
 
-            // ユーザー、工程情報を取得
-            const users = await db.select().from(schema.users);
+            // ユーザー、工程情報を取得（nameやcategoryカラムが存在しない場合に対応）
+            const { selectUsersSafely } = await import("../db");
+            const users = await selectUsersSafely(db);
             const processes = await db.select().from(schema.processes);
             const userMap = new Map(users.map((u) => [u.id, u]));
             const processMap = new Map(processes.map((p) => [p.id, p]));
@@ -348,8 +385,8 @@ export const vehiclesRouter = createTRPCRouter({
             };
         }),
 
-    // 車両を削除（管理者専用）
-    delete: adminProcedure
+    // 車両を削除（準管理者以上）
+    delete: subAdminProcedure
         .input(z.object({ id: z.number() }))
         .mutation(async ({ input }) => {
             const db = await getDb();
@@ -360,13 +397,31 @@ export const vehiclesRouter = createTRPCRouter({
                 });
             }
 
+            // 削除前にデータを確認
+            const [vehicle] = await db
+                .select()
+                .from(schema.vehicles)
+                .where(eq(schema.vehicles.id, input.id))
+                .limit(1);
+
+            if (!vehicle) {
+                throw new TRPCError({
+                    code: "NOT_FOUND",
+                    message: "車両が見つかりません",
+                });
+            }
+
+            console.log(`[vehicles.delete] 車両を削除します: ID=${input.id}, 車両番号=${vehicle.vehicleNumber}`);
+
             await db.delete(schema.vehicles).where(eq(schema.vehicles.id, input.id));
+
+            console.log(`[vehicles.delete] 車両を削除しました: ID=${input.id}, 車両番号=${vehicle.vehicleNumber}`);
 
             return { success: true };
         }),
 
-    // 車両を完成にする（管理者専用）
-    complete: adminProcedure
+    // 車両を完成にする（準管理者以上）
+    complete: subAdminProcedure
         .input(z.object({ id: z.number() }))
         .mutation(async ({ input }) => {
             const db = await getDb();
@@ -388,8 +443,8 @@ export const vehiclesRouter = createTRPCRouter({
             return { success: true };
         }),
 
-    // 車両を保管する（管理者専用）
-    archive: adminProcedure
+    // 車両を保管する（準管理者以上）
+    archive: subAdminProcedure
         .input(z.object({ id: z.number() }))
         .mutation(async ({ input }) => {
             const db = await getDb();
@@ -410,8 +465,8 @@ export const vehiclesRouter = createTRPCRouter({
             return { success: true };
         }),
 
-    // 車両を作業中に戻す（管理者専用）
-    uncomplete: adminProcedure
+    // 車両を作業中に戻す（準管理者以上）
+    uncomplete: subAdminProcedure
         .input(z.object({ id: z.number() }))
         .mutation(async ({ input }) => {
             const db = await getDb();
@@ -433,8 +488,8 @@ export const vehiclesRouter = createTRPCRouter({
             return { success: true };
         }),
 
-    // 車両を完成に戻す（管理者専用）
-    unarchive: adminProcedure
+    // 車両を完成に戻す（準管理者以上）
+    unarchive: subAdminProcedure
         .input(z.object({ id: z.number() }))
         .mutation(async ({ input }) => {
             const db = await getDb();
@@ -455,8 +510,8 @@ export const vehiclesRouter = createTRPCRouter({
             return { success: true };
         }),
 
-    // 指示書ファイルをアップロード
-    uploadInstructionSheet: adminProcedure
+    // 指示書ファイルをアップロード（準管理者以上）
+    uploadInstructionSheet: subAdminProcedure
         .input(
             z.object({
                 vehicleId: z.number(),
@@ -553,12 +608,13 @@ export const vehiclesRouter = createTRPCRouter({
                 .from(schema.vehicleAttentionPoints)
                 .where(eq(schema.vehicleAttentionPoints.vehicleId, input.vehicleId));
 
-            // ユーザー情報を取得
+            // ユーザー情報を取得（nameやcategoryカラムが存在しない場合に対応）
             const userIds = [...new Set(attentionPoints.map((ap) => ap.userId))];
             let users: any[] = [];
             if (userIds.length > 0) {
                 const { inArray } = await import("drizzle-orm");
-                users = await db.select().from(schema.users).where(inArray(schema.users.id, userIds));
+                const { selectUsersSafely } = await import("../db");
+                users = await selectUsersSafely(db, inArray(schema.users.id, userIds));
             }
 
             const userMap = new Map(users.map((u) => [u.id, u]));
@@ -573,8 +629,8 @@ export const vehiclesRouter = createTRPCRouter({
             }));
         }),
 
-    // 注意ポイントを削除（管理者のみ）
-    deleteAttentionPoint: adminProcedure
+    // 注意ポイントを削除（準管理者以上）
+    deleteAttentionPoint: subAdminProcedure
         .input(z.object({ id: z.number() }))
         .mutation(async ({ input }) => {
             const db = await getDb();
@@ -611,8 +667,8 @@ export const vehiclesRouter = createTRPCRouter({
             return outsourcing;
         }),
 
-    // 車両の外注先を設定（最大2個、管理者のみ）
-    setVehicleOutsourcing: adminProcedure
+    // 車両の外注先を設定（最大2個、準管理者以上）
+    setVehicleOutsourcing: subAdminProcedure
         .input(
             z.object({
                 vehicleId: z.number(),
@@ -657,8 +713,8 @@ export const vehiclesRouter = createTRPCRouter({
             return { success: true };
         }),
 
-    // 車両の外注先を削除（管理者のみ）
-    deleteVehicleOutsourcing: adminProcedure
+    // 車両の外注先を削除（準管理者以上）
+    deleteVehicleOutsourcing: subAdminProcedure
         .input(z.object({ id: z.number() }))
         .mutation(async ({ input }) => {
             const db = await getDb();

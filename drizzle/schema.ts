@@ -6,7 +6,8 @@ export const users = mysqlTable("users", {
     username: varchar("username", { length: 64 }).notNull().unique(),
     password: text("password").notNull(),
     name: text("name"),
-    role: mysqlEnum("role", ["user", "admin"]).default("user").notNull(),
+    role: mysqlEnum("role", ["field_worker", "sales_office", "sub_admin", "admin"]).default("field_worker").notNull(),
+    category: mysqlEnum("category", ["elephant", "squirrel"]), // 分類: ゾウ、リス
     createdAt: timestamp("createdAt").defaultNow().notNull(),
     updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
@@ -250,5 +251,49 @@ export const vehicleOutsourcing = mysqlTable("vehicleOutsourcing", {
     displayOrder: int("displayOrder").default(0), // 表示順（1番目、2番目）
     createdAt: timestamp("createdAt").defaultNow().notNull(),
     updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+// 21. staffScheduleEntries: スタッフスケジュールエントリ
+export const staffScheduleEntries = mysqlTable("staffScheduleEntries", {
+    id: int("id").autoincrement().primaryKey(),
+    userId: int("userId").notNull(), // スタッフID
+    scheduleDate: date("scheduleDate").notNull(), // スケジュール日付
+    status: mysqlEnum("status", ["work", "rest", "request", "exhibition", "other", "morning", "afternoon"]).default("work").notNull(), // 状態: 出勤、休み、希望休、展示会、その他、午前出、午後出
+    comment: varchar("comment", { length: 100 }), // コメント（支払日、買い付け、外出など）
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+// 24. staffSchedulePublished: 公開されたスケジュール期間
+export const staffSchedulePublished = mysqlTable("staffSchedulePublished", {
+    id: int("id").autoincrement().primaryKey(),
+    periodStart: date("periodStart").notNull(), // 期間開始日（20日始まり）
+    periodEnd: date("periodEnd").notNull(), // 期間終了日（19日終わり）
+    isPublished: mysqlEnum("isPublished", ["true", "false"]).default("false").notNull(), // 公開フラグ
+    publishedAt: timestamp("publishedAt"), // 公開日時
+    publishedBy: int("publishedBy"), // 公開者ID
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+// 22. staffScheduleDisplayOrder: スタッフの表示順序と表示名（管理者が変更可能）
+export const staffScheduleDisplayOrder = mysqlTable("staffScheduleDisplayOrder", {
+    id: int("id").autoincrement().primaryKey(),
+    userId: int("userId").notNull().unique(), // スタッフID（一意）
+    displayOrder: int("displayOrder").notNull(), // 表示順（0から始まる）
+    displayName: varchar("displayName", { length: 100 }), // 表示名（管理者が変更可能、nullの場合はusers.nameを使用）
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+// 23. staffScheduleEditLogs: スタッフ名変更の履歴
+export const staffScheduleEditLogs = mysqlTable("staffScheduleEditLogs", {
+    id: int("id").autoincrement().primaryKey(),
+    userId: int("userId").notNull(), // 変更されたスタッフID
+    editorId: int("editorId").notNull(), // 編集者ID
+    fieldName: varchar("fieldName", { length: 50 }).notNull(), // 変更されたフィールド名（例: "displayOrder"）
+    oldValue: text("oldValue"), // 変更前の値
+    newValue: text("newValue"), // 変更後の値
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 

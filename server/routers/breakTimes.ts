@@ -4,26 +4,31 @@ import { createTRPCRouter, protectedProcedure, adminProcedure, subAdminProcedure
 import { getDb, schema } from "../db";
 import { eq } from "drizzle-orm";
 
-export const vehicleTypesRouter = createTRPCRouter({
-    // 車種一覧を取得
+export const breakTimesRouter = createTRPCRouter({
+    // 休憩時間一覧を取得
     list: protectedProcedure.query(async () => {
         const db = await getDb();
         if (!db) {
             return [];
         }
 
-        const vehicleTypes = await db.select().from(schema.vehicleTypes);
+        const breakTimes = await db
+            .select()
+            .from(schema.breakTimes)
+            .orderBy(schema.breakTimes.startTime);
 
-        return vehicleTypes;
+        return breakTimes;
     }),
 
-    // 車種を作成（管理者専用）
+    // 休憩時間を作成（準管理者以上）
     create: subAdminProcedure
         .input(
             z.object({
-                name: z.string(),
-                description: z.string().optional(),
-                standardTotalMinutes: z.number().optional(),
+                name: z.string().min(1),
+                startTime: z.string().regex(/^([0-1][0-9]|2[0-3]):[0-5][0-9]$/), // HH:MM形式
+                endTime: z.string().regex(/^([0-1][0-9]|2[0-3]):[0-5][0-9]$/), // HH:MM形式
+                durationMinutes: z.number().int().min(0),
+                isActive: z.enum(["true", "false"]).default("true"),
             })
         )
         .mutation(async ({ input }) => {
@@ -35,23 +40,27 @@ export const vehicleTypesRouter = createTRPCRouter({
                 });
             }
 
-            await db.insert(schema.vehicleTypes).values({
+            await db.insert(schema.breakTimes).values({
                 name: input.name,
-                description: input.description,
-                standardTotalMinutes: input.standardTotalMinutes,
+                startTime: input.startTime,
+                endTime: input.endTime,
+                durationMinutes: input.durationMinutes,
+                isActive: input.isActive,
             });
 
             return { success: true };
         }),
 
-    // 車種を更新（管理者専用）
+    // 休憩時間を更新（準管理者以上）
     update: subAdminProcedure
         .input(
             z.object({
                 id: z.number(),
-                name: z.string().optional(),
-                description: z.string().optional(),
-                standardTotalMinutes: z.number().optional(),
+                name: z.string().min(1).optional(),
+                startTime: z.string().regex(/^([0-1][0-9]|2[0-3]):[0-5][0-9]$/).optional(),
+                endTime: z.string().regex(/^([0-1][0-9]|2[0-3]):[0-5][0-9]$/).optional(),
+                durationMinutes: z.number().int().min(0).optional(),
+                isActive: z.enum(["true", "false"]).optional(),
             })
         )
         .mutation(async ({ input }) => {
@@ -65,19 +74,20 @@ export const vehicleTypesRouter = createTRPCRouter({
 
             const updateData: any = {};
             if (input.name !== undefined) updateData.name = input.name;
-            if (input.description !== undefined) updateData.description = input.description;
-            if (input.standardTotalMinutes !== undefined)
-                updateData.standardTotalMinutes = input.standardTotalMinutes;
+            if (input.startTime !== undefined) updateData.startTime = input.startTime;
+            if (input.endTime !== undefined) updateData.endTime = input.endTime;
+            if (input.durationMinutes !== undefined) updateData.durationMinutes = input.durationMinutes;
+            if (input.isActive !== undefined) updateData.isActive = input.isActive;
 
             await db
-                .update(schema.vehicleTypes)
+                .update(schema.breakTimes)
                 .set(updateData)
-                .where(eq(schema.vehicleTypes.id, input.id));
+                .where(eq(schema.breakTimes.id, input.id));
 
             return { success: true };
         }),
 
-    // 車種を削除（管理者専用）
+    // 休憩時間を削除（準管理者以上）
     delete: subAdminProcedure
         .input(z.object({ id: z.number() }))
         .mutation(async ({ input }) => {
@@ -89,7 +99,7 @@ export const vehicleTypesRouter = createTRPCRouter({
                 });
             }
 
-            await db.delete(schema.vehicleTypes).where(eq(schema.vehicleTypes.id, input.id));
+            await db.delete(schema.breakTimes).where(eq(schema.breakTimes.id, input.id));
 
             return { success: true };
         }),

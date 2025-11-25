@@ -17,7 +17,12 @@ import ProcessManagement from "./pages/admin/ProcessManagement";
 import VehicleTypeManagement from "./pages/admin/VehicleTypeManagement";
 import UserManagement from "./pages/admin/UserManagement";
 import CheckItemManagement from "./pages/admin/CheckItemManagement";
+import BreakTimeManagement from "./pages/admin/BreakTimeManagement";
+import StaffSchedule from "./pages/StaffSchedule";
+import StaffScheduleManagement from "./pages/admin/StaffScheduleManagement";
+import BackupManagement from "./pages/admin/BackupManagement";
 import AppLayout from "./components/AppLayout";
+import { Button } from "./components/ui/button";
 
 function ProtectedRoute({ component: Component }: { component: React.ComponentType }) {
     const { user, loading } = useAuth();
@@ -90,10 +95,32 @@ export default function App() {
                 <Route path="/admin/check-items">
                     {() => <ProtectedRoute component={CheckItemManagement} />}
                 </Route>
+                <Route path="/admin/break-times">
+                    {() => <ProtectedRoute component={BreakTimeManagement} />}
+                </Route>
+                <Route path="/staff-schedule">
+                    {() => <ProtectedRoute component={StaffSchedule} />}
+                </Route>
+                <Route path="/admin/staff-schedule">
+                    {() => <ProtectedRoute component={StaffScheduleManagement} />}
+                </Route>
+                <Route path="/admin/backup">
+                    {() => <ProtectedRoute component={BackupManagement} />}
+                </Route>
                 <Route>
-                    <div className="min-h-screen flex items-center justify-center">
-                        <div>404 - ページが見つかりません</div>
-                    </div>
+                    <AppLayout>
+                        <div className="min-h-screen flex items-center justify-center">
+                            <div className="text-center">
+                                <h1 className="text-2xl font-bold mb-4">404 - ページが見つかりません</h1>
+                                <p className="text-[hsl(var(--muted-foreground))] mb-4">
+                                    お探しのページは存在しないか、移動された可能性があります。
+                                </p>
+                                <Button onClick={() => window.location.href = "/"}>
+                                    ホームに戻る
+                                </Button>
+                            </div>
+                        </div>
+                    </AppLayout>
                 </Route>
             </Switch>
             <Toaster position="top-center" />
