@@ -14,49 +14,19 @@ export const usersRouter = createTRPCRouter({
         }
 
         try {
-            const users = await db
-                .select({
-                    id: schema.users.id,
-                    username: schema.users.username,
-                    name: schema.users.name,
-                    role: schema.users.role,
-                    category: schema.users.category,
-                    createdAt: schema.users.createdAt,
-                })
-                .from(schema.users)
-                .orderBy(schema.users.id);
+            const { selectUsersSafely } = await import("../db");
+            const users = await selectUsersSafely(db);
 
-            return users;
-        } catch (error: any) {
-            // nameまたはcategoryカラムが存在しない場合は、基本カラムのみで取得
-            if (error?.message?.includes("category") || error?.message?.includes("name") || error?.code === "ER_BAD_FIELD_ERROR") {
-                try {
-                    const users = await db
-                        .select({
-                            id: schema.users.id,
-                            username: schema.users.username,
-                            role: schema.users.role,
-                            createdAt: schema.users.createdAt,
-                        })
-                        .from(schema.users)
-                        .orderBy(schema.users.id);
-
-                    return users.map((u) => ({ ...u, name: null, category: null }));
-                } catch (innerError: any) {
-                    // それでもエラーが発生する場合は、最小限のカラムのみで取得
-                    const users = await db
-                        .select({
-                            id: schema.users.id,
-                            username: schema.users.username,
-                            role: schema.users.role,
-                        })
-                        .from(schema.users)
-                        .orderBy(schema.users.id);
-
-                    return users.map((u) => ({ ...u, name: null, category: null, createdAt: null }));
+            // createdAtでソート（存在する場合）
+            return users.sort((a: any, b: any) => {
+                if (a.id && b.id) {
+                    return a.id - b.id;
                 }
-            }
-            throw error;
+                return 0;
+            });
+        } catch (error: any) {
+            console.error("[Users] List error:", error);
+            return [];
         }
     }),
 
@@ -66,9 +36,9 @@ export const usersRouter = createTRPCRouter({
             z.object({
                 username: z.string(),
                 password: z.string(),
-                name: z.string().optional(),
+                name: z.string().optional(), // UI上は表示名として扱うが、実際には username をそのまま使う
                 role: z.enum(["field_worker", "sales_office", "sub_admin", "admin"]).default("field_worker"),
-                category: z.enum(["elephant", "squirrel"]).optional(),
+                category: z.enum(["elephant", "squirrel"]).optional(), // 現在は保存に使わない
             })
         )
         .mutation(async ({ input }) => {
@@ -99,9 +69,8 @@ export const usersRouter = createTRPCRouter({
             await db.insert(schema.users).values({
                 username: input.username,
                 password: hashedPassword,
-                name: input.name,
+                // 表示名は username と同一として扱うため DB には個別に保存しない
                 role: input.role,
-                category: input.category || null,
             });
 
             return { success: true };
@@ -114,9 +83,9 @@ export const usersRouter = createTRPCRouter({
                 id: z.number(),
                 username: z.string().optional(),
                 password: z.string().optional(),
-                name: z.string().optional(),
+                name: z.string().optional(), // UI上の表示名だが、DBには保存しない
                 role: z.enum(["field_worker", "sales_office", "sub_admin", "admin"]).optional(),
-                category: z.enum(["elephant", "squirrel"]).optional().nullable(),
+                category: z.enum(["elephant", "squirrel"]).optional().nullable(), // 現在は保存に使わない
             })
         )
         .mutation(async ({ input }) => {
@@ -128,16 +97,32 @@ export const usersRouter = createTRPCRouter({
                 });
             }
 
+            // ユーザー名の重複チェック（変更する場合）
+            if (input.username !== undefined) {
+                const existing = await db
+                    .select({ id: schema.users.id, username: schema.users.username })
+                    .from(schema.users)
+                    .where(eq(schema.users.username, input.username))
+                    .limit(1);
+
+                if (existing.length > 0 && existing[0].id !== input.id) {
+                    throw new TRPCError({
+                        code: "BAD_REQUEST",
+                        message: "このユーザー名は既に使用されています",
+                    });
+                }
+            }
+
             const updateData: any = {};
             if (input.username !== undefined) updateData.username = input.username;
             if (input.password !== undefined) {
                 updateData.password = await bcrypt.hash(input.password, 10);
             }
-            if (input.name !== undefined) updateData.name = input.name;
             if (input.role !== undefined) updateData.role = input.role;
-            if (input.category !== undefined) updateData.category = input.category;
 
-            await db.update(schema.users).set(updateData).where(eq(schema.users.id, input.id));
+            if (Object.keys(updateData).length > 0) {
+                await db.update(schema.users).set(updateData).where(eq(schema.users.id, input.id));
+            }
 
             return { success: true };
         }),

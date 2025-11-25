@@ -82,7 +82,8 @@ export default function UserManagement() {
             id: userData.id,
             username: userData.username || "",
             password: "",
-            name: userData.name || "",
+            // 表示名が未設定の場合はユーザー名をそのまま使う
+            name: userData.name || userData.username || "",
             role: userData.role || "field_worker",
             category: userData.category || null,
         });
@@ -105,7 +106,8 @@ export default function UserManagement() {
                 id: editingUser.id,
                 username: editingUser.username,
                 password: editingUser.password || undefined,
-                name: editingUser.name || undefined,
+                // 表示名が空ならユーザー名を保存
+                name: (editingUser.name || editingUser.username) || undefined,
                 role: editingUser.role,
                 category: editingUser.category,
             });
@@ -113,7 +115,8 @@ export default function UserManagement() {
             createMutation.mutate({
                 username: editingUser.username,
                 password: editingUser.password,
-                name: editingUser.name || undefined,
+                // 新規作成時も表示名が空ならユーザー名を保存
+                name: (editingUser.name || editingUser.username) || undefined,
                 role: editingUser.role,
                 category: editingUser.category || undefined,
             });
@@ -165,8 +168,6 @@ export default function UserManagement() {
                                     <TableHead>ユーザー名</TableHead>
                                     <TableHead>表示名</TableHead>
                                     <TableHead>ロール</TableHead>
-                                    <TableHead>分類</TableHead>
-                                    <TableHead>作成日</TableHead>
                                     <TableHead>操作</TableHead>
                                 </TableRow>
                             </TableHeader>
@@ -175,7 +176,8 @@ export default function UserManagement() {
                                     <TableRow key={userData.id}>
                                         <TableCell>{userData.id}</TableCell>
                                         <TableCell className="font-medium">{userData.username}</TableCell>
-                                        <TableCell>{userData.name || "-"}</TableCell>
+                                        {/* 表示名がなければユーザー名をそのまま表示 */}
+                                        <TableCell>{userData.name || userData.username}</TableCell>
                                         <TableCell>
                                             <span
                                                 className={`px-2 py-1 rounded text-xs ${
@@ -196,16 +198,6 @@ export default function UserManagement() {
                                                     ? "営業事務"
                                                     : "現場staff"}
                                             </span>
-                                        </TableCell>
-                                        <TableCell>
-                                            {userData.category === "elephant"
-                                                ? "ゾウ"
-                                                : userData.category === "squirrel"
-                                                ? "リス"
-                                                : "-"}
-                                        </TableCell>
-                                        <TableCell>
-                                            {new Date(userData.createdAt).toLocaleDateString("ja-JP")}
                                         </TableCell>
                                         <TableCell>
                                             <div className="flex gap-2">
@@ -275,7 +267,7 @@ export default function UserManagement() {
                                     onChange={(e) =>
                                         setEditingUser({ ...editingUser, name: e.target.value })
                                     }
-                                    placeholder="表示名を入力"
+                                    placeholder="未入力の場合はユーザー名が表示されます"
                                 />
                             </div>
                             <div>
@@ -294,23 +286,6 @@ export default function UserManagement() {
                                     <option value="sales_office">営業事務</option>
                                     <option value="sub_admin">準管理人</option>
                                     <option value="admin">管理人</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label className="text-sm font-medium">分類</label>
-                                <select
-                                    className="flex h-10 w-full rounded-md border border-[hsl(var(--input))] bg-[hsl(var(--background))] px-3 py-2 text-sm"
-                                    value={editingUser.category || ""}
-                                    onChange={(e) =>
-                                        setEditingUser({
-                                            ...editingUser,
-                                            category: e.target.value === "" ? null : (e.target.value as "elephant" | "squirrel" | null),
-                                        })
-                                    }
-                                >
-                                    <option value="">未設定</option>
-                                    <option value="elephant">ゾウ</option>
-                                    <option value="squirrel">リス</option>
                                 </select>
                             </div>
                             <div className="flex gap-2">

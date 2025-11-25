@@ -2,6 +2,7 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { createTRPCRouter, adminProcedure, subAdminProcedure } from "../_core/trpc";
 import { getDb, schema } from "../db";
+import { sql } from "drizzle-orm";
 import fs from "fs";
 import path from "path";
 import { format } from "date-fns";
@@ -28,13 +29,23 @@ export async function createBackup() {
     };
 
     try {
-        // 1. 車両データ（存在しないカラムを除外して安全に取得）
+        // 1. 車両データ（存在するカラムのみを動的に取得）
         let vehicles: any[] = [];
         try {
-            vehicles = await db.select().from(schema.vehicles);
-        } catch (error: any) {
-            // 全カラム選択が失敗した場合、明示的にカラムを指定（古いカラムを除外）
-            if (error?.message?.includes("outsourcingDestination") || error?.message?.includes("outsourcingStartDate") || error?.message?.includes("outsourcingEndDate") || error?.code === "ER_BAD_FIELD_ERROR") {
+            // まず、存在するカラムを取得（データベース名は動的に取得）
+            const columnsResult = await db.execute(sql`
+                SELECT COLUMN_NAME 
+                FROM INFORMATION_SCHEMA.COLUMNS 
+                WHERE TABLE_SCHEMA = DATABASE()
+                AND TABLE_NAME = 'vehicles'
+                AND COLUMN_NAME NOT IN ('outsourcingDestination', 'outsourcingStartDate', 'outsourcingEndDate')
+                ORDER BY ORDINAL_POSITION
+            `);
+
+            const columns = (columnsResult as any[]).map((row: any) => row.COLUMN_NAME);
+
+            if (columns.length === 0) {
+                // カラム情報が取得できない場合は、基本的なカラムのみを選択
                 vehicles = await db.select({
                     id: schema.vehicles.id,
                     vehicleNumber: schema.vehicles.vehicleNumber,
@@ -42,43 +53,146 @@ export async function createBackup() {
                     category: schema.vehicles.category,
                     customerName: schema.vehicles.customerName,
                     desiredDeliveryDate: schema.vehicles.desiredDeliveryDate,
-                    checkDueDate: schema.vehicles.checkDueDate,
-                    reserveDate: schema.vehicles.reserveDate,
-                    reserveRound: schema.vehicles.reserveRound,
-                    hasCoating: schema.vehicles.hasCoating,
-                    hasLine: schema.vehicles.hasLine,
-                    hasPreferredNumber: schema.vehicles.hasPreferredNumber,
-                    hasTireReplacement: schema.vehicles.hasTireReplacement,
-                    instructionSheetUrl: schema.vehicles.instructionSheetUrl,
-                    completionDate: schema.vehicles.completionDate,
                     status: schema.vehicles.status,
-                    targetTotalMinutes: schema.vehicles.targetTotalMinutes,
                     createdAt: schema.vehicles.createdAt,
                     updatedAt: schema.vehicles.updatedAt,
                 }).from(schema.vehicles);
             } else {
-                throw error;
+                // 存在するカラムのみを選択するSQLクエリを構築
+                const columnList = columns.map((col: string) => `\`${col}\``).join(", ");
+                const rawQuery = sql.raw(`SELECT ${columnList} FROM \`vehicles\``);
+                const result = await db.execute(rawQuery);
+                vehicles = (result as any[]).map((row: any) => {
+                    const obj: any = {};
+                    columns.forEach((col: string) => {
+                        obj[col] = row[col];
+                    });
+                    return obj;
+                });
+            }
+        } catch (error: any) {
+            console.error("[Backup] Error fetching vehicles:", error.message);
+            // フォールバック: 基本的なカラムのみを選択
+            try {
+                vehicles = await db.select({
+                    id: schema.vehicles.id,
+                    vehicleNumber: schema.vehicles.vehicleNumber,
+                    vehicleTypeId: schema.vehicles.vehicleTypeId,
+                    category: schema.vehicles.category,
+                    customerName: schema.vehicles.customerName,
+                    desiredDeliveryDate: schema.vehicles.desiredDeliveryDate,
+                    status: schema.vehicles.status,
+                    createdAt: schema.vehicles.createdAt,
+                    updatedAt: schema.vehicles.updatedAt,
+                }).from(schema.vehicles);
+            } catch (fallbackError: any) {
+                console.error("[Backup] Fallback also failed:", fallbackError.message);
+                vehicles = [];
             }
         }
-        // 古いカラム（outsourcingDestination等）を除外
-        const cleanedVehicles = vehicles.map((v: any) => {
-            const { outsourcingDestination, outsourcingStartDate, outsourcingEndDate, ...rest } = v;
-            return rest;
-        });
-        backupData.data.vehicles = cleanedVehicles;
+        backupData.data.vehicles = vehicles;
 
-        // 2. チェック項目
-        const checkItems = await db.select().from(schema.checkItems);
+        // 2. チェック項目（存在するカラムのみを動的に取得）
+        let checkItems: any[] = [];
+        try {
+            // まず、存在するカラムを取得
+            const checkItemsColumnsResult = await db.execute(sql`
+                SELECT COLUMN_NAME 
+                FROM INFORMATION_SCHEMA.COLUMNS 
+                WHERE TABLE_SCHEMA = DATABASE()
+                AND TABLE_NAME = 'checkItems'
+                ORDER BY ORDINAL_POSITION
+            `);
+
+            const checkItemsColumns = (checkItemsColumnsResult as any[]).map((row: any) => row.COLUMN_NAME);
+
+            if (checkItemsColumns.length === 0) {
+                // カラム情報が取得できない場合は、基本的なカラムのみを選択
+                checkItems = await db.select({
+                    id: schema.checkItems.id,
+                    category: schema.checkItems.category,
+                    name: schema.checkItems.name,
+                    description: schema.checkItems.description,
+                    createdAt: schema.checkItems.createdAt,
+                    updatedAt: schema.checkItems.updatedAt,
+                }).from(schema.checkItems);
+            } else {
+                // 存在するカラムのみを選択するSQLクエリを構築
+                const columnList = checkItemsColumns.map((col: string) => `\`${col}\``).join(", ");
+                const rawQuery = sql.raw(`SELECT ${columnList} FROM \`checkItems\``);
+                const result = await db.execute(rawQuery);
+                checkItems = (result as any[]).map((row: any) => {
+                    const obj: any = {};
+                    checkItemsColumns.forEach((col: string) => {
+                        obj[col] = row[col];
+                    });
+                    return obj;
+                });
+            }
+        } catch (error: any) {
+            console.error("[Backup] Error fetching checkItems:", error.message);
+            // フォールバック: 基本的なカラムのみを選択
+            try {
+                checkItems = await db.select({
+                    id: schema.checkItems.id,
+                    category: schema.checkItems.category,
+                    name: schema.checkItems.name,
+                    description: schema.checkItems.description,
+                    createdAt: schema.checkItems.createdAt,
+                    updatedAt: schema.checkItems.updatedAt,
+                }).from(schema.checkItems);
+            } catch (fallbackError: any) {
+                console.error("[Backup] Fallback also failed for checkItems:", fallbackError.message);
+                checkItems = [];
+            }
+        }
         backupData.data.checkItems = checkItems;
 
-        // 3. ユーザー情報（名前、カテゴリなど）
-        const users = await db.select({
-            id: schema.users.id,
-            username: schema.users.username,
-            name: schema.users.name,
-            role: schema.users.role,
-            category: schema.users.category,
-        }).from(schema.users);
+        // 3. ユーザー情報（存在するカラムのみを動的に取得）
+        let users: any[] = [];
+        try {
+            const { selectUsersSafely } = await import("../db");
+            users = await selectUsersSafely(db);
+        } catch (error: any) {
+            console.error("[Backup] Error fetching users:", error.message);
+            // フォールバック: 基本的なカラムのみを選択
+            try {
+                // まず、存在するカラムを取得
+                const usersColumnsResult = await db.execute(sql`
+                    SELECT COLUMN_NAME 
+                    FROM INFORMATION_SCHEMA.COLUMNS 
+                    WHERE TABLE_SCHEMA = DATABASE()
+                    AND TABLE_NAME = 'users'
+                    ORDER BY ORDINAL_POSITION
+                `);
+
+                const usersColumns = (usersColumnsResult as any[]).map((row: any) => row.COLUMN_NAME);
+
+                if (usersColumns.length > 0) {
+                    // 存在するカラムのみを選択するSQLクエリを構築
+                    const columnList = usersColumns.map((col: string) => `\`${col}\``).join(", ");
+                    const rawQuery = sql.raw(`SELECT ${columnList} FROM \`users\``);
+                    const result = await db.execute(rawQuery);
+                    users = (result as any[]).map((row: any) => {
+                        const obj: any = {};
+                        usersColumns.forEach((col: string) => {
+                            obj[col] = row[col];
+                        });
+                        return obj;
+                    });
+                } else {
+                    // 最小限のカラムのみを選択
+                    users = await db.select({
+                        id: schema.users.id,
+                        username: schema.users.username,
+                        role: schema.users.role,
+                    }).from(schema.users);
+                }
+            } catch (fallbackError: any) {
+                console.error("[Backup] Fallback also failed for users:", fallbackError.message);
+                users = [];
+            }
+        }
         backupData.data.users = users;
 
         // 4. スタッフスケジュール表示順序
@@ -97,8 +211,64 @@ export async function createBackup() {
         const processes = await db.select().from(schema.processes);
         backupData.data.processes = processes;
 
-        // 7. 休憩時間設定
-        const breakTimes = await db.select().from(schema.breakTimes);
+        // 7. 休憩時間設定（存在するカラムのみを動的に取得）
+        let breakTimes: any[] = [];
+        try {
+            // まず、存在するカラムを取得
+            const breakTimesColumnsResult = await db.execute(sql`
+                SELECT COLUMN_NAME 
+                FROM INFORMATION_SCHEMA.COLUMNS 
+                WHERE TABLE_SCHEMA = DATABASE()
+                AND TABLE_NAME = 'breakTimes'
+                ORDER BY ORDINAL_POSITION
+            `);
+
+            const breakTimesColumns = (breakTimesColumnsResult as any[]).map((row: any) => row.COLUMN_NAME);
+
+            if (breakTimesColumns.length === 0) {
+                // カラム情報が取得できない場合は、基本的なカラムのみを選択
+                breakTimes = await db.select({
+                    id: schema.breakTimes.id,
+                    name: schema.breakTimes.name,
+                    startTime: schema.breakTimes.startTime,
+                    endTime: schema.breakTimes.endTime,
+                    durationMinutes: schema.breakTimes.durationMinutes,
+                    isActive: schema.breakTimes.isActive,
+                    createdAt: schema.breakTimes.createdAt,
+                    updatedAt: schema.breakTimes.updatedAt,
+                }).from(schema.breakTimes);
+            } else {
+                // 存在するカラムのみを選択するSQLクエリを構築
+                const columnList = breakTimesColumns.map((col: string) => `\`${col}\``).join(", ");
+                const rawQuery = sql.raw(`SELECT ${columnList} FROM \`breakTimes\``);
+                const result = await db.execute(rawQuery);
+                breakTimes = (result as any[]).map((row: any) => {
+                    const obj: any = {};
+                    breakTimesColumns.forEach((col: string) => {
+                        obj[col] = row[col];
+                    });
+                    return obj;
+                });
+            }
+        } catch (error: any) {
+            console.error("[Backup] Error fetching breakTimes:", error.message);
+            // フォールバック: 基本的なカラムのみを選択
+            try {
+                breakTimes = await db.select({
+                    id: schema.breakTimes.id,
+                    name: schema.breakTimes.name,
+                    startTime: schema.breakTimes.startTime,
+                    endTime: schema.breakTimes.endTime,
+                    durationMinutes: schema.breakTimes.durationMinutes,
+                    isActive: schema.breakTimes.isActive,
+                    createdAt: schema.breakTimes.createdAt,
+                    updatedAt: schema.breakTimes.updatedAt,
+                }).from(schema.breakTimes);
+            } catch (fallbackError: any) {
+                console.error("[Backup] Fallback also failed for breakTimes:", fallbackError.message);
+                breakTimes = [];
+            }
+        }
         backupData.data.breakTimes = breakTimes;
 
         // 8. 出勤記録（重要）
@@ -369,7 +539,7 @@ export const backupRouter = createTRPCRouter({
                                 .from(schema.staffScheduleDisplayOrder)
                                 .where(eq(schema.staffScheduleDisplayOrder.userId, order.userId))
                                 .limit(1);
-                            
+
                             if (existing.length > 0) {
                                 // 更新
                                 await db
@@ -609,7 +779,7 @@ export const backupRouter = createTRPCRouter({
     // バックアップファイルをダウンロード（管理者のみ）
     downloadBackup: adminProcedure
         .input(z.object({ fileName: z.string() }))
-        .query(async ({ input }) => {
+        .mutation(async ({ input }) => {
             const backupDir = path.resolve(process.cwd(), "backups");
             const backupFilePath = path.join(backupDir, input.fileName);
 
