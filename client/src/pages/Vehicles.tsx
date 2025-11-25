@@ -5,10 +5,164 @@ import { Button } from "../components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { Input } from "../components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
-import { Plus, Search, Edit, Check, Archive, FileText, Trash2, ClipboardCheck } from "lucide-react";
+import { Plus, Search, Edit, Check, Archive, FileText, Trash2, ClipboardCheck, AlertCircle, UserPlus } from "lucide-react";
 import { Link } from "wouter";
 import { toast } from "sonner";
 import { format } from "date-fns";
+
+// 車両チェックセクションコンポーネント（作業中タブ用）
+function VehicleCheckSection({ vehicleId, vehicleCategory, user }: { vehicleId: number; vehicleCategory: string; user: any }) {
+    const { data: checkData, refetch: refetchChecks } = trpc.checks.getVehicleChecks.useQuery({
+        vehicleId,
+    });
+    const utils = trpc.useUtils();
+
+    const checkMutation = trpc.checks.checkVehicle.useMutation({
+        onSuccess: () => {
+            toast.success("チェックを更新しました");
+            refetchChecks();
+            utils.checks.getVehicleChecks.invalidate();
+        },
+        onError: (error) => {
+            toast.error(error.message || "チェックの実行に失敗しました");
+        },
+    });
+
+    const getStatusLabel = (status: string) => {
+        switch (status) {
+            case "checked":
+                return "チェック済み";
+            case "needs_recheck":
+                return "要再チェック";
+            case "unchecked":
+            default:
+                return "未チェック";
+        }
+    };
+
+    const getStatusColor = (status: string) => {
+        switch (status) {
+            case "checked":
+                return "bg-green-50 border-green-200";
+            case "needs_recheck":
+                return "bg-orange-50 border-orange-200";
+            case "unchecked":
+            default:
+                return "bg-gray-50 border-gray-200";
+        }
+    };
+
+    const getStatusIcon = (status: string) => {
+        switch (status) {
+            case "checked":
+                return <Check className="h-3 w-3 sm:h-4 sm:w-4 text-green-600 flex-shrink-0" />;
+            case "needs_recheck":
+                return <AlertCircle className="h-3 w-3 sm:h-4 sm:w-4 text-orange-600 flex-shrink-0" />;
+            case "unchecked":
+            default:
+                return <div className="h-3 w-3 sm:h-4 sm:w-4 border-2 border-gray-300 rounded flex-shrink-0" />;
+        }
+    };
+
+    if (!checkData || !checkData.checkStatus || checkData.checkStatus.length === 0) {
+        return null;
+    }
+
+    // チェック済みを下に、未チェック・要再チェックを上にソート
+    const sortedChecks = [...checkData.checkStatus].sort((a: any, b: any) => {
+        if (a.status === "checked" && b.status !== "checked") return 1;
+        if (a.status !== "checked" && b.status === "checked") return -1;
+        if (a.status === "needs_recheck" && b.status === "unchecked") return -1;
+        if (a.status === "unchecked" && b.status === "needs_recheck") return 1;
+        return 0;
+    });
+
+    return (
+        <CardContent className="p-3 sm:p-4 border-t bg-blue-50/30">
+            <div className="space-y-2">
+                <div className="flex items-center justify-between mb-2">
+                    <h3 className="text-xs sm:text-sm font-semibold">チェック項目</h3>
+                </div>
+                {sortedChecks.map((status: any) => (
+                    <div
+                        key={status.checkItem.id}
+                        className={`p-2 sm:p-2.5 border rounded-lg ${getStatusColor(status.status)}`}
+                    >
+                        <div className="flex items-start gap-2">
+                            {getStatusIcon(status.status)}
+                            <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2 flex-wrap mb-1">
+                                    <p className="font-medium text-xs sm:text-sm break-words">{status.checkItem.name}</p>
+                                    <span className={`text-[10px] sm:text-xs px-1.5 py-0.5 rounded ${
+                                        status.status === "checked" ? "bg-green-100 text-green-800" :
+                                        status.status === "needs_recheck" ? "bg-orange-100 text-orange-800" :
+                                        "bg-gray-100 text-gray-800"
+                                    }`}>
+                                        {getStatusLabel(status.status)}
+                                    </span>
+                                </div>
+                                {status.checkedBy && (
+                                    <p className="text-[10px] sm:text-xs text-[hsl(var(--muted-foreground))] mb-1">
+                                        チェック実行者: {status.checkedBy.name || status.checkedBy.username}
+                                        {status.checkedAt && ` (${format(new Date(status.checkedAt), "MM/dd HH:mm")})`}
+                                    </p>
+                                )}
+                                {status.notes && (
+                                    <p className="text-[10px] sm:text-xs text-[hsl(var(--muted-foreground))] mb-1">
+                                        メモ: {status.notes}
+                                    </p>
+                                )}
+                                <div className="flex flex-wrap gap-1 mt-1.5">
+                                    <Button
+                                        size="sm"
+                                        variant={status.status === "checked" ? "default" : "outline"}
+                                        onClick={() => checkMutation.mutate({
+                                            vehicleId,
+                                            checkItemId: status.checkItem.id,
+                                            status: "checked",
+                                        })}
+                                        className="h-6 sm:h-7 px-2 text-[10px] sm:text-xs min-h-[32px]"
+                                        disabled={checkMutation.isPending}
+                                    >
+                                        チェック
+                                    </Button>
+                                    <Button
+                                        size="sm"
+                                        variant={status.status === "needs_recheck" ? "default" : "outline"}
+                                        onClick={() => checkMutation.mutate({
+                                            vehicleId,
+                                            checkItemId: status.checkItem.id,
+                                            status: "needs_recheck",
+                                        })}
+                                        className={`h-6 sm:h-7 px-2 text-[10px] sm:text-xs min-h-[32px] ${
+                                            status.status === "needs_recheck" ? "bg-orange-600 hover:bg-orange-700 text-white border-orange-600" : ""
+                                        }`}
+                                        disabled={checkMutation.isPending}
+                                    >
+                                        要再チェック
+                                    </Button>
+                                    <Button
+                                        size="sm"
+                                        variant={status.status === "unchecked" ? "default" : "outline"}
+                                        onClick={() => checkMutation.mutate({
+                                            vehicleId,
+                                            checkItemId: status.checkItem.id,
+                                            status: "unchecked",
+                                        })}
+                                        className="h-6 sm:h-7 px-2 text-[10px] sm:text-xs min-h-[32px]"
+                                        disabled={checkMutation.isPending}
+                                    >
+                                        未チェック
+                                    </Button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                ))}
+            </div>
+        </CardContent>
+    );
+}
 
 // 車両詳細コンテンツコンポーネント
 function VehicleDetailContent({
@@ -66,11 +220,11 @@ function VehicleDetailContent({
     }
 
     return (
-        <CardContent className="p-3 sm:p-4 md:p-6 space-y-3 sm:space-y-4 border-t bg-gray-50/50">
+        <CardContent className="p-3 sm:p-4 md:p-6 space-y-3 sm:space-y-4 border-t bg-gray-50/50 w-full max-w-full overflow-hidden">
             {/* 指示書と注意ポイント */}
-            <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 md:gap-4">
+            <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 md:gap-4 w-full">
                 {/* 指示書 */}
-                <Card className="flex-1 min-w-0 sm:min-w-[200px]">
+                <Card className="flex-1 min-w-0 sm:min-w-[200px] max-w-full overflow-hidden">
                     <CardHeader className="p-2 sm:p-3">
                         <CardTitle className="text-xs sm:text-sm">指示書</CardTitle>
                     </CardHeader>
@@ -92,10 +246,10 @@ function VehicleDetailContent({
                 </Card>
 
                 {/* 注意ポイント */}
-                <Card className="flex-1 min-w-0 sm:min-w-[200px]">
+                <Card className="flex-1 min-w-0 sm:min-w-[200px] max-w-full overflow-hidden">
                     <CardHeader className="p-2 sm:p-3">
-                        <div className="flex items-center justify-between">
-                            <CardTitle className="text-xs sm:text-sm">注意ポイント</CardTitle>
+                        <div className="flex items-center justify-between gap-2">
+                            <CardTitle className="text-xs sm:text-sm truncate">注意ポイント</CardTitle>
                             <Button
                                 size="sm"
                                 variant="outline"
@@ -103,24 +257,24 @@ function VehicleDetailContent({
                                     setAttentionPointContent("");
                                     setIsAttentionPointDialogOpen(true);
                                 }}
-                                className="h-5 sm:h-6 px-1.5 sm:px-2 text-[10px] sm:text-xs"
+                                className="h-5 sm:h-6 px-1.5 sm:px-2 text-[10px] sm:text-xs flex-shrink-0"
                             >
                                 <Plus className="h-2.5 w-2.5 sm:h-3 sm:w-3 mr-0.5 sm:mr-1" />
                                 追加
                             </Button>
                         </div>
                     </CardHeader>
-                    <CardContent className="p-2 sm:p-3">
+                    <CardContent className="p-2 sm:p-3 max-h-[200px] overflow-y-auto">
                         {attentionPoints && attentionPoints.length > 0 ? (
                             <div className="space-y-1.5 sm:space-y-2">
                                 {attentionPoints.map((ap) => (
                                     <div
                                         key={ap.id}
-                                        className="p-1.5 sm:p-2 border border-[hsl(var(--border))] rounded-lg bg-yellow-50"
+                                        className="p-1.5 sm:p-2 border border-[hsl(var(--border))] rounded-lg bg-yellow-50 break-words"
                                     >
-                                        <p className="text-[10px] sm:text-xs break-words">{ap.content}</p>
-                                        <div className="flex items-center justify-between mt-0.5 sm:mt-1">
-                                            <p className="text-[10px] sm:text-xs text-[hsl(var(--muted-foreground))]">
+                                        <p className="text-[10px] sm:text-xs break-words overflow-wrap-anywhere word-break-break-word whitespace-pre-wrap">{ap.content}</p>
+                                        <div className="flex items-center justify-between mt-0.5 sm:mt-1 gap-1">
+                                            <p className="text-[10px] sm:text-xs text-[hsl(var(--muted-foreground))] truncate flex-1 min-w-0">
                                                 {format(new Date(ap.createdAt), "yyyy-MM-dd HH:mm")} - {ap.userName}
                                             </p>
                                             {(user?.role === "admin" || user?.role === "sub_admin") && (
@@ -132,7 +286,7 @@ function VehicleDetailContent({
                                                             deleteAttentionPointMutation.mutate({ id: ap.id });
                                                         }
                                                     }}
-                                                    className="h-4 sm:h-5 px-0.5 sm:px-1 text-red-600 hover:text-red-800"
+                                                    className="h-4 sm:h-5 px-0.5 sm:px-1 text-red-600 hover:text-red-800 flex-shrink-0"
                                                 >
                                                     <Trash2 className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
                                                 </Button>
@@ -677,9 +831,9 @@ export default function Vehicles() {
 
                 <TabsContent value={activeTab} className="mt-4">
                     {filteredVehicles && filteredVehicles.length > 0 ? (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 w-full">
                             {filteredVehicles.map((vehicle) => (
-                                <Card key={vehicle.id} className="overflow-hidden">
+                                <Card key={vehicle.id} className="overflow-hidden w-full max-w-full">
                                     <CardHeader className="p-3 sm:p-4 md:p-6 bg-gradient-to-r from-blue-50 to-indigo-50 border-b">
                                         <div className="flex flex-col sm:flex-row items-start justify-between gap-2 sm:gap-3">
                                             <div className="flex-1 min-w-0 w-full sm:w-auto">
@@ -866,6 +1020,12 @@ export default function Vehicles() {
                                         )}
 
                                     </CardContent>
+                                    
+                                    {/* チェック項目セクション（作業中タブのみ） */}
+                                    {activeTab === "in_progress" && (
+                                        <VehicleCheckSection vehicleId={vehicle.id} vehicleCategory={vehicle.category} user={user} />
+                                    )}
+                                    
                                     <VehicleDetailContent
                                         vehicleId={vehicle.id}
                                         user={user}
