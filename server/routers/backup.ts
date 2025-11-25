@@ -28,9 +28,44 @@ export async function createBackup() {
     };
 
     try {
-        // 1. 車両データ
-        const vehicles = await db.select().from(schema.vehicles);
-        backupData.data.vehicles = vehicles;
+        // 1. 車両データ（存在しないカラムを除外して安全に取得）
+        let vehicles: any[] = [];
+        try {
+            vehicles = await db.select().from(schema.vehicles);
+        } catch (error: any) {
+            // 全カラム選択が失敗した場合、明示的にカラムを指定（古いカラムを除外）
+            if (error?.message?.includes("outsourcingDestination") || error?.message?.includes("outsourcingStartDate") || error?.message?.includes("outsourcingEndDate") || error?.code === "ER_BAD_FIELD_ERROR") {
+                vehicles = await db.select({
+                    id: schema.vehicles.id,
+                    vehicleNumber: schema.vehicles.vehicleNumber,
+                    vehicleTypeId: schema.vehicles.vehicleTypeId,
+                    category: schema.vehicles.category,
+                    customerName: schema.vehicles.customerName,
+                    desiredDeliveryDate: schema.vehicles.desiredDeliveryDate,
+                    checkDueDate: schema.vehicles.checkDueDate,
+                    reserveDate: schema.vehicles.reserveDate,
+                    reserveRound: schema.vehicles.reserveRound,
+                    hasCoating: schema.vehicles.hasCoating,
+                    hasLine: schema.vehicles.hasLine,
+                    hasPreferredNumber: schema.vehicles.hasPreferredNumber,
+                    hasTireReplacement: schema.vehicles.hasTireReplacement,
+                    instructionSheetUrl: schema.vehicles.instructionSheetUrl,
+                    completionDate: schema.vehicles.completionDate,
+                    status: schema.vehicles.status,
+                    targetTotalMinutes: schema.vehicles.targetTotalMinutes,
+                    createdAt: schema.vehicles.createdAt,
+                    updatedAt: schema.vehicles.updatedAt,
+                }).from(schema.vehicles);
+            } else {
+                throw error;
+            }
+        }
+        // 古いカラム（outsourcingDestination等）を除外
+        const cleanedVehicles = vehicles.map((v: any) => {
+            const { outsourcingDestination, outsourcingStartDate, outsourcingEndDate, ...rest } = v;
+            return rest;
+        });
+        backupData.data.vehicles = cleanedVehicles;
 
         // 2. チェック項目
         const checkItems = await db.select().from(schema.checkItems);

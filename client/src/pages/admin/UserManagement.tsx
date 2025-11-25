@@ -189,12 +189,12 @@ export default function UserManagement() {
                                                 }`}
                                             >
                                                 {userData.role === "admin"
-                                                    ? "管理者"
+                                                    ? "管理人"
                                                     : userData.role === "sub_admin"
-                                                    ? "準管理者"
+                                                    ? "準管理人"
                                                     : userData.role === "sales_office"
                                                     ? "営業事務"
-                                                    : "現場"}
+                                                    : "現場staff"}
                                             </span>
                                         </TableCell>
                                         <TableCell>
@@ -290,10 +290,10 @@ export default function UserManagement() {
                                         })
                                     }
                                 >
-                                    <option value="field_worker">現場</option>
+                                    <option value="field_worker">現場staff</option>
                                     <option value="sales_office">営業事務</option>
-                                    <option value="sub_admin">準管理者</option>
-                                    <option value="admin">管理者</option>
+                                    <option value="sub_admin">準管理人</option>
+                                    <option value="admin">管理人</option>
                                 </select>
                             </div>
                             <div>
