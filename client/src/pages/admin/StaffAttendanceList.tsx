@@ -130,23 +130,16 @@ export default function StaffAttendanceList({ selectedDate }: StaffAttendanceLis
 
     const handleEdit = (attendance: any) => {
         setEditingId(attendance.id);
-        setEditClockIn(format(new Date(attendance.clockIn), "HH:mm"));
-        setEditClockOut(attendance.clockOut ? format(new Date(attendance.clockOut), "HH:mm") : "");
+        setEditClockIn(attendance.clockInTime || "");
+        setEditClockOut(attendance.clockOutTime || "");
     };
 
     const handleSave = (attendanceId: number) => {
-        const dateStr = format(selectedDate, "yyyy-MM-dd");
-        const clockInDateTime = editClockIn ? `${dateStr}T${editClockIn}:00+09:00` : undefined;
-        const clockOutDateTime =
-            editClockOut && editClockOut !== ""
-                ? `${dateStr}T${editClockOut}:00+09:00`
-                : undefined;
-
         updateMutation.mutate({
             attendanceId,
             workDate: dateStr,
-            clockIn: clockInDateTime,
-            clockOut: clockOutDateTime,
+            clockInTime: editClockIn || null,
+            clockOutTime: editClockOut || null,
         });
     };
 
@@ -179,10 +172,10 @@ export default function StaffAttendanceList({ selectedDate }: StaffAttendanceLis
         const hours = String(now.getHours()).padStart(2, "0");
         const minutes = String(now.getMinutes()).padStart(2, "0");
         const dateStr = format(selectedDate, "yyyy-MM-dd");
-        const clockInDateTime = `${dateStr}T${hours}:${minutes}:00+09:00`;
         adminClockInMutation.mutate({
             userId,
-            clockIn: clockInDateTime,
+            workDate: dateStr,
+            time: `${hours}:${minutes}`,
             deviceType: "pc",
         });
     };
@@ -207,27 +200,20 @@ export default function StaffAttendanceList({ selectedDate }: StaffAttendanceLis
             toast.error("出勤時刻と退勤時刻を両方入力してください");
             return;
         }
-        // 出勤 <= 退勤 であることを簡単にチェック
-        if (pastEditClockIn >= pastEditClockOut) {
-            toast.error("退勤時刻は出勤時刻より後の時間を入力してください");
-            return;
-        }
-
-        const clockInDateTime = `${dateStr}T${pastEditClockIn}:00+09:00`;
-        const clockOutTime = pastEditClockOut;
 
         try {
             // まず指定日の出勤を登録
             await adminClockInMutation.mutateAsync({
                 userId,
-                clockIn: clockInDateTime,
+                workDate: dateStr,
+                time: pastEditClockIn,
                 deviceType: "pc",
             });
             // 続けて同じ日の退勤を登録
             await adminClockOutMutation.mutateAsync({
                 userId,
                 workDate: dateStr,
-                time: clockOutTime,
+                time: pastEditClockOut,
             });
 
             toast.success("出勤・退勤を登録しました");
@@ -286,25 +272,25 @@ export default function StaffAttendanceList({ selectedDate }: StaffAttendanceLis
                                             <div>
                                                 <p className="text-xs text-[hsl(var(--muted-foreground))]">出勤</p>
                                                 <p className="text-sm font-medium">
-                                                    {format(new Date(staff.attendance.clockIn), "HH:mm")}
+                                                    {staff.attendance.clockInTime || "--:--"}
                                                 </p>
                                             </div>
                                         </div>
-                                        {staff.attendance.clockOut ? (
+                                        {staff.attendance.clockOutTime ? (
                                             <>
                                                 <div className="flex items-center gap-2">
                                                     {getDeviceIcon(staff.attendance.clockOutDevice)}
                                                     <div>
                                                         <p className="text-xs text-[hsl(var(--muted-foreground))]">退勤</p>
                                                         <p className="text-sm font-medium">
-                                                            {format(new Date(staff.attendance.clockOut), "HH:mm")}
+                                                            {staff.attendance.clockOutTime || "--:--"}
                                                         </p>
                                                     </div>
                                                 </div>
                                                 <div>
                                                     <p className="text-xs text-[hsl(var(--muted-foreground))]">勤務時間</p>
                                                     <p className="text-sm font-medium">
-                                                        {formatDuration(staff.attendance.workDuration)}
+                                                        {formatDuration(staff.attendance.workMinutes)}
                                                     </p>
                                                 </div>
                                             </>

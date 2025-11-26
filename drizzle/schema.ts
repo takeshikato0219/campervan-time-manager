@@ -13,12 +13,24 @@ export const users = mysqlTable("users", {
 });
 
 // 2. attendanceRecords: 出退勤記録
+// ★ 新設計: すべて「その日の workDate + HH:MM 文字列」で管理する
+//   - 旧 timestamp カラム（clockIn / clockOut / workDuration）はレガシー互換用として残すが、
+//     新しいロジックでは基本的に参照・更新しない方針。
 export const attendanceRecords = mysqlTable("attendanceRecords", {
     id: int("id").autoincrement().primaryKey(),
     userId: int("userId").notNull(),
-    clockIn: timestamp("clockIn").notNull(),
+
+    // 新しい正規フィールド（JST 前提のその日の勤務情報）
+    workDate: date("workDate"), // その日のカレンダー日付 (YYYY-MM-DD)
+    clockInTime: varchar("clockInTime", { length: 5 }), // "HH:MM"
+    clockOutTime: varchar("clockOutTime", { length: 5 }), // "HH:MM"
+    workMinutes: int("workMinutes"), // 勤務時間（分）
+
+    // 旧フィールド（ログ・過去互換用。今後のロジックでは使用しない想定）
+    clockIn: timestamp("clockIn"),
     clockOut: timestamp("clockOut"),
     workDuration: int("workDuration"),
+
     clockInDevice: varchar("clockInDevice", { length: 50 }),
     clockOutDevice: varchar("clockOutDevice", { length: 50 }),
     createdAt: timestamp("createdAt").defaultNow().notNull(),

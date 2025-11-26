@@ -1,7 +1,6 @@
 import { useAuth } from "../hooks/useAuth";
 import { trpc } from "../lib/trpc";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
-import { format } from "date-fns";
 
 export default function MyAttendance() {
     const { user } = useAuth();
@@ -9,16 +8,16 @@ export default function MyAttendance() {
 
     // 出勤打刻は管理者専用のため、一般ユーザーは使用不可
 
-    const formatTime = (date: Date | string) => {
-        const d = typeof date === "string" ? new Date(date) : date;
-        return format(d, "HH:mm");
-    };
-
     const formatDuration = (minutes: number | null) => {
         if (!minutes) return "0分";
         const hours = Math.floor(minutes / 60);
         const mins = minutes % 60;
         return hours > 0 ? `${hours}時間${mins}分` : `${mins}分`;
+    };
+
+    const formatAttendanceTime = (time: string | null | undefined) => {
+        if (!time) return "--:--";
+        return time;
     };
 
     return (
@@ -40,17 +39,17 @@ export default function MyAttendance() {
                             <div>
                                 <p className="text-sm text-[hsl(var(--muted-foreground))]">出勤時刻</p>
                                 <p className="text-2xl font-semibold mt-1">
-                                    {formatTime(todayAttendance.clockIn)}
+                                    {formatAttendanceTime(todayAttendance.clockInTime)}
                                 </p>
                             </div>
-                            {todayAttendance.clockOut ? (
+                            {todayAttendance.clockOutTime ? (
                                 <div>
                                     <p className="text-sm text-[hsl(var(--muted-foreground))]">退勤時刻</p>
                                     <p className="text-2xl font-semibold mt-1">
-                                        {formatTime(todayAttendance.clockOut)}
+                                        {formatAttendanceTime(todayAttendance.clockOutTime)}
                                     </p>
                                     <p className="text-sm text-[hsl(var(--muted-foreground))] mt-2">
-                                        勤務時間: {formatDuration(todayAttendance.workDuration)}
+                                        勤務時間: {formatDuration(todayAttendance.workMinutes)}
                                     </p>
                                 </div>
                             ) : (

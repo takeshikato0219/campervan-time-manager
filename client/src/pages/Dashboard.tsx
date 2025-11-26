@@ -130,6 +130,11 @@ export default function Dashboard() {
         return format(d, "HH:mm");
     };
 
+    const formatAttendanceTime = (time: string | null | undefined) => {
+        if (!time) return "--:--";
+        return time;
+    };
+
     // 今日と昨日の作業記録を分ける
     const today = new Date();
     const yesterday = subDays(today, 1);
@@ -413,17 +418,17 @@ export default function Dashboard() {
                             <div>
                                 <p className="text-sm text-[hsl(var(--muted-foreground))]">出勤時刻</p>
                                 <p className="text-lg font-semibold">
-                                    {formatTime(todayAttendance.clockIn)}
+                                    {formatAttendanceTime(todayAttendance.clockInTime)}
                                 </p>
                             </div>
-                            {todayAttendance.clockOut ? (
+                            {todayAttendance.clockOutTime ? (
                                 <div>
                                     <p className="text-sm text-[hsl(var(--muted-foreground))]">退勤時刻</p>
                                     <p className="text-lg font-semibold">
-                                        {formatTime(todayAttendance.clockOut)}
+                                        {formatAttendanceTime(todayAttendance.clockOutTime)}
                                     </p>
                                     <p className="text-sm text-[hsl(var(--muted-foreground))] mt-2">
-                                        勤務時間: {formatDuration(todayAttendance.workDuration)}
+                                        勤務時間: {formatDuration(todayAttendance.workMinutes)}
                                     </p>
                                 </div>
                             ) : (
