@@ -56,7 +56,7 @@ export default function StaffAttendanceList({ selectedDate }: StaffAttendanceLis
 
     const utils = trpc.useUtils();
 
-    // 出退勤編集は「毎回サーバーから取り直す」安全な方式に変更（他のカードが巻き込まれておかしくなるのを防ぐ）
+    // 出退勤編集は「毎回サーバーから取り直す」安全な方式（他のカードが巻き込まれておかしくなるのを防ぐ）
     const updateMutation = trpc.attendance.updateAttendance.useMutation({
         onSuccess: () => {
             toast.success("出退勤記録を更新しました");
@@ -70,6 +70,21 @@ export default function StaffAttendanceList({ selectedDate }: StaffAttendanceLis
         },
         onError: (error) => {
             toast.error(error.message || "更新に失敗しました");
+        },
+    });
+
+    // 出退勤記録の削除（サーバー側で1件削除してから一覧を再取得）
+    const deleteMutation = trpc.attendance.deleteAttendance.useMutation({
+        onSuccess: () => {
+            toast.success("出退勤記録を削除しました");
+            if (isToday) {
+                utils.attendance.getAllStaffToday.invalidate();
+            } else {
+                utils.attendance.getAllStaffByDate.invalidate({ date: dateStr });
+            }
+        },
+        onError: (error) => {
+            toast.error(error.message || "削除に失敗しました");
         },
     });
 
@@ -133,9 +148,11 @@ export default function StaffAttendanceList({ selectedDate }: StaffAttendanceLis
         });
     };
 
-    // const handleDelete = (attendanceId: number) => {
-    //     // 物理削除は行わない
-    // };
+    const handleDelete = (attendanceId: number) => {
+        if (confirm("本当にこの出退勤記録を削除しますか？")) {
+            deleteMutation.mutate({ attendanceId });
+        }
+    };
 
     const getDeviceIcon = (device: string | null) => {
         if (!device) return null;
@@ -334,7 +351,18 @@ export default function StaffAttendanceList({ selectedDate }: StaffAttendanceLis
                                                     >
                                                         キャンセル
                                                     </Button>
-                                                    {/* 削除ボタンは安全性のため廃止 */}
+                                                    <Button
+                                                        size="sm"
+                                                        variant="destructive"
+                                                        className="flex-1 text-xs sm:text-sm min-h-[44px]"
+                                                        onClick={(e) => {
+                                                            e.preventDefault();
+                                                            e.stopPropagation();
+                                                            handleDelete(staff.attendance!.id);
+                                                        }}
+                                                    >
+                                                        削除
+                                                    </Button>
                                                 </div>
                                             </div>
                                         ) : (

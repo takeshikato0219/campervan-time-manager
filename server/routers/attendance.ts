@@ -34,6 +34,20 @@ function getJstDayRangeFromDateString(dateStr: string): { start: Date; end: Date
 }
 
 /**
+ * JSTの日付が同じかどうかを判定するヘルパー
+ */
+function isSameJstDate(a: Date, b: Date): boolean {
+    const toJst = (d: Date) => new Date(d.getTime() + 9 * 60 * 60 * 1000);
+    const aj = toJst(a);
+    const bj = toJst(b);
+    return (
+        aj.getUTCFullYear() === bj.getUTCFullYear() &&
+        aj.getUTCMonth() === bj.getUTCMonth() &&
+        aj.getUTCDate() === bj.getUTCDate()
+    );
+}
+
+/**
  * 出勤時刻と退勤時刻の間に含まれる休憩時間の合計を計算
  */
 export async function calculateBreakTimeMinutes(
@@ -119,7 +133,7 @@ export async function calculateBreakTimeMinutes(
 }
 
 export const attendanceRouter = createTRPCRouter({
-    // 今日の出退勤状況を取得
+    // 今日の出退勤状況を取得（JST基準で「今日」のレコードを判定）
     getTodayStatus: protectedProcedure.query(async ({ ctx }) => {
         const db = await getDb();
         if (!db) {
@@ -129,26 +143,20 @@ export const attendanceRouter = createTRPCRouter({
             });
         }
 
-        // 日本時間の「今日」の0:00〜23:59:59に対応するUTC範囲で絞り込む
-        const { start, end } = getJstDayRangeForNow();
-
-        const records = await db
+        // そのユーザーの最新の出勤記録を1件取得
+        const { desc } = await import("drizzle-orm");
+        const [record] = await db
             .select()
             .from(schema.attendanceRecords)
-            .where(
-                and(
-                    eq(schema.attendanceRecords.userId, ctx.user!.id),
-                    gte(schema.attendanceRecords.clockIn, start),
-                    lte(schema.attendanceRecords.clockIn, end)
-                )
-            )
+            .where(eq(schema.attendanceRecords.userId, ctx.user!.id))
+            .orderBy(desc(schema.attendanceRecords.clockIn))
             .limit(1);
 
-        if (records.length === 0) {
+        // レコードが無い、またはJST基準で今日ではない場合は null
+        const now = new Date();
+        if (!record || !isSameJstDate(record.clockIn, now)) {
             return null;
         }
-
-        const record = records[0];
         // 退勤時刻がある場合、勤務時間を再計算
         let workDuration = record.workDuration;
         if (record.clockOut) {
@@ -182,9 +190,8 @@ export const attendanceRouter = createTRPCRouter({
                 });
             }
 
-            const today = new Date();
-            const start = startOfDay(today);
-            const end = endOfDay(today);
+            // 日本時間の「今日」の0:00〜23:59:59に対応するUTC範囲で重複確認
+            const { start, end } = getJstDayRangeForNow();
 
             // 今日の出勤記録を確認
             const existing = await db
@@ -288,7 +295,7 @@ export const attendanceRouter = createTRPCRouter({
         };
     }),
 
-    // 全スタッフの今日の出退勤状況を取得（準管理者以上）
+    // 全スタッフの今日の出退勤状況を取得（準管理者以上・各ユーザーの最新レコードをJST基準で判定）
     getAllStaffToday: subAdminProcedure.query(async () => {
         try {
             const db = await getDb();
@@ -299,29 +306,34 @@ export const attendanceRouter = createTRPCRouter({
                 });
             }
 
-            // 日本時間の「今日」の0:00〜23:59:59に対応するUTC範囲で絞り込む
-            const { start, end } = getJstDayRangeForNow();
-
             // 全ユーザーを取得（nameやcategoryカラムが存在しない場合に対応）
             const { selectUsersSafely } = await import("../db");
             const allUsers = await selectUsersSafely(db);
+            const { desc } = await import("drizzle-orm");
+            const now = new Date();
 
             // 各ユーザーの出退勤記録を取得
             const result = await Promise.all(
                 allUsers.map(async (user) => {
                     try {
-                        const attendanceRecords = await db
+                        // そのユーザーの最新の出勤レコードを1件取得
+                        const [latest] = await db
                             .select()
                             .from(schema.attendanceRecords)
-                            .where(
-                                and(
-                                    eq(schema.attendanceRecords.userId, user.id),
-                                    gte(schema.attendanceRecords.clockIn, start),
-                                    lte(schema.attendanceRecords.clockIn, end)
-                                )
-                            )
+                            .where(eq(schema.attendanceRecords.userId, user.id))
+                            .orderBy(desc(schema.attendanceRecords.clockIn))
                             .limit(1);
-                        const attendance = attendanceRecords[0] || null;
+
+                        // レコードが無い、またはJST基準で今日でなければ未出勤とみなす
+                        if (!latest || !isSameJstDate(latest.clockIn, now)) {
+                            return {
+                                userId: user.id,
+                                userName: user.name || user.username,
+                                attendance: null,
+                            };
+                        }
+
+                        const attendance = latest;
 
                         // 退勤時刻がある場合、勤務時間を再計算
                         let workDuration = attendance?.workDuration || null;
@@ -489,9 +501,10 @@ export const attendanceRouter = createTRPCRouter({
                 });
             }
 
-            const clockInTime = new Date(input.clockIn);
-            const start = startOfDay(clockInTime);
-            const end = endOfDay(clockInTime);
+            // 入力された日時（JST想定）から日付部分(YYYY-MM-DD)だけを取り出し、
+            // その日のJST 0:00〜23:59:59に対応するUTC範囲で重複確認
+            const dateStr = input.clockIn.split("T")[0]; // "2025-11-26"
+            const { start, end } = getJstDayRangeFromDateString(dateStr);
 
             // その日の出勤記録を確認
             const existing = await db
@@ -513,11 +526,15 @@ export const attendanceRouter = createTRPCRouter({
                 });
             }
 
-            await db.insert(schema.attendanceRecords).values({
-                userId: input.userId,
-                clockIn: clockInTime,
-                clockInDevice: input.deviceType,
-            });
+            // 実際に保存するclockInは、入力文字列から生成したDate（UTC）をそのまま使用
+            const clockInTime = new Date(input.clockIn);
+            await db
+                .insert(schema.attendanceRecords)
+                .values({
+                    userId: input.userId,
+                    clockIn: clockInTime,
+                    clockInDevice: input.deviceType,
+                });
 
             const [user] = await db
                 .select()
@@ -808,15 +825,23 @@ export const attendanceRouter = createTRPCRouter({
         }
     }),
 
-    // 出退勤記録を削除（安全性のため物理削除は無効化）
-    // これ以上「出勤したのに記録が消える」ことを防ぐため、削除は不可とし、編集のみ許可する
+    // 出退勤記録を削除（準管理者以上）
     deleteAttendance: subAdminProcedure
         .input(z.object({ attendanceId: z.number() }))
-        .mutation(async () => {
-            throw new TRPCError({
-                code: "BAD_REQUEST",
-                message: "出退勤記録の削除はできません。時間の修正のみ可能です。",
-            });
+        .mutation(async ({ input }) => {
+            const db = await getDb();
+            if (!db) {
+                throw new TRPCError({
+                    code: "INTERNAL_SERVER_ERROR",
+                    message: "データベースに接続できません",
+                });
+            }
+
+            await db
+                .delete(schema.attendanceRecords)
+                .where(eq(schema.attendanceRecords.id, input.attendanceId));
+
+            return { success: true };
         }),
 
     // 編集履歴を取得（準管理者以上）
