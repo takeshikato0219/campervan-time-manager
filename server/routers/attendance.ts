@@ -745,9 +745,12 @@ export const attendanceRouter = createTRPCRouter({
             let count = 0;
 
             for (const record of unclosedRecords) {
-                // 出勤日の23:59:59に設定
-                const clockOutTime = new Date(record.clockIn);
-                clockOutTime.setHours(23, 59, 59, 0);
+                // 出勤日の「日本時間23:59:59」に相当するUTC時刻を設定
+                const year = record.clockIn.getUTCFullYear();
+                const month = record.clockIn.getUTCMonth();
+                const day = record.clockIn.getUTCDate();
+                // JST(UTC+9)の23:59:59はUTCでは14:59:59
+                const clockOutTime = new Date(Date.UTC(year, month, day, 14, 59, 59));
 
                 const totalMinutes = Math.floor(
                     (clockOutTime.getTime() - record.clockIn.getTime()) / 1000 / 60

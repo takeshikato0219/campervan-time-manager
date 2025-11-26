@@ -160,9 +160,12 @@ async function startServer() {
       let count = 0;
 
       for (const record of unclosedRecords) {
-        // 出勤日の23:59:59に設定
-        const clockOutTime = new Date(record.clockIn);
-        clockOutTime.setHours(23, 59, 59, 0);
+        // 出勤日の「日本時間23:59:59」に相当するUTC時刻を設定
+        const year = record.clockIn.getUTCFullYear();
+        const month = record.clockIn.getUTCMonth();
+        const day = record.clockIn.getUTCDate();
+        // JST(UTC+9)の23:59:59はUTCでは14:59:59
+        const clockOutTime = new Date(Date.UTC(year, month, day, 14, 59, 59));
 
         // 勤務時間を計算（休憩時間を考慮）
         const totalMinutes = Math.floor(
@@ -214,9 +217,6 @@ async function startServer() {
 
     console.log(`[Server] 次回の自動退勤処理を ${next2359.toLocaleString("ja-JP")} にスケジュールしました`);
   };
-
-  // 初回実行（起動時に未退勤記録があれば処理）
-  scheduleAutoClose();
 
   // 23:59:00に正確に実行されるようにスケジュール
   scheduleNextAutoClose();
