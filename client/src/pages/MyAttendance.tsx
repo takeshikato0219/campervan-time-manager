@@ -1,12 +1,33 @@
 import { useAuth } from "../hooks/useAuth";
 import { trpc } from "../lib/trpc";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
+import { Button } from "../components/ui/button";
+import { toast } from "sonner";
 
 export default function MyAttendance() {
     const { user } = useAuth();
+    const utils = trpc.useUtils();
     const { data: todayAttendance } = trpc.attendance.getTodayStatus.useQuery();
 
-    // 出勤打刻は管理者専用のため、一般ユーザーは使用不可
+    const clockInMutation = trpc.attendance.clockIn.useMutation({
+        onSuccess: () => {
+            toast.success("出勤を打刻しました");
+            utils.attendance.getTodayStatus.invalidate();
+        },
+        onError: (error) => {
+            toast.error(error.message || "出勤打刻に失敗しました");
+        },
+    });
+
+    const clockOutMutation = trpc.attendance.clockOut.useMutation({
+        onSuccess: () => {
+            toast.success("退勤を打刻しました");
+            utils.attendance.getTodayStatus.invalidate();
+        },
+        onError: (error) => {
+            toast.error(error.message || "退勤打刻に失敗しました");
+        },
+    });
 
     const formatDuration = (minutes: number | null) => {
         if (!minutes) return "0分";
@@ -35,7 +56,7 @@ export default function MyAttendance() {
                 </CardHeader>
                 <CardContent className="p-4 sm:p-6">
                     {todayAttendance ? (
-                        <div className="space-y-4">
+                        <div className="space-y-6">
                             <div>
                                 <p className="text-sm text-[hsl(var(--muted-foreground))]">出勤時刻</p>
                                 <p className="text-2xl font-semibold mt-1">
@@ -43,25 +64,46 @@ export default function MyAttendance() {
                                 </p>
                             </div>
                             {todayAttendance.clockOutTime ? (
-                                <div>
-                                    <p className="text-sm text-[hsl(var(--muted-foreground))]">退勤時刻</p>
-                                    <p className="text-2xl font-semibold mt-1">
-                                        {formatAttendanceTime(todayAttendance.clockOutTime)}
-                                    </p>
-                                    <p className="text-sm text-[hsl(var(--muted-foreground))] mt-2">
+                                <div className="space-y-2">
+                                    <div>
+                                        <p className="text-sm text-[hsl(var(--muted-foreground))]">退勤時刻</p>
+                                        <p className="text-2xl font-semibold mt-1">
+                                            {formatAttendanceTime(todayAttendance.clockOutTime)}
+                                        </p>
+                                    </div>
+                                    <p className="text-sm text-[hsl(var(--muted-foreground))]">
                                         勤務時間: {formatDuration(todayAttendance.workMinutes)}
                                     </p>
                                 </div>
                             ) : (
-                                <p className="text-sm text-orange-500">作業中</p>
+                                <div className="space-y-3">
+                                    <p className="text-sm text-orange-500">作業中</p>
+                                    <Button
+                                        className="w-full sm:w-auto"
+                                        onClick={() => clockOutMutation.mutate()}
+                                        disabled={clockOutMutation.isPending}
+                                    >
+                                        退勤する
+                                    </Button>
+                                </div>
                             )}
                         </div>
                     ) : (
-                        <div className="text-center py-8">
-                            <p className="text-[hsl(var(--muted-foreground))] mb-4">まだ出勤していません</p>
-                            <p className="text-sm text-[hsl(var(--muted-foreground))]">
-                                出勤は管理者が「出退勤管理」ページで行います
-                            </p>
+                        <div className="space-y-4 text-center">
+                            <p className="text-[hsl(var(--muted-foreground))]">まだ出勤していません</p>
+                            <div className="flex justify-center">
+                                <Button
+                                    className="w-full sm:w-auto"
+                                    onClick={() =>
+                                        clockInMutation.mutate({
+                                            deviceType: "pc",
+                                        })
+                                    }
+                                    disabled={clockInMutation.isPending}
+                                >
+                                    出勤する
+                                </Button>
+                            </div>
                         </div>
                     )}
                 </CardContent>

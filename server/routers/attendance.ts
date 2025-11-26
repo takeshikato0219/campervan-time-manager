@@ -132,7 +132,8 @@ export const attendanceRouter = createTRPCRouter({
             .where(
                 and(
                     eq(schema.attendanceRecords.userId, ctx.user!.id),
-                    eq(schema.attendanceRecords.workDate, new Date(todayStr))
+                    // workDate は "YYYY-MM-DD" の文字列として扱う
+                    eq(schema.attendanceRecords.workDate, todayStr as any)
                 )
             )
             .orderBy(desc(schema.attendanceRecords.id))
@@ -156,14 +157,15 @@ export const attendanceRouter = createTRPCRouter({
         };
     }),
 
-    // 出勤打刻（準管理者以上）※通常は管理画面から行う想定
-    clockIn: subAdminProcedure
+    // 出勤打刻（ログインユーザー本人用）
+    // 一般スタッフも自分自身で出勤できるようにするため、protectedProcedure に変更
+    clockIn: protectedProcedure
         .input(
             z.object({
                 deviceType: z.enum(["pc", "mobile"]).optional().default("pc"),
             })
         )
-        .mutation(async ({ input, ctx }) => {
+        .mutation(async ({ ctx, input }) => {
             const db = await getDb();
             if (!db) {
                 throw new TRPCError({
@@ -188,7 +190,7 @@ export const attendanceRouter = createTRPCRouter({
                 .where(
                     and(
                         eq(schema.attendanceRecords.userId, ctx.user!.id),
-                        eq(schema.attendanceRecords.workDate, new Date(todayStr))
+                        eq(schema.attendanceRecords.workDate, todayStr as any)
                     )
                 )
                 .limit(1);
@@ -204,7 +206,7 @@ export const attendanceRouter = createTRPCRouter({
                 .insert(schema.attendanceRecords)
                 .values({
                     userId: ctx.user!.id,
-                    workDate: new Date(todayStr),
+                    workDate: todayStr as any,
                     clockInTime: timeStr,
                     clockInDevice: input.deviceType,
                 });
@@ -258,7 +260,7 @@ export const attendanceRouter = createTRPCRouter({
             .where(
                 and(
                     eq(schema.attendanceRecords.userId, ctx.user!.id),
-                    eq(schema.attendanceRecords.workDate, new Date(todayStr))
+                    eq(schema.attendanceRecords.workDate, todayStr as any)
                 )
             )
             .limit(1);
@@ -324,7 +326,7 @@ export const attendanceRouter = createTRPCRouter({
                             .where(
                                 and(
                                     eq(schema.attendanceRecords.userId, user.id),
-                                    eq(schema.attendanceRecords.workDate, new Date(todayStr))
+                                    eq(schema.attendanceRecords.workDate, todayStr as any)
                                 )
                             )
                             .limit(1);
@@ -400,7 +402,7 @@ export const attendanceRouter = createTRPCRouter({
                                 .where(
                                     and(
                                         eq(schema.attendanceRecords.userId, user.id),
-                                        eq(schema.attendanceRecords.workDate, new Date(input.date))
+                                        eq(schema.attendanceRecords.workDate, input.date as any)
                                     )
                                 )
                                 .limit(1);
@@ -452,8 +454,9 @@ export const attendanceRouter = createTRPCRouter({
         .input(
             z.object({
                 userId: z.number(),
-                workDate: z.string(), // "YYYY-MM-DD"
-                time: z.string(), // "HH:MM"
+                // フロントがまだ古い形（clockInだけ）で呼んでいる場合もあるので、workDate/time は任意にしてサーバー側で補完する
+                workDate: z.string().optional(), // "YYYY-MM-DD"
+                time: z.string().optional(), // "HH:MM"
                 deviceType: z.enum(["pc", "mobile"]).optional().default("pc"),
             })
         )
@@ -466,31 +469,24 @@ export const attendanceRouter = createTRPCRouter({
                 });
             }
 
-            // その日の出勤記録を確認
-            const [existing] = await db
-                .select()
-                .from(schema.attendanceRecords)
-                .where(
-                    and(
-                        eq(schema.attendanceRecords.userId, input.userId),
-                        eq(schema.attendanceRecords.workDate, new Date(input.workDate))
-                    )
-                )
-                .limit(1);
+            // workDate / time が来ていなければ「今」の日付と時刻で補完する
+            const now = new Date();
+            const y = now.getFullYear();
+            const m = String(now.getMonth() + 1).padStart(2, "0");
+            const d = String(now.getDate()).padStart(2, "0");
+            const hh = String(now.getHours()).padStart(2, "0");
+            const mm = String(now.getMinutes()).padStart(2, "0");
 
-            if (existing) {
-                throw new TRPCError({
-                    code: "BAD_REQUEST",
-                    message: "その日は既に出勤しています",
-                });
-            }
+            const workDateStr = input.workDate ?? `${y}-${m}-${d}`;
+            const timeStr = input.time ?? `${hh}:${mm}`;
 
+            // ★ いったん「1日1件チェック」は外して、必ずレコードを1件追加する
             await db
                 .insert(schema.attendanceRecords)
                 .values({
                     userId: input.userId,
-                    workDate: new Date(input.workDate),
-                    clockInTime: input.time,
+                    workDate: workDateStr as any,
+                    clockInTime: timeStr,
                     clockInDevice: input.deviceType,
                 });
 
@@ -530,7 +526,7 @@ export const attendanceRouter = createTRPCRouter({
                 .where(
                     and(
                         eq(schema.attendanceRecords.userId, input.userId),
-                        eq(schema.attendanceRecords.workDate, new Date(input.workDate))
+                        eq(schema.attendanceRecords.workDate, input.workDate as any)
                     )
                 )
                 .limit(1);
@@ -548,7 +544,7 @@ export const attendanceRouter = createTRPCRouter({
             await db
                 .update(schema.attendanceRecords)
                 .set({
-                    workDate: new Date(input.workDate),
+                    workDate: input.workDate as any,
                     clockInTime: norm.clockInTime,
                     clockOutTime: norm.clockOutTime,
                     workMinutes,
