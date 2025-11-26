@@ -591,6 +591,32 @@ export const vehiclesRouter = createTRPCRouter({
             return { success: true };
         }),
 
+    // メモを追加（全ユーザー可）
+    addMemo: protectedProcedure
+        .input(
+            z.object({
+                vehicleId: z.number(),
+                content: z.string().min(1),
+            })
+        )
+        .mutation(async ({ input, ctx }) => {
+            const db = await getDb();
+            if (!db) {
+                throw new TRPCError({
+                    code: "INTERNAL_SERVER_ERROR",
+                    message: "データベースに接続できません",
+                });
+            }
+
+            await db.insert(schema.vehicleMemos).values({
+                vehicleId: input.vehicleId,
+                userId: ctx.user!.id,
+                content: input.content,
+            });
+
+            return { success: true };
+        }),
+
     // 注意ポイントを取得
     getAttentionPoints: protectedProcedure
         .input(z.object({ vehicleId: z.number() }))

@@ -49,6 +49,17 @@ export const salesBroadcastsRouter = createTRPCRouter({
                 console.error("[salesBroadcasts.create] Failed to add attention point:", error);
             }
 
+            // 拡散項目を車両のメモにも保存（車ごとのメモとして蓄積）
+            try {
+                await db.insert(schema.vehicleMemos).values({
+                    vehicleId: input.vehicleId,
+                    userId: ctx.user!.id,
+                    content: `【拡散項目】${input.message}`,
+                });
+            } catch (error) {
+                console.error("[salesBroadcasts.create] Failed to add memo from broadcast:", error);
+            }
+
             return { id: result };
         }),
 

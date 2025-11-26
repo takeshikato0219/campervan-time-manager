@@ -29,7 +29,7 @@ function VehicleDetailContent({
     uncompleteMutation?: any;
     unarchiveMutation?: any;
 }) {
-    const { data: vehicle } = trpc.vehicles.get.useQuery({ id: vehicleId });
+    const { data: vehicle, refetch: refetchVehicle } = trpc.vehicles.get.useQuery({ id: vehicleId });
     const { data: attentionPoints, refetch: refetchAttentionPoints } = trpc.vehicles.getAttentionPoints.useQuery(
         { vehicleId },
         { enabled: !!vehicleId }
@@ -56,6 +56,18 @@ function VehicleDetailContent({
 
     const [isAttentionPointDialogOpen, setIsAttentionPointDialogOpen] = useState(false);
     const [attentionPointContent, setAttentionPointContent] = useState("");
+    const [isMemoDialogOpen, setIsMemoDialogOpen] = useState(false);
+    const [memoContent, setMemoContent] = useState("");
+
+    const addMemoMutation = trpc.vehicles.addMemo.useMutation({
+        onSuccess: () => {
+            toast.success("メモを追加しました");
+            refetchVehicle();
+        },
+        onError: (error) => {
+            toast.error(error.message || "メモの追加に失敗しました");
+        },
+    });
 
 
     if (!vehicle) {
@@ -68,7 +80,7 @@ function VehicleDetailContent({
 
     return (
         <CardContent className="p-3 sm:p-4 md:p-6 space-y-3 sm:space-y-4 border-t bg-gray-50/50 w-full max-w-full overflow-hidden">
-            {/* 指示書と注意ポイント */}
+            {/* 指示書 */}
             <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 md:gap-4 w-full">
                 {/* 指示書 */}
                 <Card className="flex-1 min-w-0 sm:min-w-[200px] max-w-full overflow-hidden">
@@ -91,62 +103,6 @@ function VehicleDetailContent({
                         )}
                     </CardContent>
                 </Card>
-
-                {/* 注意ポイント */}
-                <Card className="flex-1 min-w-0 sm:min-w-[200px] max-w-full overflow-hidden">
-                    <CardHeader className="p-2 sm:p-3">
-                        <div className="flex items-center justify-between gap-2">
-                            <CardTitle className="text-xs sm:text-sm truncate">注意ポイント</CardTitle>
-                            <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => {
-                                    setAttentionPointContent("");
-                                    setIsAttentionPointDialogOpen(true);
-                                }}
-                                className="h-5 sm:h-6 px-1.5 sm:px-2 text-[10px] sm:text-xs flex-shrink-0"
-                            >
-                                <Plus className="h-2.5 w-2.5 sm:h-3 sm:w-3 mr-0.5 sm:mr-1" />
-                                追加
-                            </Button>
-                        </div>
-                    </CardHeader>
-                    <CardContent className="p-2 sm:p-3 max-h-[200px] overflow-y-auto">
-                        {attentionPoints && attentionPoints.length > 0 ? (
-                            <div className="space-y-1.5 sm:space-y-2">
-                                {attentionPoints.map((ap) => (
-                                    <div
-                                        key={ap.id}
-                                        className="p-1.5 sm:p-2 border border-[hsl(var(--border))] rounded-lg bg-yellow-50 break-words"
-                                    >
-                                        <p className="text-[10px] sm:text-xs break-words overflow-wrap-anywhere word-break-break-word whitespace-pre-wrap">{ap.content}</p>
-                                        <div className="flex items-center justify-between mt-0.5 sm:mt-1 gap-1">
-                                            <p className="text-[10px] sm:text-xs text-[hsl(var(--muted-foreground))] truncate flex-1 min-w-0">
-                                                {format(new Date(ap.createdAt), "yyyy-MM-dd HH:mm")} - {ap.userName}
-                                            </p>
-                                            {user?.role === "admin" && (
-                                                <Button
-                                                    size="sm"
-                                                    variant="ghost"
-                                                    onClick={() => {
-                                                        if (confirm("この注意ポイントを削除しますか？")) {
-                                                            deleteAttentionPointMutation.mutate({ id: ap.id });
-                                                        }
-                                                    }}
-                                                    className="h-4 sm:h-5 px-0.5 sm:px-1 text-red-600 hover:text-red-800 flex-shrink-0"
-                                                >
-                                                    <Trash2 className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
-                                                </Button>
-                                            )}
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        ) : (
-                            <p className="text-[10px] sm:text-xs text-[hsl(var(--muted-foreground))]">注意ポイントがありません</p>
-                        )}
-                    </CardContent>
-                </Card>
             </div>
 
 
@@ -154,7 +110,21 @@ function VehicleDetailContent({
             {/* メモ */}
             <Card className="border-2">
                 <CardHeader className="p-2 sm:p-3 md:p-4 bg-white border-b">
-                    <CardTitle className="text-xs sm:text-sm font-semibold">メモ</CardTitle>
+                    <div className="flex items-center justify-between gap-2">
+                        <CardTitle className="text-xs sm:text-sm font-semibold">メモ</CardTitle>
+                        <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                                setMemoContent("");
+                                setIsMemoDialogOpen(true);
+                            }}
+                            className="h-5 sm:h-6 px-1.5 sm:px-2 text-[10px] sm:text-xs flex-shrink-0"
+                        >
+                            <Plus className="h-2.5 w-2.5 sm:h-3 sm:w-3 mr-0.5 sm:mr-1" />
+                            追加
+                        </Button>
+                    </div>
                 </CardHeader>
                 <CardContent className="p-2 sm:p-3 md:p-4">
                     {vehicle.memos && vehicle.memos.length > 0 ? (
@@ -174,6 +144,66 @@ function VehicleDetailContent({
                     ) : (
                         <p className="text-center py-1 sm:py-2 text-[10px] sm:text-xs text-[hsl(var(--muted-foreground))]">
                             メモがありません
+                        </p>
+                    )}
+                </CardContent>
+            </Card>
+
+            {/* 注意ポイント（下の段に配置） */}
+            <Card className="border-2">
+                <CardHeader className="p-2 sm:p-3 md:p-4 bg-white border-b">
+                    <div className="flex items-center justify-between gap-2">
+                        <CardTitle className="text-xs sm:text-sm font-semibold">注意ポイント</CardTitle>
+                        <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                                setAttentionPointContent("");
+                                setIsAttentionPointDialogOpen(true);
+                            }}
+                            className="h-5 sm:h-6 px-1.5 sm:px-2 text-[10px] sm:text-xs flex-shrink-0"
+                        >
+                            <Plus className="h-2.5 w-2.5 sm:h-3 sm:w-3 mr-0.5 sm:mr-1" />
+                            追加
+                        </Button>
+                    </div>
+                </CardHeader>
+                <CardContent className="p-2 sm:p-3 md:p-4 max-h-[200px] overflow-y-auto">
+                    {attentionPoints && attentionPoints.length > 0 ? (
+                        <div className="space-y-1.5 sm:space-y-2">
+                            {attentionPoints.map((ap) => (
+                                <div
+                                    key={ap.id}
+                                    className="p-1.5 sm:p-2 border border-[hsl(var(--border))] rounded-lg bg-yellow-50 break-words"
+                                >
+                                    <p className="text-[10px] sm:text-xs break-words overflow-wrap-anywhere word-break-break-word whitespace-pre-wrap">
+                                        {ap.content}
+                                    </p>
+                                    <div className="flex items-center justify-between mt-0.5 sm:mt-1 gap-1">
+                                        <p className="text-[10px] sm:text-xs text-[hsl(var(--muted-foreground))] truncate flex-1 min-w-0">
+                                            {format(new Date(ap.createdAt), "yyyy-MM-dd HH:mm")} - {ap.userName}
+                                        </p>
+                                        {user?.role === "admin" && (
+                                            <Button
+                                                size="sm"
+                                                variant="ghost"
+                                                onClick={() => {
+                                                    if (confirm("この注意ポイントを削除しますか？")) {
+                                                        deleteAttentionPointMutation.mutate({ id: ap.id });
+                                                    }
+                                                }}
+                                                className="h-4 sm:h-5 px-0.5 sm:px-1 text-red-600 hover:text-red-800 flex-shrink-0"
+                                            >
+                                                <Trash2 className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
+                                            </Button>
+                                        )}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    ) : (
+                        <p className="text-[10px] sm:text-xs text-[hsl(var(--muted-foreground))]">
+                            注意ポイントがありません
                         </p>
                     )}
                 </CardContent>
@@ -303,6 +333,61 @@ function VehicleDetailContent({
                                     onClick={() => {
                                         setIsAttentionPointDialogOpen(false);
                                         setAttentionPointContent("");
+                                    }}
+                                >
+                                    キャンセル
+                                </Button>
+                            </div>
+                        </CardContent>
+                    </Card>
+                </div>
+            )}
+
+            {/* メモ追加ダイアログ */}
+            {isMemoDialogOpen && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-2 sm:p-4 overflow-y-auto">
+                    <Card className="w-full max-w-md min-w-0 my-auto">
+                        <CardHeader className="p-3 sm:p-4">
+                            <CardTitle className="text-sm">メモを追加</CardTitle>
+                        </CardHeader>
+                        <CardContent className="p-3 sm:p-4 space-y-3">
+                            <div className="min-w-0">
+                                <label className="text-xs font-medium block mb-1">メモ *</label>
+                                <textarea
+                                    value={memoContent}
+                                    onChange={(e) => setMemoContent(e.target.value)}
+                                    placeholder="メモを入力してください"
+                                    className="flex min-h-[100px] w-full rounded-md border border-[hsl(var(--input))] bg-[hsl(var(--background))] px-2 py-1 text-xs"
+                                    required
+                                />
+                            </div>
+                            <div className="flex gap-2 pt-2">
+                                <Button
+                                    size="sm"
+                                    className="flex-1 h-8 text-xs"
+                                    onClick={() => {
+                                        if (!memoContent.trim()) {
+                                            toast.error("メモを入力してください");
+                                            return;
+                                        }
+                                        addMemoMutation.mutate({
+                                            vehicleId,
+                                            content: memoContent,
+                                        });
+                                        setIsMemoDialogOpen(false);
+                                        setMemoContent("");
+                                    }}
+                                    disabled={addMemoMutation.isPending}
+                                >
+                                    {addMemoMutation.isPending ? "追加中..." : "追加"}
+                                </Button>
+                                <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="flex-1 h-8 text-xs"
+                                    onClick={() => {
+                                        setIsMemoDialogOpen(false);
+                                        setMemoContent("");
                                     }}
                                 >
                                     キャンセル
