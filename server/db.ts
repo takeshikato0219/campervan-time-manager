@@ -83,13 +83,14 @@ export async function selectUsersSafely(db: Awaited<ReturnType<typeof getDb>>, w
     if (!db) return [];
 
     try {
-        // できる限りシンプルに、DBに必ず存在するカラムだけを素直に取得する
-        // 表示名(name) や 分類(category) はアプリ側で補完する
+        // usersテーブルの主要カラムをそのまま取得（name は社員名として利用）
         const baseSelect = {
             id: schema.users.id,
             username: schema.users.username,
             password: schema.users.password,
+            name: schema.users.name,
             role: schema.users.role,
+            category: schema.users.category,
         };
 
         let query = db.select(baseSelect).from(schema.users);
@@ -97,37 +98,32 @@ export async function selectUsersSafely(db: Awaited<ReturnType<typeof getDb>>, w
             query = query.where(where) as any;
         }
         const result = await query;
-        // name は常に username と同じ、category は使わないので null を設定
-        return result.map((u: any) => ({
-            ...u,
-            name: u.username,
-            category: null,
-        }));
+        return result;
     } catch (error: any) {
         console.error("[selectUsersSafely] Error:", error);
-        // フォールバック: 最小限のカラムのみで取得
-        try {
-            const baseSelect = {
-                id: schema.users.id,
-                username: schema.users.username,
-                password: schema.users.password,
-                role: schema.users.role,
-            };
+        // name / category カラムが存在しない古いDBでも動くようにフォールバック
+        if (error?.message?.includes("category") || error?.message?.includes("name") || error?.code === "ER_BAD_FIELD_ERROR") {
+            try {
+                const baseSelect = {
+                    id: schema.users.id,
+                    username: schema.users.username,
+                    password: schema.users.password,
+                    role: schema.users.role,
+                };
 
-            let query = db.select(baseSelect).from(schema.users);
-            if (where) {
-                query = query.where(where) as any;
+                let query = db.select(baseSelect).from(schema.users);
+                if (where) {
+                    query = query.where(where) as any;
+                }
+                const result = await query;
+                return result.map((u: any) => ({ ...u, name: null, category: null }));
+            } catch (innerError: any) {
+                console.error("[selectUsersSafely] Fallback also failed:", innerError);
+                return [];
             }
-            const result = await query;
-            return result.map((u: any) => ({
-                ...u,
-                name: u.username,
-                category: null,
-            }));
-        } catch (innerError: any) {
-            console.error("[selectUsersSafely] Fallback also failed:", innerError);
-            return [];
         }
+
+        return [];
     }
 }
 

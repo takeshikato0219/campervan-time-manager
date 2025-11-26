@@ -4,7 +4,9 @@ import { createTRPCRouter, protectedProcedure, adminProcedure, subAdminProcedure
 import { getDb, schema } from "../db";
 import { eq, and, gte, lte, sql } from "drizzle-orm";
 import { startOfDay, endOfDay, format, eachDayOfInterval, getDay } from "date-fns";
-import { ja } from "date-fns/locale";
+
+// スタッフ休み予定用のデフォルト20名（あとから名前編集で自由に変更可能）
+const FIXED_STAFF_NAMES: string[] = Array.from({ length: 20 }, (_, i) => `スタッフ${i + 1}`);
 
 // 20日始まりの19日終わりの期間を計算する関数
 function getMonthPeriod20th(date: Date): { start: Date; end: Date } {
@@ -82,39 +84,6 @@ async function getScheduleQuery(db: any, baseDateStr?: string) {
         const baseDate = baseDateStr ? new Date(baseDateStr) : new Date();
         const { start, end } = getMonthPeriod20th(baseDate);
 
-        // 全ユーザーを取得（表示順序でソート）
-        let users: any[];
-        try {
-            // categoryカラムが存在する場合
-            users = await db.select({
-                id: schema.users.id,
-                username: schema.users.username,
-                password: schema.users.password,
-                name: schema.users.name,
-                role: schema.users.role,
-                category: schema.users.category,
-                createdAt: schema.users.createdAt,
-                updatedAt: schema.users.updatedAt,
-            }).from(schema.users).orderBy(schema.users.id);
-        } catch (error: any) {
-            // categoryカラムが存在しない場合は、categoryを除いて取得
-            if (error?.message?.includes("category") || error?.code === "ER_BAD_FIELD_ERROR") {
-                users = await db.select({
-                    id: schema.users.id,
-                    username: schema.users.username,
-                    password: schema.users.password,
-                    name: schema.users.name,
-                    role: schema.users.role,
-                    createdAt: schema.users.createdAt,
-                    updatedAt: schema.users.updatedAt,
-                }).from(schema.users).orderBy(schema.users.id);
-                // categoryをnullとして追加
-                users = users.map((u) => ({ ...u, category: null }));
-            } else {
-                throw error;
-            }
-        }
-
         // 表示順序を取得（テーブルが存在しない場合は空配列）
         let displayOrders: any[] = [];
         try {
@@ -141,18 +110,49 @@ async function getScheduleQuery(db: any, baseDateStr?: string) {
                 throw error;
             }
         }
+        // staffScheduleDisplayOrder にデータが無ければ、独立した20人のスタッフを自動作成
+        if (displayOrders.length === 0) {
+            const defaultStaff = FIXED_STAFF_NAMES.map((name, index) => ({
+                userId: index + 1,
+                displayOrder: index + 1,
+                displayName: name,
+            }));
+            await db.insert(schema.staffScheduleDisplayOrder).values(defaultStaff);
+            displayOrders = await db.select().from(schema.staffScheduleDisplayOrder);
+        } else {
+            // 既存データが20件未満の場合、不足分をFIXED_STAFF_NAMESから補完
+            const existingIds = new Set(displayOrders.map((o) => o.userId));
+            const inserts: any[] = [];
+            for (let i = 0; i < FIXED_STAFF_NAMES.length; i++) {
+                const userId = i + 1;
+                if (!existingIds.has(userId)) {
+                    inserts.push({
+                        userId,
+                        displayOrder: userId,
+                        displayName: FIXED_STAFF_NAMES[i],
+                    });
+                }
+            }
+            if (inserts.length > 0) {
+                await db.insert(schema.staffScheduleDisplayOrder).values(inserts);
+                displayOrders = await db.select().from(schema.staffScheduleDisplayOrder);
+            }
+        }
+
         const displayOrderMap = new Map(displayOrders.map((o) => [o.userId, o.displayOrder]));
         const displayNameMap = new Map(displayOrders.map((o) => [o.userId, o.displayName]));
 
-        // 表示順序でソート（表示順序がない場合はID順）
-        const sortedUsers = [...users].sort((a, b) => {
-            const orderA = displayOrderMap.get(a.id) ?? a.id;
-            const orderB = displayOrderMap.get(b.id) ?? b.id;
-            return orderA - orderB;
-        });
+        // スタッフ一覧（usersテーブルとは独立）
+        const staffList = displayOrders.map((o) => ({
+            id: o.userId,
+            name: o.displayName || `スタッフ${o.userId}`,
+            displayOrder: o.displayOrder,
+        }));
 
-        // 20人に制限
-        const limitedUsers = sortedUsers.slice(0, 20);
+        // 表示順序でソートし、20人に制限
+        const limitedUsers = [...staffList]
+            .sort((a, b) => (a.displayOrder ?? a.id) - (b.displayOrder ?? b.id))
+            .slice(0, 20);
 
         // 期間内のスケジュールエントリを取得
         let entries: any[] = [];
@@ -218,7 +218,7 @@ async function getScheduleQuery(db: any, baseDateStr?: string) {
                 const entry = entryMap.get(key);
                 // 土日はデフォルトで休み、それ以外は出勤
                 const defaultStatus = isWeekend ? "rest" : "work";
-                const displayName = displayNameMap.get(user.id) || user.name || user.username || "不明";
+                const displayName = displayNameMap.get(user.id) || user.name || "不明";
                 return {
                     userId: user.id,
                     userName: displayName,
@@ -305,7 +305,7 @@ async function getScheduleQuery(db: any, baseDateStr?: string) {
             // 休みの数 = 実際に登録された休み（rest）の日数
             const actualRestDays = restDays;
 
-            const displayName = displayNameMap.get(user.id) || user.name || user.username || "不明";
+            const displayName = displayNameMap.get(user.id) || user.name || "不明";
             return {
                 userId: user.id,
                 userName: displayName,
@@ -327,10 +327,8 @@ async function getScheduleQuery(db: any, baseDateStr?: string) {
             summary,
             users: limitedUsers.map((u) => ({
                 id: u.id,
-                name: displayNameMap.get(u.id) || u.name || u.username || "不明",
+                name: displayNameMap.get(u.id) || u.name || "不明",
                 displayOrder: displayOrderMap.get(u.id) ?? u.id,
-                category: u.category || null,
-                role: u.role,
             })),
         };
     } catch (error: any) {
@@ -723,13 +721,7 @@ export const staffScheduleRouter = createTRPCRouter({
                 throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "データベースに接続できません" });
             }
 
-            // usersテーブルのnameカラムを更新
-            await db
-                .update(schema.users)
-                .set({ name: input.displayName })
-                .where(eq(schema.users.id, input.userId));
-
-            // 表示順序テーブルにも表示名を保存（オプション）
+            // staffScheduleDisplayOrder テーブルの displayName を更新（usersテーブルとは完全に独立）
             const existing = await db
                 .select()
                 .from(schema.staffScheduleDisplayOrder)
@@ -742,10 +734,10 @@ export const staffScheduleRouter = createTRPCRouter({
                     .set({ displayName: input.displayName })
                     .where(eq(schema.staffScheduleDisplayOrder.userId, input.userId));
             } else {
-                // 表示順序レコードが存在しない場合は作成
+                // レコードがない場合は作成（デフォルト表示順は userId）
                 await db.insert(schema.staffScheduleDisplayOrder).values({
                     userId: input.userId,
-                    displayOrder: input.userId, // デフォルトはユーザーID
+                    displayOrder: input.userId,
                     displayName: input.displayName,
                 });
             }

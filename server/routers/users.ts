@@ -36,9 +36,9 @@ export const usersRouter = createTRPCRouter({
             z.object({
                 username: z.string(),
                 password: z.string(),
-                name: z.string().optional(), // UI上は表示名として扱うが、実際には username をそのまま使う
+                name: z.string().optional(), // 表示名（社員名）
                 role: z.enum(["field_worker", "sales_office", "sub_admin", "admin"]).default("field_worker"),
-                category: z.enum(["elephant", "squirrel"]).optional(), // 現在は保存に使わない
+                category: z.enum(["elephant", "squirrel"]).optional(),
             })
         )
         .mutation(async ({ input }) => {
@@ -69,8 +69,9 @@ export const usersRouter = createTRPCRouter({
             await db.insert(schema.users).values({
                 username: input.username,
                 password: hashedPassword,
-                // 表示名は username と同一として扱うため DB には個別に保存しない
+                name: input.name || null,
                 role: input.role,
+                category: input.category || null,
             });
 
             return { success: true };
@@ -83,9 +84,9 @@ export const usersRouter = createTRPCRouter({
                 id: z.number(),
                 username: z.string().optional(),
                 password: z.string().optional(),
-                name: z.string().optional(), // UI上の表示名だが、DBには保存しない
+                name: z.string().optional(), // 表示名（社員名）
                 role: z.enum(["field_worker", "sales_office", "sub_admin", "admin"]).optional(),
-                category: z.enum(["elephant", "squirrel"]).optional().nullable(), // 現在は保存に使わない
+                category: z.enum(["elephant", "squirrel"]).optional().nullable(),
             })
         )
         .mutation(async ({ input }) => {
@@ -118,7 +119,9 @@ export const usersRouter = createTRPCRouter({
             if (input.password !== undefined) {
                 updateData.password = await bcrypt.hash(input.password, 10);
             }
+            if (input.name !== undefined) updateData.name = input.name;
             if (input.role !== undefined) updateData.role = input.role;
+            if (input.category !== undefined) updateData.category = input.category;
 
             if (Object.keys(updateData).length > 0) {
                 await db.update(schema.users).set(updateData).where(eq(schema.users.id, input.id));

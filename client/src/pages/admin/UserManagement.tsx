@@ -82,8 +82,8 @@ export default function UserManagement() {
             id: userData.id,
             username: userData.username || "",
             password: "",
-            // 表示名が未設定の場合はユーザー名をそのまま使う
-            name: userData.name || userData.username || "",
+            // 表示名（社員名）はDBのnameをそのまま使う。未設定なら空。
+            name: userData.name || "",
             role: userData.role || "field_worker",
             category: userData.category || null,
         });
@@ -106,8 +106,8 @@ export default function UserManagement() {
                 id: editingUser.id,
                 username: editingUser.username,
                 password: editingUser.password || undefined,
-                // 表示名が空ならユーザー名を保存
-                name: (editingUser.name || editingUser.username) || undefined,
+                // 表示名（社員名）はそのまま保存。空ならundefinedで変更なし。
+                name: editingUser.name || undefined,
                 role: editingUser.role,
                 category: editingUser.category,
             });
@@ -115,8 +115,7 @@ export default function UserManagement() {
             createMutation.mutate({
                 username: editingUser.username,
                 password: editingUser.password,
-                // 新規作成時も表示名が空ならユーザー名を保存
-                name: (editingUser.name || editingUser.username) || undefined,
+                name: editingUser.name || undefined,
                 role: editingUser.role,
                 category: editingUser.category || undefined,
             });
@@ -176,27 +175,26 @@ export default function UserManagement() {
                                     <TableRow key={userData.id}>
                                         <TableCell>{userData.id}</TableCell>
                                         <TableCell className="font-medium">{userData.username}</TableCell>
-                                        {/* 表示名がなければユーザー名をそのまま表示 */}
-                                        <TableCell>{userData.name || userData.username}</TableCell>
+                                        {/* 表示名（社員名）。未設定なら - を表示 */}
+                                        <TableCell>{userData.name || "-"}</TableCell>
                                         <TableCell>
                                             <span
-                                                className={`px-2 py-1 rounded text-xs ${
-                                                    userData.role === "admin"
+                                                className={`px-2 py-1 rounded text-xs ${userData.role === "admin"
                                                         ? "bg-purple-100 text-purple-800"
                                                         : userData.role === "sub_admin"
-                                                        ? "bg-blue-100 text-blue-800"
-                                                        : userData.role === "sales_office"
-                                                        ? "bg-green-100 text-green-800"
-                                                        : "bg-gray-100 text-gray-800"
-                                                }`}
+                                                            ? "bg-blue-100 text-blue-800"
+                                                            : userData.role === "sales_office"
+                                                                ? "bg-green-100 text-green-800"
+                                                                : "bg-gray-100 text-gray-800"
+                                                    }`}
                                             >
                                                 {userData.role === "admin"
                                                     ? "管理人"
                                                     : userData.role === "sub_admin"
-                                                    ? "準管理人"
-                                                    : userData.role === "sales_office"
-                                                    ? "営業事務"
-                                                    : "現場staff"}
+                                                        ? "準管理人"
+                                                        : userData.role === "sales_office"
+                                                            ? "営業事務"
+                                                            : "現場staff"}
                                             </span>
                                         </TableCell>
                                         <TableCell>
@@ -261,13 +259,13 @@ export default function UserManagement() {
                                 />
                             </div>
                             <div>
-                                <label className="text-sm font-medium">表示名</label>
+                                <label className="text-sm font-medium">表示名（社員名）</label>
                                 <Input
                                     value={editingUser.name}
                                     onChange={(e) =>
                                         setEditingUser({ ...editingUser, name: e.target.value })
                                     }
-                                    placeholder="未入力の場合はユーザー名が表示されます"
+                                    placeholder="社員の名前を入力してください"
                                 />
                             </div>
                             <div>

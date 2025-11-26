@@ -31,7 +31,7 @@ const STATUS_LABELS: Record<ScheduleStatus, string> = {
 export default function StaffSchedule() {
     const { user } = useAuth();
     const [baseDate, setBaseDate] = useState(() => format(new Date(), "yyyy-MM-dd"));
-    const [filterCategory, setFilterCategory] = useState<"all" | "elephant" | "squirrel" | "sales_office">("all");
+    // フィルタは一旦「全員表示」のみ（スタッフは独立管理のため）
 
     const { data: scheduleData, isLoading, error, isError } = trpc.staffSchedule.getPublishedSchedule.useQuery(
         { baseDate },
@@ -87,14 +87,8 @@ export default function StaffSchedule() {
         return <div className="text-center py-8">データがありません</div>;
     }
 
-    // フィルタリングされたユーザーリスト
-    const filteredUsers = scheduleData.users.filter((u) => {
-        if (filterCategory === "all") return true;
-        if (filterCategory === "elephant") return u.category === "elephant";
-        if (filterCategory === "squirrel") return u.category === "squirrel";
-        if (filterCategory === "sales_office") return u.role === "sales_office";
-        return true;
-    });
+    // フィルタリングされたユーザーリスト（現状は全員）
+    const filteredUsers = scheduleData.users;
 
     // フィルタリングされたスケジュールデータ
     const filteredScheduleData = scheduleData.scheduleData.map((day) => ({
@@ -120,22 +114,7 @@ export default function StaffSchedule() {
                     </p>
                 </div>
                 <div className="flex flex-wrap gap-2">
-                    <Input
-                        type="date"
-                        value={baseDate}
-                        onChange={(e) => setBaseDate(e.target.value)}
-                        className="max-w-xs"
-                    />
-                    <select
-                        className="flex h-10 rounded-md border border-[hsl(var(--input))] bg-[hsl(var(--background))] px-3 py-2 text-sm"
-                        value={filterCategory}
-                        onChange={(e) => setFilterCategory(e.target.value as "all" | "elephant" | "squirrel" | "sales_office")}
-                    >
-                        <option value="all">全て表示</option>
-                        <option value="elephant">ゾウ</option>
-                        <option value="squirrel">リス</option>
-                        <option value="sales_office">営業事務</option>
-                    </select>
+                    <Input type="date" value={baseDate} onChange={(e) => setBaseDate(e.target.value)} className="max-w-xs" />
                 </div>
             </div>
 
