@@ -71,6 +71,44 @@ export default function WorkRecords() {
         },
     });
 
+    // 「作業追加」ダイアログを開くとき、
+    // 1件目: 開始時刻デフォルト 8:35
+    // 2件目以降: 直前の作業の終了時刻を開始時刻に自動セット
+    const handleOpenAddDialog = () => {
+        const now = new Date();
+        const todayStr = format(now, "yyyy-MM-dd");
+
+        // デフォルトは今日の 8:35 にする
+        let nextDate = todayStr;
+        let nextStart = "08:35";
+
+        if (workRecords && workRecords.length > 0) {
+            const lastWithEnd = [...workRecords]
+                .filter((r) => r.endTime)
+                .sort((a, b) => {
+                    const aEnd = a.endTime ? new Date(a.endTime as any) : new Date(a.startTime as any);
+                    const bEnd = b.endTime ? new Date(b.endTime as any) : new Date(b.startTime as any);
+                    return aEnd.getTime() - bEnd.getTime();
+                })
+                .pop();
+
+            if (lastWithEnd && lastWithEnd.endTime) {
+                const end = typeof lastWithEnd.endTime === "string"
+                    ? new Date(lastWithEnd.endTime)
+                    : lastWithEnd.endTime;
+                nextDate = format(end, "yyyy-MM-dd");
+                nextStart = format(end, "HH:mm");
+            }
+        }
+
+        setWorkDate(nextDate);
+        setStartTime(nextStart);
+        setEndTime("");
+        setSelectedVehicleId("");
+        setSelectedProcessId("");
+        setIsAddDialogOpen(true);
+    };
+
     const handleAddWork = () => {
         if (!selectedVehicleId || !selectedProcessId || !workDate || !startTime) {
             toast.error("車両、工程、日付、開始時刻を入力してください");
@@ -155,7 +193,7 @@ export default function WorkRecords() {
                         自分の作業記録を確認・追加します
                     </p>
                 </div>
-                <Button onClick={() => setIsAddDialogOpen(true)} className="w-full sm:w-auto">
+                <Button onClick={handleOpenAddDialog} className="w-full sm:w-auto">
                     <Plus className="h-4 w-4 mr-2" />
                     作業追加
                 </Button>

@@ -412,15 +412,18 @@ export default function VehicleChecks() {
 
     const utils = trpc.useUtils();
     const checkMutation = trpc.checks.checkVehicle.useMutation({
-        onSuccess: (_, variables) => {
+        onSuccess: async (_, variables) => {
             const statusLabel = variables.status === "checked" ? "チェック済み" : variables.status === "needs_recheck" ? "要再チェック" : "未チェック";
             toast.success(`${statusLabel}に更新しました`);
             setCheckingVehicleId(null);
             setCheckingItemId(null);
             setCheckStatus("checked");
             setCheckNotes("");
-            // 全ての車両チェックデータを再取得
-            utils.checks.getVehicleChecks.invalidate();
+            // 全ての車両チェックデータと自分宛てチェック依頼を再取得
+            await Promise.all([
+                utils.checks.getVehicleChecks.invalidate(),
+                utils.checks.getMyCheckRequests.invalidate(),
+            ]);
         },
         onError: (error) => {
             toast.error(error.message || "チェックの実行に失敗しました");

@@ -1,6 +1,6 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { createTRPCRouter, protectedProcedure, adminProcedure, subAdminProcedure } from "../_core/trpc";
+import { createTRPCRouter, protectedProcedure, subAdminProcedure } from "../_core/trpc";
 import { getDb, schema } from "../db";
 import { eq, and, gte, lte, sql } from "drizzle-orm";
 import { startOfDay, endOfDay, format, eachDayOfInterval, getDay } from "date-fns";
@@ -72,6 +72,15 @@ async function getScheduleQuery(db: any, baseDateStr?: string) {
                         \`oldValue\` text,
                         \`newValue\` text,
                         \`createdAt\` timestamp DEFAULT CURRENT_TIMESTAMP NOT NULL
+            )`);
+            await db.execute(sql`CREATE TABLE IF NOT EXISTS \`staffScheduleAdjustments\` (
+                        \`id\` int AUTO_INCREMENT PRIMARY KEY NOT NULL,
+                        \`userId\` int NOT NULL,
+                        \`periodStart\` date NOT NULL,
+                        \`periodEnd\` date NOT NULL,
+                        \`adjustment\` int NOT NULL DEFAULT 0,
+                        \`createdAt\` timestamp DEFAULT CURRENT_TIMESTAMP NOT NULL,
+                        \`updatedAt\` timestamp DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP NOT NULL
             )`);
         } catch (error: any) {
             // テーブルが既に存在する場合は無視
@@ -236,6 +245,35 @@ async function getScheduleQuery(db: any, baseDateStr?: string) {
             };
         });
 
+        // 調整休テーブルから、この期間の調整値を取得
+        let adjustments: any[] = [];
+        try {
+            const periodStartStr = format(start, "yyyy-MM-dd");
+            const periodEndStr = format(end, "yyyy-MM-dd");
+            adjustments = await db
+                .select()
+                .from(sql`staffScheduleAdjustments` as any)
+                .where(
+                    and(
+                        sql`CAST(${sql`staffScheduleAdjustments.periodStart`} AS CHAR) = ${periodStartStr}`,
+                        sql`CAST(${sql`staffScheduleAdjustments.periodEnd`} AS CHAR) = ${periodEndStr}`
+                    )
+                );
+        } catch (error: any) {
+            // テーブルが無い場合などは調整なしとして扱う
+            const msg = error?.message || "";
+            if (!msg.includes("staffScheduleAdjustments")) {
+                console.warn("[staffSchedule] 調整休テーブル取得エラー（無視）:", msg);
+            }
+            adjustments = [];
+        }
+
+        const adjustmentMap = new Map<number, number>();
+        adjustments.forEach((adj) => {
+            const value = typeof adj.adjustment === "number" ? adj.adjustment : 0;
+            adjustmentMap.set(adj.userId, value);
+        });
+
         // 集計データを計算
         const summary = limitedUsers.map((user) => {
             // 期間内の該当ユーザーのエントリを取得
@@ -299,8 +337,11 @@ async function getScheduleQuery(db: any, baseDateStr?: string) {
             // 有休 = 休み + 希望休（実際に登録されたもの）
             const paidLeave = restDays + requestDays;
 
-            // 合計 = 公休 + 有休
-            const totalRest = publicHolidays + paidLeave;
+            // 調整休（デフォルト0）
+            const adjustment = adjustmentMap.get(user.id) ?? 0;
+
+            // 合計 = 公休 + 有休 + 調整休
+            const totalRest = publicHolidays + paidLeave + adjustment;
 
             // 休みの数 = 実際に登録された休み（rest）の日数
             const actualRestDays = restDays;
@@ -314,7 +355,7 @@ async function getScheduleQuery(db: any, baseDateStr?: string) {
                 publicHolidays,
                 paidLeave,
                 totalRest,
-                adjustment: 0, // 調整欄（今後実装）
+                adjustment,
             };
         });
 
@@ -885,6 +926,66 @@ export const staffScheduleRouter = createTRPCRouter({
             return { success: true };
         }),
 
+    // スケジュールを非公開にする（管理者のみ）
+    unpublishSchedule: subAdminProcedure
+        .input(
+            z.object({
+                periodStart: z.string(), // YYYY-MM-DD形式
+                periodEnd: z.string(), // YYYY-MM-DD形式
+            })
+        )
+        .mutation(async ({ input, ctx }) => {
+            const db = await getDb();
+            if (!db) {
+                throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "データベースに接続できません" });
+            }
+
+            try {
+                await db.execute(sql`CREATE TABLE IF NOT EXISTS \`staffSchedulePublished\` (
+                    \`id\` int AUTO_INCREMENT PRIMARY KEY NOT NULL,
+                    \`periodStart\` date NOT NULL,
+                    \`periodEnd\` date NOT NULL,
+                    \`isPublished\` enum('true','false') DEFAULT 'false' NOT NULL,
+                    \`publishedAt\` timestamp,
+                    \`publishedBy\` int,
+                    \`createdAt\` timestamp DEFAULT CURRENT_TIMESTAMP NOT NULL,
+                    \`updatedAt\` timestamp DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP NOT NULL
+                )`);
+            } catch (error: any) {
+                if (!error?.message?.includes("already exists")) {
+                    console.warn("[staffSchedule] 公開テーブル作成エラー（無視）:", error?.message);
+                }
+            }
+
+            const existing = await db
+                .select()
+                .from(schema.staffSchedulePublished)
+                .where(
+                    and(
+                        sql`CAST(${schema.staffSchedulePublished.periodStart} AS CHAR) = ${input.periodStart}`,
+                        sql`CAST(${schema.staffSchedulePublished.periodEnd} AS CHAR) = ${input.periodEnd}`
+                    )
+                )
+                .limit(1);
+
+            if (existing.length > 0) {
+                await db
+                    .update(schema.staffSchedulePublished)
+                    .set({
+                        isPublished: "false",
+                        publishedAt: null,
+                        publishedBy: ctx.user.id,
+                    } as any)
+                    .where(eq(schema.staffSchedulePublished.id, existing[0].id));
+            } else {
+                await db.execute(
+                    sql`INSERT INTO \`staffSchedulePublished\` (\`periodStart\`, \`periodEnd\`, \`isPublished\`, \`publishedAt\`, \`publishedBy\`) VALUES (${input.periodStart}, ${input.periodEnd}, 'false', NULL, ${ctx.user.id})`
+                );
+            }
+
+            return { success: true };
+        }),
+
     // 公開されたスケジュールを取得（一般ユーザー用）
     getPublishedSchedule: protectedProcedure
         .input(
@@ -925,6 +1026,124 @@ export const staffScheduleRouter = createTRPCRouter({
 
             // 公開された期間のスケジュールを取得
             return await getScheduleQuery(db, latestPublished.periodStart);
+        }),
+
+    // 調整休を更新（管理者のみ）
+    updateAdjustment: subAdminProcedure
+        .input(
+            z.object({
+                userId: z.number(),
+                periodStart: z.string(), // YYYY-MM-DD
+                periodEnd: z.string(),   // YYYY-MM-DD
+                adjustment: z.number(),  // マイナスも許可
+            })
+        )
+        .mutation(async ({ input, ctx }) => {
+            const db = await getDb();
+            if (!db) {
+                throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "データベースに接続できません" });
+            }
+
+            // テーブルが存在しない場合は作成
+            try {
+                await db.execute(sql`CREATE TABLE IF NOT EXISTS \`staffScheduleAdjustments\` (
+                    \`id\` int AUTO_INCREMENT PRIMARY KEY NOT NULL,
+                    \`userId\` int NOT NULL,
+                    \`periodStart\` date NOT NULL,
+                    \`periodEnd\` date NOT NULL,
+                    \`adjustment\` int NOT NULL DEFAULT 0,
+                    \`createdAt\` timestamp DEFAULT CURRENT_TIMESTAMP NOT NULL,
+                    \`updatedAt\` timestamp DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP NOT NULL
+                )`);
+            } catch (error: any) {
+                if (!error?.message?.includes("already exists")) {
+                    console.warn("[staffSchedule] 調整休テーブル作成エラー（無視）:", error?.message);
+                }
+            }
+
+            // 既存レコードを確認
+            const existing = await db
+                .select()
+                .from(sql`staffScheduleAdjustments` as any)
+                .where(
+                    and(
+                        sql`CAST(${sql`staffScheduleAdjustments.userId`} AS SIGNED) = ${input.userId}`,
+                        sql`CAST(${sql`staffScheduleAdjustments.periodStart`} AS CHAR) = ${input.periodStart}`,
+                        sql`CAST(${sql`staffScheduleAdjustments.periodEnd`} AS CHAR) = ${input.periodEnd}`
+                    )
+                )
+                .limit(1);
+
+            if (existing.length > 0) {
+                await db
+                    .execute(
+                        sql`UPDATE \`staffScheduleAdjustments\` SET \`adjustment\` = ${input.adjustment} WHERE \`id\` = ${existing[0].id}`
+                    );
+            } else {
+                await db.execute(
+                    sql`INSERT INTO \`staffScheduleAdjustments\` (\`userId\`, \`periodStart\`, \`periodEnd\`, \`adjustment\`) VALUES (${input.userId}, ${input.periodStart}, ${input.periodEnd}, ${input.adjustment})`
+                );
+            }
+
+            // 編集履歴に残しておくと分かりやすい
+            try {
+                await db.insert(schema.staffScheduleEditLogs).values({
+                    userId: input.userId,
+                    editorId: ctx.user.id,
+                    fieldName: "adjustment",
+                    oldValue: null,
+                    newValue: input.adjustment.toString(),
+                });
+            } catch {
+                // 履歴が失敗しても本体は成功とする
+            }
+
+            return { success: true };
+        }),
+
+    // 期間内のスケジュールを初期状態（平日=出勤、土日=休み）に戻す（管理者のみ）
+    resetScheduleToDefault: subAdminProcedure
+        .input(
+            z.object({
+                periodStart: z.string(), // YYYY-MM-DD
+                periodEnd: z.string(),   // YYYY-MM-DD
+            })
+        )
+        .mutation(async ({ input }) => {
+            const db = await getDb();
+            if (!db) {
+                throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "データベースに接続できません" });
+            }
+
+            try {
+                // 指定期間のスケジュールエントリを削除
+                await db.execute(
+                    sql`DELETE FROM \`staffScheduleEntries\` WHERE \`scheduleDate\` BETWEEN ${input.periodStart} AND ${input.periodEnd}`
+                );
+            } catch (error: any) {
+                const msg = error?.message || "";
+                if (!msg.includes("staffScheduleEntries")) {
+                    console.error("[staffSchedule] resetScheduleToDefault エラー:", msg);
+                    throw new TRPCError({
+                        code: "INTERNAL_SERVER_ERROR",
+                        message: msg || "スケジュールの初期化に失敗しました",
+                    });
+                }
+            }
+
+            try {
+                // 調整休もリセット
+                await db.execute(
+                    sql`DELETE FROM \`staffScheduleAdjustments\` WHERE \`periodStart\` = ${input.periodStart} AND \`periodEnd\` = ${input.periodEnd}`
+                );
+            } catch (error: any) {
+                const msg = error?.message || "";
+                if (!msg.includes("staffScheduleAdjustments")) {
+                    console.warn("[staffSchedule] 調整休リセットエラー（無視）:", msg);
+                }
+            }
+
+            return { success: true };
         }),
 });
 

@@ -52,6 +52,7 @@ export default function Dashboard() {
             toast.success("掲示板に投稿しました");
             refetchBulletin();
             setBulletinInput("");
+            setBulletinExpireDays("5");
         },
         onError: (error) => {
             toast.error(error.message || "掲示板への投稿に失敗しました");
@@ -60,6 +61,7 @@ export default function Dashboard() {
 
     // データ更新用のコールバック
     const [bulletinInput, setBulletinInput] = useState("");
+    const [bulletinExpireDays, setBulletinExpireDays] = useState<"1" | "3" | "5">("5");
 
     const refreshData = useCallback(() => {
         console.log("[マイダッシュボード] データを更新します");
@@ -140,8 +142,17 @@ export default function Dashboard() {
         return isSameDay(recordDate, yesterday);
     }) || [];
 
-    // 「作業追加」ダイアログを開くとき、直前の作業の終了時刻を開始時刻に自動セット
+    // 「作業追加」ダイアログを開くとき、
+    // 1件目: 開始時刻デフォルト 8:35
+    // 2件目以降: 直前の作業の終了時刻を開始時刻に自動セット
     const handleOpenAddDialog = () => {
+        const now = new Date();
+        const todayStr = format(now, "yyyy-MM-dd");
+
+        // デフォルトは今日の 8:35 にする
+        let nextDate = todayStr;
+        let nextStart = "08:35";
+
         if (todayRecordsFiltered.length > 0) {
             // 終了時間が入っているレコードの中から一番新しいものを探す
             const lastWithEnd = [...todayRecordsFiltered]
@@ -157,10 +168,14 @@ export default function Dashboard() {
                 const end = typeof lastWithEnd.endTime === "string"
                     ? new Date(lastWithEnd.endTime)
                     : lastWithEnd.endTime;
-                setWorkDate(format(end, "yyyy-MM-dd"));
-                setStartTime(format(end, "HH:mm"));
+                nextDate = format(end, "yyyy-MM-dd");
+                nextStart = format(end, "HH:mm");
             }
         }
+
+        setWorkDate(nextDate);
+        setStartTime(nextStart);
+        setEndTime("");
         setIsAddDialogOpen(true);
     };
 
@@ -186,19 +201,33 @@ export default function Dashboard() {
                             placeholder="全員に共有したい一言メッセージを入力（3行程度）"
                             className="flex-1"
                         />
-                        <Button
-                            onClick={() => {
-                                if (!bulletinInput.trim()) {
-                                    toast.error("メッセージを入力してください");
-                                    return;
-                                }
-                                createBulletinMutation.mutate({ message: bulletinInput.trim() });
-                            }}
-                            disabled={createBulletinMutation.isPending}
-                            className="w-full sm:w-auto"
-                        >
-                            投稿
-                        </Button>
+                        <div className="flex items-center gap-2">
+                            <select
+                                className="h-10 text-xs sm:text-sm rounded-md border border-[hsl(var(--input))] bg-[hsl(var(--background))] px-2 sm:px-3"
+                                value={bulletinExpireDays}
+                                onChange={(e) => setBulletinExpireDays(e.target.value as "1" | "3" | "5")}
+                            >
+                                <option value="1">1日</option>
+                                <option value="3">3日</option>
+                                <option value="5">5日</option>
+                            </select>
+                            <Button
+                                onClick={() => {
+                                    if (!bulletinInput.trim()) {
+                                        toast.error("メッセージを入力してください");
+                                        return;
+                                    }
+                                    createBulletinMutation.mutate({
+                                        message: bulletinInput.trim(),
+                                        expireDays: parseInt(bulletinExpireDays, 10),
+                                    });
+                                }}
+                                disabled={createBulletinMutation.isPending}
+                                className="w-full sm:w-auto"
+                            >
+                                投稿
+                            </Button>
+                        </div>
                     </div>
                     <div className="space-y-2 max-h-32 overflow-y-auto">
                         {bulletinMessages && bulletinMessages.length > 0 ? (
@@ -210,9 +239,16 @@ export default function Dashboard() {
                                             <span className="font-medium text-xs sm:text-sm">
                                                 {msg.user?.name || msg.user?.username || "不明"} さん
                                             </span>
-                                            <span className="text-[10px] text-[hsl(var(--muted-foreground))]">
-                                                {format(new Date(msg.createdAt), "MM/dd HH:mm")}
-                                            </span>
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-[10px] text-[hsl(var(--muted-foreground))]">
+                                                    {format(new Date(msg.createdAt), "MM/dd HH:mm")}
+                                                </span>
+                                                {typeof (msg as any).expireDays === "number" && (
+                                                    <span className="text-[10px] text-[hsl(var(--muted-foreground))]">
+                                                        {(msg as any).expireDays}日表示
+                                                    </span>
+                                                )}
+                                            </div>
                                         </div>
                                         <p className="mt-1 text-xs sm:text-sm whitespace-pre-wrap break-words">
                                             {msg.message}
@@ -220,7 +256,9 @@ export default function Dashboard() {
                                     </div>
                                 ))
                         ) : (
-                            <p className="text-xs text-[hsl(var(--muted-foreground))]">まだ掲示板のメッセージはありません</p>
+                            <p className="text-xs text-[hsl(var(--muted-foreground))]">
+                                まだ掲示板のメッセージはありません
+                            </p>
                         )}
                     </div>
                 </CardContent>

@@ -69,6 +69,16 @@ function VehicleDetailContent({
         },
     });
 
+    const updateAttentionPointMutation = trpc.vehicles.updateAttentionPoint.useMutation({
+        onSuccess: () => {
+            toast.success("注意ポイントを更新しました");
+            refetchAttentionPoints();
+        },
+        onError: (error) => {
+            toast.error(error.message || "注意ポイントの更新に失敗しました");
+        },
+    });
+
 
     if (!vehicle) {
         return (
@@ -431,6 +441,16 @@ export default function Vehicles() {
         status: activeTab,
     });
     const { data: vehicleTypes } = trpc.vehicleTypes.list.useQuery();
+
+    // 分数を「〜時間〜分」に整形
+    const formatMinutes = (minutes: number | null | undefined) => {
+        if (minutes == null || minutes <= 0) return "0分";
+        const h = Math.floor(minutes / 60);
+        const m = minutes % 60;
+        if (h === 0) return `${m}分`;
+        if (m === 0) return `${h}時間`;
+        return `${h}時間${m}分`;
+    };
 
     const registerMutation = trpc.vehicles.create.useMutation({
         onSuccess: () => {
@@ -800,44 +820,69 @@ export default function Vehicles() {
                                                     )}
                                                 </div>
                                             </div>
-                                            <div className="flex gap-1 flex-shrink-0 w-full sm:w-auto justify-end sm:justify-start">
-                                                <Link href="/vehicle-checks" className="flex-1 sm:flex-none">
-                                                    <Button
-                                                        size="sm"
-                                                        variant="outline"
-                                                        className="h-7 sm:h-8 px-2 text-[10px] sm:text-xs w-full sm:w-auto"
-                                                        title="車両チェック"
-                                                    >
-                                                        <ClipboardCheck className="h-3 w-3 sm:h-4 sm:w-4 mr-0.5 sm:mr-1" />
-                                                        チェック
-                                                    </Button>
-                                                </Link>
-                                                {(user?.role === "admin" || user?.role === "sub_admin") && (
-                                                    <>
+                                            <div className="flex flex-col items-end sm:items-start gap-1 flex-shrink-0 w-full sm:w-auto">
+                                                <div className="flex gap-1 w-full sm:w-auto justify-end sm:justify-start">
+                                                    <Link href="/vehicle-checks" className="flex-1 sm:flex-none">
                                                         <Button
                                                             size="sm"
                                                             variant="outline"
-                                                            onClick={() => handleEdit(vehicle)}
-                                                            className="h-7 sm:h-8 w-7 sm:w-8 p-0 flex-shrink-0"
-                                                            title="編集"
+                                                            className="h-7 sm:h-8 px-2 text-[10px] sm:text-xs w-full sm:w-auto"
+                                                            title="車両チェック"
                                                         >
-                                                            <Edit className="h-3 w-3 sm:h-4 sm:w-4" />
+                                                            <ClipboardCheck className="h-3 w-3 sm:h-4 sm:w-4 mr-0.5 sm:mr-1" />
+                                                            チェック
                                                         </Button>
-                                                        <Button
-                                                            size="sm"
-                                                            variant="outline"
-                                                            onClick={() => {
-                                                                setBroadcastingVehicleId(vehicle.id);
-                                                                setBroadcastMessage("");
-                                                                setIsBroadcastDialogOpen(true);
-                                                            }}
-                                                            className="h-7 sm:h-8 px-2 text-[10px] sm:text-xs flex-1 sm:flex-none"
-                                                            title="拡散項目"
-                                                        >
-                                                            拡散項目
-                                                        </Button>
-                                                    </>
-                                                )}
+                                                    </Link>
+                                                    {(user?.role === "admin" || user?.role === "sub_admin") && (
+                                                        <>
+                                                            <Button
+                                                                size="sm"
+                                                                variant="outline"
+                                                                onClick={() => handleEdit(vehicle)}
+                                                                className="h-7 sm:h-8 w-7 sm:w-8 p-0 flex-shrink-0"
+                                                                title="編集"
+                                                            >
+                                                                <Edit className="h-3 w-3 sm:h-4 sm:w-4" />
+                                                            </Button>
+                                                            <Button
+                                                                size="sm"
+                                                                variant="outline"
+                                                                onClick={() => {
+                                                                    setBroadcastingVehicleId(vehicle.id);
+                                                                    setBroadcastMessage("");
+                                                                    setIsBroadcastDialogOpen(true);
+                                                                }}
+                                                                className="h-7 sm:h-8 px-2 text-[10px] sm:text-xs flex-1 sm:flex-none"
+                                                                title="拡散項目"
+                                                            >
+                                                                拡散項目
+                                                            </Button>
+                                                        </>
+                                                    )}
+                                                </div>
+                                                {(typeof (vehicle as any).totalWorkMinutes === "number" ||
+                                                    typeof vehicle.targetTotalMinutes === "number") && (
+                                                        <div className="text-right sm:text-left text-xs sm:text-sm text-gray-700 leading-snug">
+                                                            <div>
+                                                                合計作業時間:
+                                                            </div>
+                                                            <div>
+                                                                <span className="text-lg sm:text-xl font-semibold">
+                                                                    {formatMinutes((vehicle as any).totalWorkMinutes)}
+                                                                </span>
+                                                            </div>
+                                                            <div className="mt-0.5">
+                                                                目標:
+                                                            </div>
+                                                            <div>
+                                                                <span className="text-lg sm:text-xl font-semibold">
+                                                                    {vehicle.targetTotalMinutes
+                                                                        ? formatMinutes(vehicle.targetTotalMinutes as any)
+                                                                        : "未設定"}
+                                                                </span>
+                                                            </div>
+                                                        </div>
+                                                    )}
                                             </div>
                                         </div>
                                     </CardHeader>

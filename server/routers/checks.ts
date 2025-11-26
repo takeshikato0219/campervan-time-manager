@@ -332,6 +332,27 @@ export const checksRouter = createTRPCRouter({
                 }
             }
 
+            // 自分宛ての「チェック依頼」がある場合、
+            // 状態を「completed」にしてダッシュボード／車両チェックの通知から消えるようにする
+            try {
+                await db
+                    .update(schema.checkRequests)
+                    .set({
+                        status: "completed",
+                        completedAt: new Date(),
+                    })
+                    .where(
+                        and(
+                            eq(schema.checkRequests.vehicleId, input.vehicleId),
+                            eq(schema.checkRequests.checkItemId, input.checkItemId),
+                            eq(schema.checkRequests.requestedTo, ctx.user!.id),
+                            eq(schema.checkRequests.status, "pending")
+                        )
+                    );
+            } catch (e) {
+                console.error("[checks.checkVehicle] checkRequests update error:", e);
+            }
+
             return { success: true };
         }),
 

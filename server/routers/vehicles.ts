@@ -32,16 +32,27 @@ export const vehiclesRouter = createTRPCRouter({
                 vehicles = await db.select().from(schema.vehicles);
             }
 
-            // すべての車両の外注先を一度に取得
+            // すべての車両IDを取得
             const vehicleIds = vehicles.map((v) => v.id);
+
+            // すべての車両の外注先を一度に取得
             let allOutsourcing: any[] = [];
+            // すべての車両の作業記録を一度に取得
+            let allWorkRecords: any[] = [];
+
             if (vehicleIds.length > 0) {
                 const { inArray } = await import("drizzle-orm");
+
                 allOutsourcing = await db
                     .select()
                     .from(schema.vehicleOutsourcing)
                     .where(inArray(schema.vehicleOutsourcing.vehicleId, vehicleIds))
                     .orderBy(schema.vehicleOutsourcing.displayOrder);
+
+                allWorkRecords = await db
+                    .select()
+                    .from(schema.workRecords)
+                    .where(inArray(schema.workRecords.vehicleId, vehicleIds));
             }
 
             // 車両IDごとに外注先をマッピング
@@ -56,6 +67,17 @@ export const vehiclesRouter = createTRPCRouter({
                     displayOrder: o.displayOrder,
                 });
                 outsourcingMap.set(o.vehicleId, existing);
+            });
+
+            // 車両IDごとに合計作業時間（分）を集計
+            const totalMinutesMap = new Map<number, number>();
+            allWorkRecords.forEach((wr) => {
+                if (!wr.endTime) return;
+                const minutes = Math.floor(
+                    (wr.endTime.getTime() - wr.startTime.getTime()) / 1000 / 60
+                );
+                const current = totalMinutesMap.get(wr.vehicleId) || 0;
+                totalMinutesMap.set(wr.vehicleId, current + minutes);
             });
 
             return vehicles.map((v) => ({
@@ -80,6 +102,7 @@ export const vehiclesRouter = createTRPCRouter({
                 completionDate: v.completionDate,
                 status: v.status,
                 targetTotalMinutes: v.targetTotalMinutes,
+                totalWorkMinutes: totalMinutesMap.get(v.id) || 0,
                 processTime: [],
                 processTargets: [],
             }));
@@ -587,6 +610,34 @@ export const vehiclesRouter = createTRPCRouter({
                 userId: ctx.user!.id,
                 content: input.content,
             });
+
+            return { success: true };
+        }),
+
+    // 注意ポイントを更新（準管理者以上）
+    updateAttentionPoint: subAdminProcedure
+        .input(
+            z.object({
+                id: z.number(),
+                content: z.string().min(1),
+            })
+        )
+        .mutation(async ({ input }) => {
+            const db = await getDb();
+            if (!db) {
+                throw new TRPCError({
+                    code: "INTERNAL_SERVER_ERROR",
+                    message: "データベースに接続できません",
+                });
+            }
+
+            await db
+                .update(schema.vehicleAttentionPoints)
+                .set({
+                    content: input.content,
+                    updatedAt: new Date(),
+                } as any)
+                .where(eq(schema.vehicleAttentionPoints.id, input.id));
 
             return { success: true };
         }),

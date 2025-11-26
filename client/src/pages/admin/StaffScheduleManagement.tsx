@@ -55,6 +55,8 @@ export default function StaffScheduleManagement() {
     const [isEditNameMode, setIsEditNameMode] = useState(false);
     const [editingNameUserId, setEditingNameUserId] = useState<number | null>(null);
     const [editingName, setEditingName] = useState("");
+    const [baseMenuUserId, setBaseMenuUserId] = useState<number | null>(null);
+    const [isResetDialogOpen, setIsResetDialogOpen] = useState(false);
     // フィルタは一旦「全員表示」のみ（スタッフは独立管理のため）
 
     // 月移動用の関数
@@ -66,6 +68,25 @@ export default function StaffScheduleManagement() {
 
     const { data: scheduleData, refetch, isLoading, error } = trpc.staffSchedule.getSchedule.useQuery({ baseDate });
     const { data: editLogs } = trpc.staffSchedule.getEditLogs.useQuery();
+    const updateAdjustmentMutation = trpc.staffSchedule.updateAdjustment.useMutation({
+        onSuccess: () => {
+            refetch();
+        },
+        onError: (error) => {
+            toast.error(error.message || "調整休の更新に失敗しました");
+        },
+    });
+
+    const resetScheduleMutation = trpc.staffSchedule.resetScheduleToDefault.useMutation({
+        onSuccess: () => {
+            toast.success("スケジュールを初期状態に戻しました");
+            setIsResetDialogOpen(false);
+            refetch();
+        },
+        onError: (error) => {
+            toast.error(error.message || "スケジュールの初期化に失敗しました");
+        },
+    });
     const publishMutation = trpc.staffSchedule.publishSchedule.useMutation({
         onSuccess: () => {
             toast.success("スケジュールを公開しました");
@@ -73,6 +94,15 @@ export default function StaffScheduleManagement() {
         },
         onError: (error) => {
             toast.error(error.message || "公開に失敗しました");
+        },
+    });
+    const unpublishMutation = trpc.staffSchedule.unpublishSchedule.useMutation({
+        onSuccess: () => {
+            toast.success("スケジュールを非公開にしました");
+            refetch();
+        },
+        onError: (error) => {
+            toast.error(error.message || "非公開に失敗しました");
         },
     });
 
@@ -233,6 +263,87 @@ export default function StaffScheduleManagement() {
         [scheduleData, filteredUsers]
     );
 
+    // 右端・右から2番目のスタッフを「ベース用テンプレ」として扱う
+    const templateUserRight =
+        filteredUsers.length >= 1 ? filteredUsers[filteredUsers.length - 1] : null;
+    const templateUserRight2 =
+        filteredUsers.length >= 2 ? filteredUsers[filteredUsers.length - 2] : null;
+
+    // 指定したスタッフの予定を、テンプレートスタッフの予定で上書きする
+    const applyBaseFromTemplate = (targetUserId: number, templateUserId: number) => {
+        if (!scheduleData) return;
+        if (targetUserId === templateUserId) {
+            toast.error("同じスタッフにはベースを適用できません");
+            return;
+        }
+
+        const updates: {
+            userId: number;
+            date: string;
+            status: ScheduleStatus;
+            comment: string | null;
+        }[] = [];
+
+        filteredScheduleData.forEach((day) => {
+            const templateEntry = day.userEntries.find((e) => e.userId === templateUserId);
+            if (!templateEntry) return;
+            updates.push({
+                userId: targetUserId,
+                date: day.date,
+                status: templateEntry.status as ScheduleStatus,
+                comment: templateEntry.comment || null,
+            });
+        });
+
+        if (updates.length === 0) {
+            toast.error("ベースにする出勤予定がありません");
+            return;
+        }
+
+        const templateName =
+            filteredUsers.find((u) => u.id === templateUserId)?.name || `スタッフ${templateUserId}`;
+        const targetName =
+            filteredUsers.find((u) => u.id === targetUserId)?.name || `スタッフ${targetUserId}`;
+
+        if (
+            !window.confirm(
+                `${templateName} の出勤予定をベースにして、${targetName} の20日分の予定を上書きしますか？`
+            )
+        ) {
+            return;
+        }
+
+        bulkUpdateMutation.mutate({ updates });
+    };
+
+    const handleAdjustmentClick = (userId: number, currentValue: number | undefined | null) => {
+        if (!scheduleData) return;
+        const input = window.prompt(
+            "調整休の日数を入力してください（マイナスも可、例: -1, 0, 2）",
+            currentValue != null ? String(currentValue) : "0"
+        );
+        if (input === null) return;
+
+        const trimmed = input.trim();
+        if (trimmed === "") {
+            toast.error("数値を入力してください");
+            return;
+        }
+
+        const value = Number(trimmed);
+        if (!Number.isFinite(value) || !Number.isInteger(value)) {
+            toast.error("整数で入力してください（例: -1, 0, 2）");
+            return;
+        }
+
+        updateAdjustmentMutation.mutate({
+            userId,
+            periodStart: scheduleData.period.start,
+            periodEnd: scheduleData.period.end,
+            adjustment: value,
+        });
+    };
+
     if (isLoading) {
         return <div className="text-center py-8">読み込み中...</div>;
     }
@@ -313,6 +424,32 @@ export default function StaffScheduleManagement() {
                     >
                         <Globe className="h-4 w-4 mr-2" />
                         公開
+                    </Button>
+                    <Button
+                        variant="outline"
+                        onClick={() => {
+                            if (!scheduleData) return;
+                            if (
+                                !window.confirm(
+                                    "この期間のスタッフ休み予定を非公開にしますか？\n一般ユーザー側からは見えなくなります。"
+                                )
+                            ) {
+                                return;
+                            }
+                            unpublishMutation.mutate({
+                                periodStart: scheduleData.period.start,
+                                periodEnd: scheduleData.period.end,
+                            });
+                        }}
+                        disabled={unpublishMutation.isPending}
+                    >
+                        非公開
+                    </Button>
+                    <Button
+                        variant="outline"
+                        onClick={() => setIsResetDialogOpen(true)}
+                    >
+                        初期に戻す
                     </Button>
                 </div>
             </div>
@@ -457,17 +594,61 @@ export default function StaffScheduleManagement() {
                                                 autoFocus
                                             />
                                         ) : (
-                                            <span
-                                                className="text-[18px] truncate leading-tight cursor-pointer hover:underline"
-                                                onClick={() => {
-                                                    if (isEditNameMode) {
-                                                        setEditingNameUserId(u.id);
-                                                        setEditingName(u.name || "");
-                                                    }
-                                                }}
-                                            >
-                                                {u.name || "不明"}
-                                            </span>
+                                            <div className="flex flex-col gap-0.5">
+                                                <span
+                                                    className="text-[18px] truncate leading-tight cursor-pointer hover:underline"
+                                                    onClick={() => {
+                                                        if (isEditNameMode) {
+                                                            // 名前編集モード中は従来通り名前編集
+                                                            setEditingNameUserId(u.id);
+                                                            setEditingName(u.name || "");
+                                                        } else {
+                                                            // 通常モード：ベース適用用のタブを開閉
+                                                            setBaseMenuUserId((prev) => (prev === u.id ? null : u.id));
+                                                        }
+                                                    }}
+                                                >
+                                                    {u.name || "不明"}
+                                                </span>
+                                                {/* ベース適用タブ（右端2列をベースにする） */}
+                                                {baseMenuUserId === u.id && !isEditNameMode && !isEditOrderMode && (
+                                                    <div className="mt-0.5 flex flex-col gap-0.5 text-[10px]">
+                                                        {templateUserRight2 && (
+                                                            <Button
+                                                                type="button"
+                                                                size="sm"
+                                                                variant="outline"
+                                                                className="h-5 px-1 text-[10px]"
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    applyBaseFromTemplate(u.id, templateUserRight2.id);
+                                                                }}
+                                                            >
+                                                                右から2番目をベース（{templateUserRight2.name}）
+                                                            </Button>
+                                                        )}
+                                                        {templateUserRight && (
+                                                            <Button
+                                                                type="button"
+                                                                size="sm"
+                                                                variant="outline"
+                                                                className="h-5 px-1 text-[10px]"
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    applyBaseFromTemplate(u.id, templateUserRight.id);
+                                                                }}
+                                                            >
+                                                                一番右をベース（{templateUserRight.name}）
+                                                            </Button>
+                                                        )}
+                                                        {(!templateUserRight || !templateUserRight2) && (
+                                                            <div className="text-[9px] text-[hsl(var(--muted-foreground))]">
+                                                                右端2列をベース用に設定してください
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                )}
+                                            </div>
                                         )}
                                         {isEditOrderMode && (
                                             <div className="flex flex-col gap-0.5">
@@ -647,6 +828,21 @@ export default function StaffScheduleManagement() {
                         </tr>
                         <tr className="bg-gray-50">
                             <td className="border border-[hsl(var(--border))] p-1 text-[16px] font-bold">
+                                調整休
+                            </td>
+                            {filteredSummary.map((s) => (
+                                <td
+                                    key={s.userId}
+                                    className="border border-[hsl(var(--border))] p-1 text-[16px] text-center font-bold cursor-pointer hover:bg-yellow-100"
+                                    onClick={() => handleAdjustmentClick(s.userId, (s as any).adjustment)}
+                                    title="クリックして調整休を編集"
+                                >
+                                    {(s as any).adjustment ?? 0}
+                                </td>
+                            ))}
+                        </tr>
+                        <tr className="bg-gray-50">
+                            <td className="border border-[hsl(var(--border))] p-1 text-[16px] font-bold">
                                 合計
                             </td>
                             {filteredSummary.map((s) => (
@@ -658,6 +854,50 @@ export default function StaffScheduleManagement() {
                     </tfoot>
                 </table>
             </div>
+
+            {/* 初期化確認ダイアログ */}
+            {isResetDialogOpen && scheduleData && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-2 sm:p-4">
+                    <Card className="w-full max-w-md">
+                        <CardHeader>
+                            <CardTitle className="text-lg">スケジュールを初期に戻しますか？</CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                            <p className="text-sm text-[hsl(var(--muted-foreground))]">
+                                この期間（{format(parse(scheduleData.period.start, "yyyy-MM-dd", new Date()), "yyyy年MM月dd日")} ～{" "}
+                                {format(parse(scheduleData.period.end, "yyyy-MM-dd", new Date()), "yyyy年MM月dd日")}）の
+                                すべてのスタッフの予定を、
+                                <span className="font-semibold">平日は出勤、土日は休み</span>
+                                の初期状態に戻します。調整休もリセットされます。
+                            </p>
+                            <p className="text-sm text-red-600">
+                                一度実行すると元には戻せません。本当に初期化してよろしいですか？
+                            </p>
+                            <div className="flex justify-end gap-2">
+                                <Button
+                                    variant="outline"
+                                    onClick={() => setIsResetDialogOpen(false)}
+                                    disabled={resetScheduleMutation.isPending}
+                                >
+                                    キャンセル
+                                </Button>
+                                <Button
+                                    variant="destructive"
+                                    onClick={() => {
+                                        resetScheduleMutation.mutate({
+                                            periodStart: scheduleData.period.start,
+                                            periodEnd: scheduleData.period.end,
+                                        });
+                                    }}
+                                    disabled={resetScheduleMutation.isPending}
+                                >
+                                    初期化する
+                                </Button>
+                            </div>
+                        </CardContent>
+                    </Card>
+                </div>
+            )}
 
             {/* 編集履歴 */}
             {editLogs && editLogs.length > 0 && (

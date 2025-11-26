@@ -258,6 +258,7 @@ export const bulletinMessages = mysqlTable("bulletinMessages", {
     id: int("id").autoincrement().primaryKey(),
     userId: int("userId").notNull(), // 投稿者ID
     message: text("message").notNull(), // メッセージ本文
+    expireDays: int("expireDays").default(5).notNull(), // 掲載日数（1/3/5日）
     createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 
