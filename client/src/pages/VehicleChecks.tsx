@@ -283,6 +283,39 @@ function VehicleCheckCard({
                                                         )
                                                     </p>
                                                 )}
+                                                {/* このチェック項目への依頼一覧（誰が誰に依頼したかが分かるように表示） */}
+                                                {status.requests && status.requests.length > 0 && (
+                                                    <div className="mt-1 space-y-0.5">
+                                                        {status.requests.map((req: any) => (
+                                                            <p
+                                                                key={req.id}
+                                                                className="text-[10px] sm:text-xs text-orange-700 flex flex-wrap gap-1"
+                                                            >
+                                                                <span>
+                                                                    依頼:
+                                                                    {req.requestedBy?.name ||
+                                                                        req.requestedBy?.username ||
+                                                                        "不明"}
+                                                                    さん →{" "}
+                                                                    {req.requestedTo?.name ||
+                                                                        req.requestedTo?.username ||
+                                                                        "不明"}
+                                                                    さん
+                                                                </span>
+                                                                {req.dueDate && (
+                                                                    <span>
+                                                                        （期限:
+                                                                        {format(
+                                                                            new Date(req.dueDate),
+                                                                            "yyyy-MM-dd"
+                                                                        )}
+                                                                        ）
+                                                                    </span>
+                                                                )}
+                                                            </p>
+                                                        ))}
+                                                    </div>
+                                                )}
                                                 {status.notes && (
                                                     <p className="text-xs text-[hsl(var(--muted-foreground))] mt-1">
                                                         メモ: {status.notes}
@@ -483,9 +516,9 @@ export default function VehicleChecks() {
                 </p>
             </div>
 
-            {/* チェック依頼通知 */}
+            {/* チェック依頼通知（どの車両のどの項目か分かるように表示） */}
             {pendingCheckRequests.length > 0 && (
-                <Card className="border-orange-200 bg-orange-50">
+                <Card className="border-orange-300 bg-orange-50">
                     <CardContent className="p-4">
                         <div className="flex items-start gap-3">
                             <AlertCircle className="h-5 w-5 text-orange-600 flex-shrink-0 mt-0.5" />
@@ -494,16 +527,27 @@ export default function VehicleChecks() {
                                     チェック依頼が{pendingCheckRequests.length}件あります
                                 </p>
                                 <div className="mt-2 space-y-1">
-                                    {pendingCheckRequests.slice(0, 3).map((request) => (
-                                        <Link
+                                    {pendingCheckRequests.slice(0, 5).map((request) => (
+                                        <div
                                             key={request.id}
-                                            href={`/vehicles/${request.vehicleId}`}
-                                            className="block text-xs sm:text-sm text-orange-800 hover:text-orange-900 underline"
+                                            className="flex flex-wrap items-center gap-1 text-xs sm:text-sm text-orange-900"
                                         >
-                                            {request.vehicle?.vehicleNumber || "車両ID: " + request.vehicleId} -{" "}
-                                            {request.requestedByUser?.name || request.requestedByUser?.username || "不明"}
-                                            さんから依頼
-                                        </Link>
+                                            <span className="font-semibold">
+                                                {request.vehicle?.vehicleNumber || "車両ID: " + request.vehicleId}
+                                            </span>
+                                            {request.checkItem?.name && (
+                                                <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-white text-orange-800 text-[10px] sm:text-xs">
+                                                    項目: {request.checkItem.name}
+                                                </span>
+                                            )}
+                                            <span>
+                                                （
+                                                {request.requestedByUser?.name ||
+                                                    request.requestedByUser?.username ||
+                                                    "不明"}
+                                                さんから依頼）
+                                            </span>
+                                        </div>
                                     ))}
                                     {pendingCheckRequests.length > 3 && (
                                         <p className="text-xs text-orange-700">

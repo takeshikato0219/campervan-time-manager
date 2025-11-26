@@ -328,7 +328,7 @@ export default function Vehicles() {
     const [editingVehicle, setEditingVehicle] = useState<any>(null);
     const [vehicleNumber, setVehicleNumber] = useState("");
     const [vehicleTypeId, setVehicleTypeId] = useState("");
-    const [category, setCategory] = useState<"一般" | "キャンパー" | "中古" | "修理" | "クレーム">("一般");
+    const [category, setCategory] = useState<"一般" | "キャンパー" | "中古" | "修理" | "クレーム">("キャンパー");
     const [customerName, setCustomerName] = useState("");
     const [desiredDeliveryDate, setDesiredDeliveryDate] = useState("");
     const [checkDueDate, setCheckDueDate] = useState("");
@@ -353,7 +353,7 @@ export default function Vehicles() {
             setIsRegisterDialogOpen(false);
             setVehicleNumber("");
             setVehicleTypeId("");
-            setCategory("一般");
+            setCategory("キャンパー");
             setCustomerName("");
             setDesiredDeliveryDate("");
             setCheckDueDate("");
@@ -678,29 +678,38 @@ export default function Vehicles() {
 
                 <TabsContent value={activeTab} className="mt-4">
                     {filteredVehicles && filteredVehicles.length > 0 ? (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 w-full">
+                        // 画面幅が中途半端なときにカードが細くなりすぎないよう、3列表示はより広い画面のみ
+                        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-4 w-full">
                             {filteredVehicles.map((vehicle) => (
                                 <Card key={vehicle.id} className="overflow-hidden w-full max-w-full">
                                     <CardHeader className="p-3 sm:p-4 md:p-6 bg-gradient-to-r from-blue-50 to-indigo-50 border-b">
                                         <div className="flex flex-col sm:flex-row items-start justify-between gap-2 sm:gap-3">
                                             <div className="flex-1 min-w-0 w-full sm:w-auto">
-                                                <div className="mb-1 sm:mb-2">
-                                                    <CardTitle className="text-base sm:text-lg md:text-xl font-bold truncate mb-0.5 sm:mb-1">
+                                                <div className="mb-1.5 sm:mb-2">
+                                                    <CardTitle className="text-sm sm:text-base md:text-lg font-bold leading-snug break-words mb-0.5 sm:mb-1">
                                                         {vehicle.vehicleNumber}
                                                     </CardTitle>
-                                                    <p className="text-[10px] sm:text-xs text-gray-500 font-mono">ID: {vehicle.id}</p>
+                                                    <p className="text-[10px] sm:text-xs text-gray-500 font-mono leading-tight">
+                                                        ID: {vehicle.id}
+                                                    </p>
                                                 </div>
                                                 {vehicle.customerName && (
-                                                    <p className="text-sm sm:text-base md:text-lg font-semibold text-gray-900 mb-1 sm:mb-2 break-words">
-                                                        {vehicle.customerName}
+                                                    <p
+                                                        className="text-xs sm:text-sm md:text-base font-semibold text-gray-900 mb-1.5 sm:mb-2 leading-snug break-words"
+                                                        title={vehicle.customerName}
+                                                    >
+                                                        {
+                                                            // 改行をスペースに変換して、縦にバラバラにならないようにする
+                                                            vehicle.customerName.replace(/[\r\n]+/g, " ")
+                                                        }
                                                     </p>
                                                 )}
                                                 <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
-                                                    <span className="inline-flex items-center px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-md text-[10px] sm:text-xs font-medium bg-white/80 text-gray-700 border border-gray-200">
+                                                    <span className="inline-flex items-center max-w-full px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-md text-[10px] sm:text-xs font-medium bg-white/80 text-gray-700 border border-gray-200 break-words">
                                                         {vehicleTypes?.find((vt) => vt.id === vehicle.vehicleTypeId)?.name || "不明"}
                                                     </span>
                                                     {vehicle.category && (
-                                                        <span className="inline-flex items-center px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-md text-[10px] sm:text-xs font-semibold bg-blue-600 text-white">
+                                                        <span className="inline-flex items-center max-w-full px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-md text-[10px] sm:text-xs font-semibold bg-blue-600 text-white break-words">
                                                             {vehicle.category}
                                                         </span>
                                                     )}
@@ -867,7 +876,7 @@ export default function Vehicles() {
                                         )}
 
                                     </CardContent>
-                                    
+
                                     <VehicleDetailContent
                                         vehicleId={vehicle.id}
                                         user={user}
@@ -889,423 +898,429 @@ export default function Vehicles() {
             </Tabs>
 
             {/* 車両登録ダイアログ */}
-            {isRegisterDialogOpen && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-                    <Card className="w-full max-w-md mx-4">
-                        <CardHeader>
-                            <CardTitle>車両登録</CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                            <div>
-                                <label className="text-sm font-medium">車両番号 *</label>
-                                <Input
-                                    value={vehicleNumber}
-                                    onChange={(e) => setVehicleNumber(e.target.value)}
-                                    placeholder="例: ABC-001"
-                                    required
-                                />
-                            </div>
-                            <div>
-                                <label className="text-sm font-medium">車種 *</label>
-                                <select
-                                    className="flex h-10 w-full rounded-md border border-[hsl(var(--input))] bg-[hsl(var(--background))] px-3 py-2 text-sm"
-                                    value={vehicleTypeId}
-                                    onChange={(e) => setVehicleTypeId(e.target.value)}
-                                    required
-                                >
-                                    <option value="">選択してください</option>
-                                    {vehicleTypes?.map((vt) => (
-                                        <option key={vt.id} value={vt.id}>
-                                            {vt.name}
-                                        </option>
-                                    ))}
-                                </select>
-                            </div>
-                            <div>
-                                <label className="text-sm font-medium">お客様名</label>
-                                <Input
-                                    value={customerName}
-                                    onChange={(e) => setCustomerName(e.target.value)}
-                                    placeholder="お客様名を入力"
-                                />
-                            </div>
-                            <div>
-                                <label className="text-sm font-medium">希望納期</label>
-                                <Input
-                                    type="date"
-                                    value={desiredDeliveryDate}
-                                    onChange={(e) => setDesiredDeliveryDate(e.target.value)}
-                                />
-                            </div>
-                            <div className="flex gap-2">
-                                <Button
-                                    className="flex-1"
-                                    onClick={handleRegister}
-                                    disabled={registerMutation.isPending}
-                                >
-                                    登録
-                                </Button>
-                                <Button
-                                    variant="outline"
-                                    className="flex-1"
-                                    onClick={() => {
-                                        setIsRegisterDialogOpen(false);
-                                        setVehicleNumber("");
-                                        setVehicleTypeId("");
-                                        setCategory("一般");
-                                        setCustomerName("");
-                                        setDesiredDeliveryDate("");
-                                    }}
-                                >
-                                    キャンセル
-                                </Button>
-                            </div>
-                        </CardContent>
-                    </Card>
-                </div>
-            )}
+            {
+                isRegisterDialogOpen && (
+                    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+                        <Card className="w-full max-w-md mx-4">
+                            <CardHeader>
+                                <CardTitle>車両登録</CardTitle>
+                            </CardHeader>
+                            <CardContent className="space-y-4">
+                                <div>
+                                    <label className="text-sm font-medium">車両番号 *</label>
+                                    <Input
+                                        value={vehicleNumber}
+                                        onChange={(e) => setVehicleNumber(e.target.value)}
+                                        placeholder="例: ABC-001"
+                                        required
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-sm font-medium">車種 *</label>
+                                    <select
+                                        className="flex h-10 w-full rounded-md border border-[hsl(var(--input))] bg-[hsl(var(--background))] px-3 py-2 text-sm"
+                                        value={vehicleTypeId}
+                                        onChange={(e) => setVehicleTypeId(e.target.value)}
+                                        required
+                                    >
+                                        <option value="">選択してください</option>
+                                        {vehicleTypes?.map((vt) => (
+                                            <option key={vt.id} value={vt.id}>
+                                                {vt.name}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="text-sm font-medium">お客様名</label>
+                                    <Input
+                                        value={customerName}
+                                        onChange={(e) => setCustomerName(e.target.value)}
+                                        placeholder="お客様名を入力"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-sm font-medium">希望納期</label>
+                                    <Input
+                                        type="date"
+                                        value={desiredDeliveryDate}
+                                        onChange={(e) => setDesiredDeliveryDate(e.target.value)}
+                                    />
+                                </div>
+                                <div className="flex gap-2">
+                                    <Button
+                                        className="flex-1"
+                                        onClick={handleRegister}
+                                        disabled={registerMutation.isPending}
+                                    >
+                                        登録
+                                    </Button>
+                                    <Button
+                                        variant="outline"
+                                        className="flex-1"
+                                        onClick={() => {
+                                            setIsRegisterDialogOpen(false);
+                                            setVehicleNumber("");
+                                            setVehicleTypeId("");
+                                            setCategory("一般");
+                                            setCustomerName("");
+                                            setDesiredDeliveryDate("");
+                                        }}
+                                    >
+                                        キャンセル
+                                    </Button>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    </div>
+                )
+            }
 
             {/* 車両編集ダイアログ */}
-            {isEditDialogOpen && editingVehicle && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-2 sm:p-4 overflow-y-auto">
-                    <Card className="w-full max-w-md min-w-0 my-auto max-h-[90vh] flex flex-col">
-                        <CardHeader className="p-3 sm:p-4 md:p-6 flex-shrink-0">
-                            <CardTitle className="text-base sm:text-lg md:text-xl">車両編集</CardTitle>
-                        </CardHeader>
-                        <CardContent className="p-3 sm:p-4 md:p-6 space-y-3 sm:space-y-4 overflow-y-auto flex-1">
-                            <div className="min-w-0">
-                                <label className="text-sm font-medium block mb-1">車両番号 *</label>
-                                <Input
-                                    value={vehicleNumber}
-                                    onChange={(e) => setVehicleNumber(e.target.value)}
-                                    placeholder="例: ABC-001"
-                                    required
-                                    className="w-full min-w-0"
-                                />
-                            </div>
-                            <div className="min-w-0">
-                                <label className="text-sm font-medium block mb-1">車種 *</label>
-                                <select
-                                    className="flex h-10 w-full min-w-0 rounded-md border border-[hsl(var(--input))] bg-[hsl(var(--background))] px-3 py-2 text-sm"
-                                    value={vehicleTypeId}
-                                    onChange={(e) => setVehicleTypeId(e.target.value)}
-                                    required
-                                >
-                                    <option value="">選択してください</option>
-                                    {vehicleTypes?.map((vt) => (
-                                        <option key={vt.id} value={vt.id}>
-                                            {vt.name}
-                                        </option>
-                                    ))}
-                                </select>
-                            </div>
-                            <div className="min-w-0">
-                                <label className="text-sm font-medium block mb-1">区分 *</label>
-                                <select
-                                    className="flex h-10 w-full min-w-0 rounded-md border border-[hsl(var(--input))] bg-[hsl(var(--background))] px-3 py-2 text-sm"
-                                    value={category}
-                                    onChange={(e) => setCategory(e.target.value as any)}
-                                    required
-                                >
-                                    <option value="一般">一般</option>
-                                    <option value="キャンパー">キャンパー</option>
-                                    <option value="中古">中古</option>
-                                    <option value="修理">修理</option>
-                                    <option value="クレーム">クレーム</option>
-                                </select>
-                            </div>
-                            <div className="min-w-0">
-                                <label className="text-sm font-medium block mb-1">お客様名</label>
-                                <Input
-                                    value={customerName}
-                                    onChange={(e) => setCustomerName(e.target.value)}
-                                    placeholder="お客様名を入力"
-                                    className="w-full min-w-0"
-                                />
-                            </div>
-                            <div className="min-w-0">
-                                <label className="text-sm font-medium block mb-1">希望納期</label>
-                                <Input
-                                    type="date"
-                                    value={desiredDeliveryDate}
-                                    onChange={(e) => setDesiredDeliveryDate(e.target.value)}
-                                    className="w-full min-w-0"
-                                />
-                            </div>
-                            <div className="min-w-0">
-                                <label className="text-sm font-medium block mb-1">チェック期限</label>
-                                <Input
-                                    type="date"
-                                    value={checkDueDate}
-                                    onChange={(e) => setCheckDueDate(e.target.value)}
-                                    className="w-full min-w-0"
-                                />
-                            </div>
-                            <div className="min-w-0">
-                                <label className="text-sm font-medium block mb-1">予備権の日付</label>
-                                <Input
-                                    type="date"
-                                    value={reserveDate}
-                                    onChange={(e) => setReserveDate(e.target.value)}
-                                    className="w-full min-w-0"
-                                />
-                            </div>
-                            <div className="min-w-0">
-                                <label className="text-sm font-medium block mb-1">予備権のR</label>
-                                <Input
-                                    value={reserveRound}
-                                    onChange={(e) => setReserveRound(e.target.value)}
-                                    placeholder="例: 1R, 2R"
-                                    className="w-full min-w-0"
-                                />
-                            </div>
-                            <div className="min-w-0">
-                                <label className="text-sm font-medium block mb-1">コーティング</label>
-                                <select
-                                    className="flex h-10 w-full min-w-0 rounded-md border border-[hsl(var(--input))] bg-[hsl(var(--background))] px-3 py-2 text-sm"
-                                    value={hasCoating}
-                                    onChange={(e) => setHasCoating(e.target.value as "yes" | "no" | "")}
-                                >
-                                    <option value="">選択してください</option>
-                                    <option value="yes">あり</option>
-                                    <option value="no">なし</option>
-                                </select>
-                            </div>
-                            <div className="min-w-0">
-                                <label className="text-sm font-medium block mb-1">ライン</label>
-                                <select
-                                    className="flex h-10 w-full min-w-0 rounded-md border border-[hsl(var(--input))] bg-[hsl(var(--background))] px-3 py-2 text-sm"
-                                    value={hasLine}
-                                    onChange={(e) => setHasLine(e.target.value as "yes" | "no" | "")}
-                                >
-                                    <option value="">選択してください</option>
-                                    <option value="yes">あり</option>
-                                    <option value="no">なし</option>
-                                </select>
-                            </div>
-                            <div className="min-w-0">
-                                <label className="text-sm font-medium block mb-1">希望ナンバー</label>
-                                <select
-                                    className="flex h-10 w-full min-w-0 rounded-md border border-[hsl(var(--input))] bg-[hsl(var(--background))] px-3 py-2 text-sm"
-                                    value={hasPreferredNumber}
-                                    onChange={(e) => setHasPreferredNumber(e.target.value as "yes" | "no" | "")}
-                                >
-                                    <option value="">選択してください</option>
-                                    <option value="yes">あり</option>
-                                    <option value="no">なし</option>
-                                </select>
-                            </div>
-                            <div className="min-w-0">
-                                <label className="text-sm font-medium block mb-1">タイヤ交換</label>
-                                <select
-                                    className="flex h-10 w-full min-w-0 rounded-md border border-[hsl(var(--input))] bg-[hsl(var(--background))] px-3 py-2 text-sm"
-                                    value={hasTireReplacement}
-                                    onChange={(e) => setHasTireReplacement(e.target.value as "summer" | "winter" | "no" | "")}
-                                >
-                                    <option value="">選択してください</option>
-                                    <option value="summer">あり（夏タイヤ納車）</option>
-                                    <option value="winter">あり（冬タイヤ納車）</option>
-                                    <option value="no">なし</option>
-                                </select>
-                            </div>
-                            {user?.role === "admin" && (
+            {
+                isEditDialogOpen && editingVehicle && (
+                    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-2 sm:p-4 overflow-y-auto">
+                        <Card className="w-full max-w-md min-w-0 my-auto max-h-[90vh] flex flex-col">
+                            <CardHeader className="p-3 sm:p-4 md:p-6 flex-shrink-0">
+                                <CardTitle className="text-base sm:text-lg md:text-xl">車両編集</CardTitle>
+                            </CardHeader>
+                            <CardContent className="p-3 sm:p-4 md:p-6 space-y-3 sm:space-y-4 overflow-y-auto flex-1">
                                 <div className="min-w-0">
-                                    <label className="text-sm font-medium block mb-1">指示書（PDF/JPG）</label>
-                                    <div className="flex items-center gap-2">
-                                        <Input
-                                            type="file"
-                                            accept=".pdf,.jpg,.jpeg"
-                                            onChange={(e) => {
-                                                const file = e.target.files?.[0];
-                                                if (file) {
-                                                    setInstructionSheetFile(file);
-                                                }
-                                            }}
-                                            className="w-full min-w-0"
-                                        />
-                                        {editingVehicle?.instructionSheetUrl && (
-                                            <a
-                                                href={editingVehicle.instructionSheetUrl}
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                                className="text-xs text-blue-600 hover:text-blue-800 underline"
-                                            >
-                                                現在の指示書を表示
-                                            </a>
-                                        )}
-                                    </div>
+                                    <label className="text-sm font-medium block mb-1">車両番号 *</label>
+                                    <Input
+                                        value={vehicleNumber}
+                                        onChange={(e) => setVehicleNumber(e.target.value)}
+                                        placeholder="例: ABC-001"
+                                        required
+                                        className="w-full min-w-0"
+                                    />
                                 </div>
-                            )}
-                            <div className="min-w-0 space-y-3">
-                                <label className="text-sm font-medium block mb-2">外注先（最大2個）</label>
-                                {outsourcing.map((o, index) => (
-                                    <div key={index} className="space-y-2 p-3 border border-[hsl(var(--border))] rounded-lg">
-                                        <div className="flex items-center justify-between mb-2">
-                                            <span className="text-xs font-medium text-[hsl(var(--muted-foreground))]">
-                                                外注先 {index + 1}
-                                            </span>
-                                            {index > 0 && (
-                                                <Button
-                                                    type="button"
-                                                    size="sm"
-                                                    variant="ghost"
-                                                    onClick={() => {
-                                                        setOutsourcing(outsourcing.filter((_, i) => i !== index));
-                                                    }}
-                                                    className="h-6 px-2 text-xs text-red-600 hover:text-red-800"
+                                <div className="min-w-0">
+                                    <label className="text-sm font-medium block mb-1">車種 *</label>
+                                    <select
+                                        className="flex h-10 w-full min-w-0 rounded-md border border-[hsl(var(--input))] bg-[hsl(var(--background))] px-3 py-2 text-sm"
+                                        value={vehicleTypeId}
+                                        onChange={(e) => setVehicleTypeId(e.target.value)}
+                                        required
+                                    >
+                                        <option value="">選択してください</option>
+                                        {vehicleTypes?.map((vt) => (
+                                            <option key={vt.id} value={vt.id}>
+                                                {vt.name}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div className="min-w-0">
+                                    <label className="text-sm font-medium block mb-1">区分 *</label>
+                                    <select
+                                        className="flex h-10 w-full min-w-0 rounded-md border border-[hsl(var(--input))] bg-[hsl(var(--background))] px-3 py-2 text-sm"
+                                        value={category}
+                                        onChange={(e) => setCategory(e.target.value as any)}
+                                        required
+                                    >
+                                        <option value="一般">一般</option>
+                                        <option value="キャンパー">キャンパー</option>
+                                        <option value="中古">中古</option>
+                                        <option value="修理">修理</option>
+                                        <option value="クレーム">クレーム</option>
+                                    </select>
+                                </div>
+                                <div className="min-w-0">
+                                    <label className="text-sm font-medium block mb-1">お客様名</label>
+                                    <Input
+                                        value={customerName}
+                                        onChange={(e) => setCustomerName(e.target.value)}
+                                        placeholder="お客様名を入力"
+                                        className="w-full min-w-0"
+                                    />
+                                </div>
+                                <div className="min-w-0">
+                                    <label className="text-sm font-medium block mb-1">希望納期</label>
+                                    <Input
+                                        type="date"
+                                        value={desiredDeliveryDate}
+                                        onChange={(e) => setDesiredDeliveryDate(e.target.value)}
+                                        className="w-full min-w-0"
+                                    />
+                                </div>
+                                <div className="min-w-0">
+                                    <label className="text-sm font-medium block mb-1">チェック期限</label>
+                                    <Input
+                                        type="date"
+                                        value={checkDueDate}
+                                        onChange={(e) => setCheckDueDate(e.target.value)}
+                                        className="w-full min-w-0"
+                                    />
+                                </div>
+                                <div className="min-w-0">
+                                    <label className="text-sm font-medium block mb-1">予備権の日付</label>
+                                    <Input
+                                        type="date"
+                                        value={reserveDate}
+                                        onChange={(e) => setReserveDate(e.target.value)}
+                                        className="w-full min-w-0"
+                                    />
+                                </div>
+                                <div className="min-w-0">
+                                    <label className="text-sm font-medium block mb-1">予備権のR</label>
+                                    <Input
+                                        value={reserveRound}
+                                        onChange={(e) => setReserveRound(e.target.value)}
+                                        placeholder="例: 1R, 2R"
+                                        className="w-full min-w-0"
+                                    />
+                                </div>
+                                <div className="min-w-0">
+                                    <label className="text-sm font-medium block mb-1">コーティング</label>
+                                    <select
+                                        className="flex h-10 w-full min-w-0 rounded-md border border-[hsl(var(--input))] bg-[hsl(var(--background))] px-3 py-2 text-sm"
+                                        value={hasCoating}
+                                        onChange={(e) => setHasCoating(e.target.value as "yes" | "no" | "")}
+                                    >
+                                        <option value="">選択してください</option>
+                                        <option value="yes">あり</option>
+                                        <option value="no">なし</option>
+                                    </select>
+                                </div>
+                                <div className="min-w-0">
+                                    <label className="text-sm font-medium block mb-1">ライン</label>
+                                    <select
+                                        className="flex h-10 w-full min-w-0 rounded-md border border-[hsl(var(--input))] bg-[hsl(var(--background))] px-3 py-2 text-sm"
+                                        value={hasLine}
+                                        onChange={(e) => setHasLine(e.target.value as "yes" | "no" | "")}
+                                    >
+                                        <option value="">選択してください</option>
+                                        <option value="yes">あり</option>
+                                        <option value="no">なし</option>
+                                    </select>
+                                </div>
+                                <div className="min-w-0">
+                                    <label className="text-sm font-medium block mb-1">希望ナンバー</label>
+                                    <select
+                                        className="flex h-10 w-full min-w-0 rounded-md border border-[hsl(var(--input))] bg-[hsl(var(--background))] px-3 py-2 text-sm"
+                                        value={hasPreferredNumber}
+                                        onChange={(e) => setHasPreferredNumber(e.target.value as "yes" | "no" | "")}
+                                    >
+                                        <option value="">選択してください</option>
+                                        <option value="yes">あり</option>
+                                        <option value="no">なし</option>
+                                    </select>
+                                </div>
+                                <div className="min-w-0">
+                                    <label className="text-sm font-medium block mb-1">タイヤ交換</label>
+                                    <select
+                                        className="flex h-10 w-full min-w-0 rounded-md border border-[hsl(var(--input))] bg-[hsl(var(--background))] px-3 py-2 text-sm"
+                                        value={hasTireReplacement}
+                                        onChange={(e) => setHasTireReplacement(e.target.value as "summer" | "winter" | "no" | "")}
+                                    >
+                                        <option value="">選択してください</option>
+                                        <option value="summer">あり（夏タイヤ納車）</option>
+                                        <option value="winter">あり（冬タイヤ納車）</option>
+                                        <option value="no">なし</option>
+                                    </select>
+                                </div>
+                                {user?.role === "admin" && (
+                                    <div className="min-w-0">
+                                        <label className="text-sm font-medium block mb-1">指示書（PDF/JPG）</label>
+                                        <div className="flex items-center gap-2">
+                                            <Input
+                                                type="file"
+                                                accept=".pdf,.jpg,.jpeg"
+                                                onChange={(e) => {
+                                                    const file = e.target.files?.[0];
+                                                    if (file) {
+                                                        setInstructionSheetFile(file);
+                                                    }
+                                                }}
+                                                className="w-full min-w-0"
+                                            />
+                                            {editingVehicle?.instructionSheetUrl && (
+                                                <a
+                                                    href={editingVehicle.instructionSheetUrl}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="text-xs text-blue-600 hover:text-blue-800 underline"
                                                 >
-                                                    <Trash2 className="h-3 w-3" />
-                                                    削除
-                                                </Button>
+                                                    現在の指示書を表示
+                                                </a>
                                             )}
                                         </div>
-                                        <div className="min-w-0">
-                                            <label className="text-xs font-medium block mb-1">外注先</label>
-                                            <Input
-                                                value={o.destination}
-                                                onChange={(e) => {
-                                                    const newOutsourcing = [...outsourcing];
-                                                    newOutsourcing[index].destination = e.target.value;
-                                                    setOutsourcing(newOutsourcing);
-                                                }}
-                                                placeholder="外注先を入力"
-                                                className="w-full min-w-0"
-                                            />
-                                        </div>
-                                        <div className="min-w-0">
-                                            <label className="text-xs font-medium block mb-1">外注開始日</label>
-                                            <Input
-                                                type="date"
-                                                value={o.startDate}
-                                                onChange={(e) => {
-                                                    const newOutsourcing = [...outsourcing];
-                                                    newOutsourcing[index].startDate = e.target.value;
-                                                    setOutsourcing(newOutsourcing);
-                                                }}
-                                                className="w-full min-w-0"
-                                            />
-                                        </div>
-                                        <div className="min-w-0">
-                                            <label className="text-xs font-medium block mb-1">外注終了日</label>
-                                            <Input
-                                                type="date"
-                                                value={o.endDate}
-                                                onChange={(e) => {
-                                                    const newOutsourcing = [...outsourcing];
-                                                    newOutsourcing[index].endDate = e.target.value;
-                                                    setOutsourcing(newOutsourcing);
-                                                }}
-                                                className="w-full min-w-0"
-                                            />
-                                        </div>
                                     </div>
-                                ))}
-                                {outsourcing.length < 2 && (
-                                    <Button
-                                        type="button"
-                                        size="sm"
-                                        variant="outline"
-                                        onClick={() => {
-                                            setOutsourcing([...outsourcing, { destination: "", startDate: "", endDate: "" }]);
-                                        }}
-                                        className="w-full text-xs"
-                                    >
-                                        <Plus className="h-3 w-3 mr-1" />
-                                        外注先を追加
-                                    </Button>
                                 )}
-                            </div>
-                            <div className="flex flex-col sm:flex-row gap-2 pt-2 flex-shrink-0">
-                                <Button
-                                    className="flex-1 w-full sm:w-auto"
-                                    onClick={handleUpdate}
-                                    disabled={updateMutation.isPending}
-                                >
-                                    更新
-                                </Button>
-                                <Button
-                                    variant="outline"
-                                    className="flex-1 w-full sm:w-auto"
-                                    onClick={() => {
-                                        setIsEditDialogOpen(false);
-                                        setEditingVehicle(null);
-                                        setVehicleNumber("");
-                                        setVehicleTypeId("");
-                                        setCustomerName("");
-                                        setDesiredDeliveryDate("");
-                                        setCheckDueDate("");
-                                        setReserveDate("");
-                                        setReserveRound("");
-                                        setHasCoating("");
-                                        setHasLine("");
-                                        setHasPreferredNumber("");
-                                        setHasTireReplacement("");
-                                        setOutsourcing([{ destination: "", startDate: "", endDate: "" }]);
-                                    }}
-                                >
-                                    キャンセル
-                                </Button>
-                            </div>
-                        </CardContent>
-                    </Card>
-                </div>
-            )}
+                                <div className="min-w-0 space-y-3">
+                                    <label className="text-sm font-medium block mb-2">外注先（最大2個）</label>
+                                    {outsourcing.map((o, index) => (
+                                        <div key={index} className="space-y-2 p-3 border border-[hsl(var(--border))] rounded-lg">
+                                            <div className="flex items-center justify-between mb-2">
+                                                <span className="text-xs font-medium text-[hsl(var(--muted-foreground))]">
+                                                    外注先 {index + 1}
+                                                </span>
+                                                {index > 0 && (
+                                                    <Button
+                                                        type="button"
+                                                        size="sm"
+                                                        variant="ghost"
+                                                        onClick={() => {
+                                                            setOutsourcing(outsourcing.filter((_, i) => i !== index));
+                                                        }}
+                                                        className="h-6 px-2 text-xs text-red-600 hover:text-red-800"
+                                                    >
+                                                        <Trash2 className="h-3 w-3" />
+                                                        削除
+                                                    </Button>
+                                                )}
+                                            </div>
+                                            <div className="min-w-0">
+                                                <label className="text-xs font-medium block mb-1">外注先</label>
+                                                <Input
+                                                    value={o.destination}
+                                                    onChange={(e) => {
+                                                        const newOutsourcing = [...outsourcing];
+                                                        newOutsourcing[index].destination = e.target.value;
+                                                        setOutsourcing(newOutsourcing);
+                                                    }}
+                                                    placeholder="外注先を入力"
+                                                    className="w-full min-w-0"
+                                                />
+                                            </div>
+                                            <div className="min-w-0">
+                                                <label className="text-xs font-medium block mb-1">外注開始日</label>
+                                                <Input
+                                                    type="date"
+                                                    value={o.startDate}
+                                                    onChange={(e) => {
+                                                        const newOutsourcing = [...outsourcing];
+                                                        newOutsourcing[index].startDate = e.target.value;
+                                                        setOutsourcing(newOutsourcing);
+                                                    }}
+                                                    className="w-full min-w-0"
+                                                />
+                                            </div>
+                                            <div className="min-w-0">
+                                                <label className="text-xs font-medium block mb-1">外注終了日</label>
+                                                <Input
+                                                    type="date"
+                                                    value={o.endDate}
+                                                    onChange={(e) => {
+                                                        const newOutsourcing = [...outsourcing];
+                                                        newOutsourcing[index].endDate = e.target.value;
+                                                        setOutsourcing(newOutsourcing);
+                                                    }}
+                                                    className="w-full min-w-0"
+                                                />
+                                            </div>
+                                        </div>
+                                    ))}
+                                    {outsourcing.length < 2 && (
+                                        <Button
+                                            type="button"
+                                            size="sm"
+                                            variant="outline"
+                                            onClick={() => {
+                                                setOutsourcing([...outsourcing, { destination: "", startDate: "", endDate: "" }]);
+                                            }}
+                                            className="w-full text-xs"
+                                        >
+                                            <Plus className="h-3 w-3 mr-1" />
+                                            外注先を追加
+                                        </Button>
+                                    )}
+                                </div>
+                                <div className="flex flex-col sm:flex-row gap-2 pt-2 flex-shrink-0">
+                                    <Button
+                                        className="flex-1 w-full sm:w-auto"
+                                        onClick={handleUpdate}
+                                        disabled={updateMutation.isPending}
+                                    >
+                                        更新
+                                    </Button>
+                                    <Button
+                                        variant="outline"
+                                        className="flex-1 w-full sm:w-auto"
+                                        onClick={() => {
+                                            setIsEditDialogOpen(false);
+                                            setEditingVehicle(null);
+                                            setVehicleNumber("");
+                                            setVehicleTypeId("");
+                                            setCustomerName("");
+                                            setDesiredDeliveryDate("");
+                                            setCheckDueDate("");
+                                            setReserveDate("");
+                                            setReserveRound("");
+                                            setHasCoating("");
+                                            setHasLine("");
+                                            setHasPreferredNumber("");
+                                            setHasTireReplacement("");
+                                            setOutsourcing([{ destination: "", startDate: "", endDate: "" }]);
+                                        }}
+                                    >
+                                        キャンセル
+                                    </Button>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    </div>
+                )
+            }
 
             {/* 拡散項目ダイアログ */}
-            {isBroadcastDialogOpen && broadcastingVehicleId && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-2 sm:p-4 overflow-y-auto">
-                    <Card className="w-full max-w-md min-w-0 my-auto">
-                        <CardHeader className="p-3 sm:p-4 md:p-6">
-                            <CardTitle className="text-base sm:text-lg md:text-xl">拡散項目</CardTitle>
-                        </CardHeader>
-                        <CardContent className="p-3 sm:p-4 md:p-6 space-y-3 sm:space-y-4">
-                            <div className="min-w-0">
-                                <label className="text-sm font-medium block mb-1">コメント *</label>
-                                <textarea
-                                    value={broadcastMessage}
-                                    onChange={(e) => setBroadcastMessage(e.target.value)}
-                                    placeholder="全員に通知するコメントを入力してください"
-                                    className="flex min-h-[120px] w-full rounded-md border border-[hsl(var(--input))] bg-[hsl(var(--background))] px-3 py-2 text-sm"
-                                    required
-                                />
-                                <p className="text-xs text-[hsl(var(--muted-foreground))] mt-1">
-                                    このコメントは全員のダッシュボードに通知されます。一週間後に自動で削除されます。
-                                </p>
-                            </div>
-                            <div className="flex flex-col sm:flex-row gap-2 pt-2">
-                                <Button
-                                    className="flex-1 w-full sm:w-auto"
-                                    onClick={() => {
-                                        if (!broadcastMessage.trim()) {
-                                            toast.error("コメントを入力してください");
-                                            return;
-                                        }
-                                        createBroadcastMutation.mutate({
-                                            vehicleId: broadcastingVehicleId,
-                                            message: broadcastMessage,
-                                        });
-                                    }}
-                                    disabled={createBroadcastMutation.isPending}
-                                >
-                                    {createBroadcastMutation.isPending ? "送信中..." : "送信"}
-                                </Button>
-                                <Button
-                                    variant="outline"
-                                    className="flex-1 w-full sm:w-auto"
-                                    onClick={() => {
-                                        setIsBroadcastDialogOpen(false);
-                                        setBroadcastingVehicleId(null);
-                                        setBroadcastMessage("");
-                                    }}
-                                >
-                                    キャンセル
-                                </Button>
-                            </div>
-                        </CardContent>
-                    </Card>
-                </div>
-            )}
-        </div>
+            {
+                isBroadcastDialogOpen && broadcastingVehicleId && (
+                    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-2 sm:p-4 overflow-y-auto">
+                        <Card className="w-full max-w-md min-w-0 my-auto">
+                            <CardHeader className="p-3 sm:p-4 md:p-6">
+                                <CardTitle className="text-base sm:text-lg md:text-xl">拡散項目</CardTitle>
+                            </CardHeader>
+                            <CardContent className="p-3 sm:p-4 md:p-6 space-y-3 sm:space-y-4">
+                                <div className="min-w-0">
+                                    <label className="text-sm font-medium block mb-1">コメント *</label>
+                                    <textarea
+                                        value={broadcastMessage}
+                                        onChange={(e) => setBroadcastMessage(e.target.value)}
+                                        placeholder="全員に通知するコメントを入力してください"
+                                        className="flex min-h-[120px] w-full rounded-md border border-[hsl(var(--input))] bg-[hsl(var(--background))] px-3 py-2 text-sm"
+                                        required
+                                    />
+                                    <p className="text-xs text-[hsl(var(--muted-foreground))] mt-1">
+                                        このコメントは全員のダッシュボードに通知されます。一週間後に自動で削除されます。
+                                    </p>
+                                </div>
+                                <div className="flex flex-col sm:flex-row gap-2 pt-2">
+                                    <Button
+                                        className="flex-1 w-full sm:w-auto"
+                                        onClick={() => {
+                                            if (!broadcastMessage.trim()) {
+                                                toast.error("コメントを入力してください");
+                                                return;
+                                            }
+                                            createBroadcastMutation.mutate({
+                                                vehicleId: broadcastingVehicleId,
+                                                message: broadcastMessage,
+                                            });
+                                        }}
+                                        disabled={createBroadcastMutation.isPending}
+                                    >
+                                        {createBroadcastMutation.isPending ? "送信中..." : "送信"}
+                                    </Button>
+                                    <Button
+                                        variant="outline"
+                                        className="flex-1 w-full sm:w-auto"
+                                        onClick={() => {
+                                            setIsBroadcastDialogOpen(false);
+                                            setBroadcastingVehicleId(null);
+                                            setBroadcastMessage("");
+                                        }}
+                                    >
+                                        キャンセル
+                                    </Button>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    </div>
+                )
+            }
+        </div >
     );
 }
 

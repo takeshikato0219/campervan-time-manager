@@ -202,6 +202,37 @@ export default function StaffScheduleManagement() {
         }
     };
 
+    // フィルタリングされたユーザーリスト（現状は全員）
+    const filteredUsers = useMemo(
+        () => (scheduleData ? scheduleData.users : []),
+        [scheduleData]
+    );
+
+    // フィルタリングされたスケジュールデータ（useMemoで再計算を最小限に）
+    const filteredScheduleData = useMemo(
+        () =>
+            scheduleData
+                ? scheduleData.scheduleData.map((day) => ({
+                    ...day,
+                    userEntries: day.userEntries.filter((entry) =>
+                        filteredUsers.some((u) => u.id === entry.userId)
+                    ),
+                }))
+                : [],
+        [scheduleData, filteredUsers]
+    );
+
+    // フィルタリングされた集計データ（useMemoで再計算を最小限に）
+    const filteredSummary = useMemo(
+        () =>
+            scheduleData
+                ? scheduleData.summary.filter((s) =>
+                    filteredUsers.some((u) => u.id === s.userId)
+                )
+                : [],
+        [scheduleData, filteredUsers]
+    );
+
     if (isLoading) {
         return <div className="text-center py-8">読み込み中...</div>;
     }
@@ -220,30 +251,6 @@ export default function StaffScheduleManagement() {
     if (!scheduleData) {
         return <div className="text-center py-8">データがありません</div>;
     }
-
-    // フィルタリングされたユーザーリスト（現状は全員）
-    const filteredUsers = useMemo(() => scheduleData.users, [scheduleData]);
-
-    // フィルタリングされたスケジュールデータ（useMemoで再計算を最小限に）
-    const filteredScheduleData = useMemo(
-        () =>
-            scheduleData.scheduleData.map((day) => ({
-                ...day,
-                userEntries: day.userEntries.filter((entry) =>
-                    filteredUsers.some((u) => u.id === entry.userId)
-                ),
-            })),
-        [scheduleData, filteredUsers]
-    );
-
-    // フィルタリングされた集計データ（useMemoで再計算を最小限に）
-    const filteredSummary = useMemo(
-        () =>
-            scheduleData.summary.filter((s) =>
-                filteredUsers.some((u) => u.id === s.userId)
-            ),
-        [scheduleData, filteredUsers]
-    );
 
     return (
         <div className="space-y-6">

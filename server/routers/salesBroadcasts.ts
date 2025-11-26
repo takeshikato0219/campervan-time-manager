@@ -36,6 +36,19 @@ export const salesBroadcastsRouter = createTRPCRouter({
                 })
                 .$returningId();
 
+            // 拡散項目を車両の注意ポイントとしても保存（チェック済み後も残す）
+            try {
+                await db.insert(schema.vehicleAttentionPoints).values({
+                    vehicleId: input.vehicleId,
+                    userId: ctx.user!.id,
+                    // 拡散由来と分かるようにラベルを付与
+                    content: `【拡散項目】${input.message}`,
+                });
+            } catch (error) {
+                // 注意ポイントの保存に失敗しても、拡散自体は成功扱いとする
+                console.error("[salesBroadcasts.create] Failed to add attention point:", error);
+            }
+
             return { id: result };
         }),
 

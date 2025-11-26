@@ -294,9 +294,9 @@ export default function Dashboard() {
                 </Card>
             )}
 
-            {/* チェック依頼通知 */}
+            {/* チェック依頼通知（誰から・どの項目か分かるように表示） */}
             {pendingCheckRequests.length > 0 && (
-                <Card className="border-orange-200 bg-orange-50">
+                <Card className="border-orange-300 bg-orange-50">
                     <CardContent className="p-4">
                         <div className="flex items-start gap-3">
                             <AlertCircle className="h-5 w-5 text-orange-600 flex-shrink-0 mt-0.5" />
@@ -308,12 +308,24 @@ export default function Dashboard() {
                                     {pendingCheckRequests.slice(0, 3).map((request) => (
                                         <Link
                                             key={request.id}
-                                            href={`/vehicles/${request.vehicleId}`}
-                                            className="block text-xs sm:text-sm text-orange-800 hover:text-orange-900 underline"
+                                            href="/vehicle-checks"
+                                            className="block text-xs sm:text-sm text-orange-800 hover:text-orange-900"
                                         >
-                                            {request.vehicle?.vehicleNumber || "車両ID: " + request.vehicleId} -{" "}
-                                            {request.requestedByUser?.name || request.requestedByUser?.username || "不明"}
-                                            さんから依頼
+                                            <span className="font-semibold">
+                                                {request.vehicle?.vehicleNumber || "車両ID: " + request.vehicleId}
+                                            </span>
+                                            <span className="ml-1">
+                                                （
+                                                {request.requestedByUser?.name ||
+                                                    request.requestedByUser?.username ||
+                                                    "不明"}
+                                                さんから依頼）
+                                            </span>
+                                            {request.checkItem?.name && (
+                                                <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full bg-orange-100 text-orange-800 text-[10px] sm:text-xs">
+                                                    項目: {request.checkItem.name}
+                                                </span>
+                                            )}
                                         </Link>
                                     ))}
                                     {pendingCheckRequests.length > 3 && (

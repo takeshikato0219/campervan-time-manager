@@ -215,19 +215,52 @@ export const checksRouter = createTRPCRouter({
                 .from(schema.checkRequests)
                 .where(eq(schema.checkRequests.vehicleId, input.vehicleId));
 
+            // チェック依頼に関係するユーザー情報を取得
+            const requestUserIds = [
+                ...new Set([
+                    ...checkRequests.map((r) => r.requestedBy),
+                    ...checkRequests.map((r) => r.requestedTo),
+                ]),
+            ];
+            let requestUsers: any[] = [];
+            if (requestUserIds.length > 0) {
+                const { inArray } = await import("drizzle-orm");
+                const { selectUsersSafely } = await import("../db");
+                requestUsers = await selectUsersSafely(
+                    db,
+                    inArray(schema.users.id, requestUserIds)
+                );
+            }
+            const requestUserMap = new Map(requestUsers.map((u) => [u.id, u]));
+
             // チェック項目ごとにチェック状況を整理
             const checkStatus = checkItems.map((item) => {
                 const check = checks.find((c) => c.checkItemId === item.id);
-                const request = checkRequests.find((r) => r.checkItemId === item.id && r.status === "pending");
+                const pendingRequestsForItem = checkRequests.filter(
+                    (r) => r.checkItemId === item.id && r.status === "pending"
+                );
+
                 return {
                     checkItem: item,
-                    checked: check ? true : false,
+                    checked: !!check,
                     status: check?.status || "unchecked",
                     checkedBy: check ? userMap.get(check.checkedBy) : null,
                     checkedAt: check ? check.checkedAt : null,
                     notes: check ? check.notes : null,
-                    hasRequest: request ? true : false,
-                    requestDueDate: request?.dueDate || null,
+                    hasRequest: pendingRequestsForItem.length > 0,
+                    requestDueDate:
+                        pendingRequestsForItem.length > 0
+                            ? pendingRequestsForItem[0].dueDate || null
+                            : null,
+                    // 全ユーザーが「誰が誰に依頼しているか」分かるよう、依頼詳細を返す
+                    requests: pendingRequestsForItem.map((r) => ({
+                        id: r.id,
+                        requestedBy: requestUserMap.get(r.requestedBy) || null,
+                        requestedTo: requestUserMap.get(r.requestedTo) || null,
+                        dueDate: r.dueDate,
+                        message: r.message,
+                        status: r.status,
+                    })),
                 };
             });
 
