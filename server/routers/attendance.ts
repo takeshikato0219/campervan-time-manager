@@ -47,6 +47,42 @@ function isSameJstDate(a: Date, b: Date): boolean {
     );
 }
 
+// "2025-11-27T08:30:00+09:00" から "HH:MM" だけ抜き出す
+function extractTimeFromIso(iso: string | null | undefined): string | null {
+    if (!iso) return null;
+    const parts = iso.split("T");
+    if (parts.length < 2) return null;
+    const timePart = parts[1]; // "08:30:00+09:00"
+    const [hhmm] = timePart.split("+"); // "08:30:00"
+    const [h, m] = hhmm.split(":");
+    if (!h || !m) return null;
+    return `${h}:${m}`; // "08:30"
+}
+
+// Date から "HH:MM" を取り出す
+function extractTimeFromDate(d: Date | null | undefined): string | null {
+    if (!d) return null;
+    const h = String(d.getUTCHours()).padStart(2, "0");
+    const m = String(d.getUTCMinutes()).padStart(2, "0");
+    return `${h}:${m}`;
+}
+
+// "YYYY-MM-DD" と "HH:MM" から、その日の JST の Date を作成（DBはUTCで保存）
+function makeJstDate(workDate: string, timeStr: string): Date {
+    const [y, mo, d] = workDate.split("-").map((v) => parseInt(v, 10));
+    const [h, mi] = timeStr.split(":").map((v) => parseInt(v, 10));
+    // JST(UTC+9) の y/mo/d h:mi を UTC に変換して Date を作成
+    return new Date(Date.UTC(y, mo - 1, d, h - 9, mi, 0, 0));
+}
+
+// 分を 0〜(23*60+59) に収める
+function clampMinutes(m: number): number {
+    const MIN = 0;
+    const MAX = 23 * 60 + 59;
+    if (Number.isNaN(m)) return MIN;
+    return Math.min(Math.max(m, MIN), MAX);
+}
+
 /**
  * 出勤時刻と退勤時刻の間に含まれる休憩時間の合計を計算
  */
@@ -548,7 +584,8 @@ export const attendanceRouter = createTRPCRouter({
         .input(
             z.object({
                 userId: z.number(),
-                clockOut: z.string(),
+                workDate: z.string(), // "YYYY-MM-DD" - 必ずこの日のレコードだけを対象にする
+                time: z.string(),     // "HH:MM"
             })
         )
         .mutation(async ({ input }) => {
@@ -560,14 +597,17 @@ export const attendanceRouter = createTRPCRouter({
                 });
             }
 
-            // 最新の未退勤記録を取得
+            // 指定日の未退勤記録を取得（userId + workDate で限定）
+            const { start, end } = getJstDayRangeFromDateString(input.workDate);
             const [record] = await db
                 .select()
                 .from(schema.attendanceRecords)
                 .where(
                     and(
                         eq(schema.attendanceRecords.userId, input.userId),
-                        isNull(schema.attendanceRecords.clockOut)
+                        isNull(schema.attendanceRecords.clockOut),
+                        gte(schema.attendanceRecords.clockIn, start),
+                        lte(schema.attendanceRecords.clockIn, end)
                     )
                 )
                 .orderBy(schema.attendanceRecords.clockIn)
@@ -580,12 +620,8 @@ export const attendanceRouter = createTRPCRouter({
                 });
             }
 
-            const requestedClockOut = new Date(input.clockOut);
-
-            // 出勤日の23:59:59を超える場合は、23:59:59に丸める（夜勤は無い前提）
-            const maxClockOut = new Date(record.clockIn);
-            maxClockOut.setHours(23, 59, 59, 0);
-            const effectiveClockOut = requestedClockOut > maxClockOut ? maxClockOut : requestedClockOut;
+            // workDate と HH:MM から同じ日の退勤時刻を生成
+            const effectiveClockOut = makeJstDate(input.workDate, input.time);
 
             const totalMinutes = Math.floor(
                 (effectiveClockOut.getTime() - record.clockIn.getTime()) / 1000 / 60
@@ -596,7 +632,7 @@ export const attendanceRouter = createTRPCRouter({
             await db
                 .update(schema.attendanceRecords)
                 .set({
-                        clockOut: effectiveClockOut,
+                    clockOut: effectiveClockOut,
                     clockOutDevice: "pc",
                     workDuration,
                 })
@@ -619,7 +655,8 @@ export const attendanceRouter = createTRPCRouter({
         .input(
             z.object({
                 attendanceId: z.number(),
-                clockIn: z.string().optional(),
+                workDate: z.string(), // "YYYY-MM-DD" - 必ずこの日の中で正規化する
+                clockIn: z.string().optional(), // "....T08:30:00+09:00"
                 // 退勤時刻は「文字列 or null or 未指定」を許可
                 clockOut: z.string().nullable().optional(),
             })
@@ -648,45 +685,53 @@ export const attendanceRouter = createTRPCRouter({
             }
 
             const updateData: any = {};
-            if (input.clockIn) {
-                updateData.clockIn = new Date(input.clockIn);
+
+            // 1) まず "HH:MM" を取り出す（入力が無ければ既存レコードから取り出す）
+            let inTimeStr = extractTimeFromIso(input.clockIn) ?? extractTimeFromDate(record.clockIn);
+            let outTimeStr =
+                input.clockOut !== undefined
+                    ? extractTimeFromIso(input.clockOut)
+                    : extractTimeFromDate(record.clockOut);
+
+            // どちらも無い場合はデフォルト 08:00-17:00 とする
+            if (!inTimeStr && !outTimeStr) {
+                inTimeStr = "08:00";
+                outTimeStr = "17:00";
             }
-            // clockOutが明示的に送信された場合のみ更新（undefinedの場合は既存の値を保持）
-            if (input.clockOut !== undefined) {
-                if (input.clockOut) {
-                    const clockOutTime = new Date(input.clockOut);
-                    const clockInTime = input.clockIn ? new Date(input.clockIn) : record.clockIn;
-
-                    // 出勤日の23:59:59を超える場合は、23:59:59に丸める（夜勤は無い前提）
-                    const maxClockOut = new Date(clockInTime);
-                    maxClockOut.setHours(23, 59, 59, 0);
-                    const effectiveClockOut = clockOutTime > maxClockOut ? maxClockOut : clockOutTime;
-
-                    updateData.clockOut = effectiveClockOut;
-                } else {
-                    // 空文字列の場合はnullに設定（出勤中に戻す）
-                    updateData.clockOut = null;
-                }
+            if (!inTimeStr && outTimeStr) {
+                inTimeStr = outTimeStr;
+            }
+            if (!outTimeStr && inTimeStr) {
+                outTimeStr = inTimeStr;
             }
 
-            // 出勤時刻または退勤時刻が変更された場合、勤務時間を再計算
-            if (input.clockIn || input.clockOut !== undefined) {
-                const clockIn = input.clockIn ? new Date(input.clockIn) : record.clockIn;
-                const clockOut = input.clockOut !== undefined
-                    ? (input.clockOut ? (updateData.clockOut ?? new Date(input.clockOut)) : null)
-                    : record.clockOut;
+            // "HH:MM" -> 分
+            const toMinutes = (t: string) => {
+                const [h, m] = t.split(":").map((v) => parseInt(v, 10));
+                return clampMinutes(h * 60 + m);
+            };
 
-                if (clockOut) {
-                    const totalMinutes = Math.floor(
-                        (clockOut.getTime() - clockIn.getTime()) / 1000 / 60
-                    );
-                    const breakMinutes = await calculateBreakTimeMinutes(clockIn, clockOut, db);
-                    updateData.workDuration = Math.max(0, totalMinutes - breakMinutes); // 負の値にならないようにする
-                } else {
-                    // clockOutがnullの場合（出勤中）、workDurationもnullに設定
-                    updateData.workDuration = null;
-                }
-            }
+            const inMin = toMinutes(inTimeStr!);
+            const outMin = toMinutes(outTimeStr!);
+
+            // 早い方を出勤、遅い方を退勤
+            let start = Math.min(inMin, outMin);
+            let end = Math.max(inMin, outMin);
+
+            const pad = (n: number) => String(n).padStart(2, "0");
+            const startStr = `${pad(Math.floor(start / 60))}:${pad(start % 60)}`;
+            const endStr = `${pad(Math.floor(end / 60))}:${pad(end % 60)}`;
+
+            const newClockIn = makeJstDate(input.workDate, startStr);
+            const newClockOut = makeJstDate(input.workDate, endStr);
+
+            const totalMinutes = end - start;
+            const breakMinutes = await calculateBreakTimeMinutes(newClockIn, newClockOut, db);
+            const workDuration = Math.max(0, totalMinutes - breakMinutes);
+
+            updateData.clockIn = newClockIn;
+            updateData.clockOut = newClockOut;
+            updateData.workDuration = workDuration;
 
             await db
                 .update(schema.attendanceRecords)

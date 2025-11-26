@@ -137,22 +137,14 @@ export default function StaffAttendanceList({ selectedDate }: StaffAttendanceLis
     const handleSave = (attendanceId: number) => {
         const dateStr = format(selectedDate, "yyyy-MM-dd");
         const clockInDateTime = editClockIn ? `${dateStr}T${editClockIn}:00+09:00` : undefined;
-
-        let clockOutDateTime: string | undefined;
-        if (editClockOut === "") {
-            if (isToday) {
-                // 今日：空欄ならサーバー側で既存値維持 or 出勤中扱い（従来どおり）
-                clockOutDateTime = undefined;
-            } else {
-                // 前日・過去日：退勤なしの「作業中」は紛らわしいので 23:59 に強制退勤
-                clockOutDateTime = `${dateStr}T23:59:00+09:00`;
-            }
-        } else {
-            clockOutDateTime = `${dateStr}T${editClockOut}:00+09:00`;
-        }
+        const clockOutDateTime =
+            editClockOut && editClockOut !== ""
+                ? `${dateStr}T${editClockOut}:00+09:00`
+                : undefined;
 
         updateMutation.mutate({
             attendanceId,
+            workDate: dateStr,
             clockIn: clockInDateTime,
             clockOut: clockOutDateTime,
         });
@@ -201,11 +193,10 @@ export default function StaffAttendanceList({ selectedDate }: StaffAttendanceLis
         const hours = String(now.getHours()).padStart(2, "0");
         const minutes = String(now.getMinutes()).padStart(2, "0");
         const dateStr = format(selectedDate, "yyyy-MM-dd");
-        const clockOutDateTime = `${dateStr}T${hours}:${minutes}:00+09:00`;
-        console.log("退勤打刻:", { userId, clockOutDateTime });
         adminClockOutMutation.mutate({
             userId,
-            clockOut: clockOutDateTime,
+            workDate: dateStr,
+            time: `${hours}:${minutes}`,
         });
     };
 
@@ -223,7 +214,7 @@ export default function StaffAttendanceList({ selectedDate }: StaffAttendanceLis
         }
 
         const clockInDateTime = `${dateStr}T${pastEditClockIn}:00+09:00`;
-        const clockOutDateTime = `${dateStr}T${pastEditClockOut}:00+09:00`;
+        const clockOutTime = pastEditClockOut;
 
         try {
             // まず指定日の出勤を登録
@@ -235,7 +226,8 @@ export default function StaffAttendanceList({ selectedDate }: StaffAttendanceLis
             // 続けて同じ日の退勤を登録
             await adminClockOutMutation.mutateAsync({
                 userId,
-                clockOut: clockOutDateTime,
+                workDate: dateStr,
+                time: clockOutTime,
             });
 
             toast.success("出勤・退勤を登録しました");
