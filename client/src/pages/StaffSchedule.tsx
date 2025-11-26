@@ -1,9 +1,9 @@
 import React, { useState } from "react";
 import { useAuth } from "../hooks/useAuth";
 import { trpc } from "../lib/trpc";
-import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
-import { Input } from "../components/ui/input";
-import { format, parse } from "date-fns";
+import { Card, CardContent } from "../components/ui/card";
+import { Button } from "../components/ui/button";
+import { format, parse, addMonths, subMonths } from "date-fns";
 import { ja } from "date-fns/locale";
 
 type ScheduleStatus = "work" | "rest" | "request" | "exhibition" | "other" | "morning" | "afternoon";
@@ -103,6 +103,18 @@ export default function StaffSchedule() {
         filteredUsers.some((u) => u.id === s.userId)
     );
 
+    const baseDateObj = parse(baseDate, "yyyy-MM-dd", new Date());
+
+    const handlePrevMonth = () => {
+        const prev = subMonths(baseDateObj, 1);
+        setBaseDate(format(prev, "yyyy-MM-dd"));
+    };
+
+    const handleNextMonth = () => {
+        const next = addMonths(baseDateObj, 1);
+        setBaseDate(format(next, "yyyy-MM-dd"));
+    };
+
     return (
         <div className="space-y-6">
             <div className="flex items-center justify-between">
@@ -113,46 +125,18 @@ export default function StaffSchedule() {
                         {format(parse(scheduleData.period.end, "yyyy-MM-dd", new Date()), "yyyy年MM月dd日")}
                     </p>
                 </div>
-                <div className="flex flex-wrap gap-2">
-                    <Input type="date" value={baseDate} onChange={(e) => setBaseDate(e.target.value)} className="max-w-xs" />
+                <div className="flex flex-wrap items-center gap-2">
+                    <Button variant="outline" size="sm" onClick={handlePrevMonth}>
+                        前月へ
+                    </Button>
+                    <span className="text-sm sm:text-base font-semibold">
+                        {format(baseDateObj, "yyyy年MM月", { locale: ja })}
+                    </span>
+                    <Button variant="outline" size="sm" onClick={handleNextMonth}>
+                        次月へ
+                    </Button>
                 </div>
             </div>
-
-            {/* 凡例 */}
-            <Card>
-                <CardContent className="pt-6">
-                    <div className="flex flex-wrap gap-4 text-sm">
-                        <div className="flex items-center gap-2">
-                            <div className={`w-6 h-6 rounded ${STATUS_COLORS.work}`}></div>
-                            <span>出勤</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                            <div className={`w-6 h-6 rounded ${STATUS_COLORS.rest}`}></div>
-                            <span>休み</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                            <div className={`w-6 h-6 rounded ${STATUS_COLORS.request}`}></div>
-                            <span>希望休</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                            <div className={`w-6 h-6 rounded ${STATUS_COLORS.exhibition}`}></div>
-                            <span>展示会</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                            <div className={`w-6 h-6 rounded ${STATUS_COLORS.other}`}></div>
-                            <span>その他業務</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                            <div className={`w-6 h-6 rounded ${STATUS_COLORS.morning}`}></div>
-                            <span>午前出</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                            <div className={`w-6 h-6 rounded ${STATUS_COLORS.afternoon}`}></div>
-                            <span>午後出</span>
-                        </div>
-                    </div>
-                </CardContent>
-            </Card>
 
             {/* スケジュール表 */}
             <div className="overflow-x-auto">

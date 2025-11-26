@@ -39,7 +39,7 @@ export default function VehicleProductionTime() {
 
     if (completed) {
       return (
-        <span className="text-xs text-[hsl(var(--muted-foreground))]">
+        <span className="text-base sm:text-2xl font-semibold text-[hsl(var(--muted-foreground))]">
           納車日: {format(completed, "yyyy-MM-dd")}
         </span>
       );
@@ -50,14 +50,14 @@ export default function VehicleProductionTime() {
       const days = differenceInCalendarDays(desired, today);
       const suffix = days > 0 ? `（あと${days}日）` : days === 0 ? "（本日）" : `（${Math.abs(days)}日前）`;
       return (
-        <span className="text-xs text-[hsl(var(--muted-foreground))]">
+        <span className="text-base sm:text-2xl font-semibold text-[hsl(var(--muted-foreground))]">
           納車予定: {format(desired, "yyyy-MM-dd")} {suffix}
         </span>
       );
     }
 
     return (
-      <span className="text-xs text-[hsl(var(--muted-foreground))]">
+      <span className="text-base sm:text-2xl font-semibold text-[hsl(var(--muted-foreground))]">
         納車予定: 未設定
       </span>
     );
@@ -83,17 +83,18 @@ export default function VehicleProductionTime() {
   }, [vehicles, selected]);
 
   return (
-    <div className="w-full h-full flex flex-col gap-4">
+    <div className="w-full h-full flex flex-col gap-6 text-lg sm:text-2xl">
       <div className="flex items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl sm:text-3xl font-bold">車両制作時間確認</h1>
-          <p className="text-[hsl(var(--muted-foreground))] mt-1 text-sm sm:text-base">
+          <p className="text-[hsl(var(--muted-foreground))] mt-2 text-sm sm:text-base">
             1台ごとの累計作業時間と工程別時間を確認できます（全期間）。
           </p>
         </div>
         <Button
           variant={isListMode ? "default" : "outline"}
           onClick={() => setIsListMode((v) => !v)}
+          className="text-sm sm:text-base px-4 py-2"
         >
           {isListMode ? "通常モード" : "一覧モード"}
         </Button>
@@ -105,15 +106,15 @@ export default function VehicleProductionTime() {
             <Card key={v.vehicleId} className="flex flex-col h-full">
               <CardHeader className="pb-2">
                 <CardTitle className="flex flex-col gap-1">
-                  <span className="text-lg sm:text-xl font-bold">
+                  <span className="text-2xl sm:text-3xl font-bold">
                     {v.vehicleNumber}
                   </span>
                   {v.customerName && (
-                    <span className="text-sm text-[hsl(var(--muted-foreground))]">
+                    <span className="text-2xl sm:text-3xl text-[hsl(var(--muted-foreground))]">
                       {v.customerName}
                     </span>
                   )}
-                  <span className="text-sm sm:text-base text-blue-600 font-semibold">
+                  <span className="text-base sm:text-2xl text-blue-600 font-semibold">
                     合計 {formatDuration(v.totalMinutes)}
                   </span>
                   {renderDeliveryInfo(v)}
@@ -121,11 +122,11 @@ export default function VehicleProductionTime() {
               </CardHeader>
               <CardContent className="flex-1 overflow-auto">
                 {v.processes && v.processes.length > 0 ? (
-                  <table className="w-full text-xs sm:text-sm">
+                  <table className="w-full text-base sm:text-2xl">
                     <thead>
                       <tr className="border-b border-[hsl(var(--border))]">
-                        <th className="text-left py-1 pr-2">工程</th>
-                        <th className="text-right py-1">時間</th>
+                        <th className="text-left py-2 pr-4">工程</th>
+                        <th className="text-right py-2">時間</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -135,10 +136,10 @@ export default function VehicleProductionTime() {
                           className="border-b border-[hsl(var(--border))] hover:bg-[hsl(var(--muted))] cursor-pointer"
                           onClick={() => setSelected({ vehicleId: v.vehicleId, processId: p.processId })}
                         >
-                          <td className="py-1 pr-2 whitespace-nowrap">
+                          <td className="py-2 pr-4 whitespace-nowrap">
                             {p.processName}
                           </td>
-                          <td className="py-1 text-right font-medium">
+                          <td className="py-2 text-right font-medium">
                             {formatDuration(p.totalMinutes)}
                           </td>
                         </tr>
@@ -146,7 +147,7 @@ export default function VehicleProductionTime() {
                     </tbody>
                   </table>
                 ) : (
-                  <p className="text-[hsl(var(--muted-foreground))] text-sm">
+                  <p className="text-[hsl(var(--muted-foreground))] text-base sm:text-2xl">
                     作業記録がありません
                   </p>
                 )}
@@ -162,13 +163,13 @@ export default function VehicleProductionTime() {
 
       {selectedProcess && (
         <div className="fixed inset-0 bg-black/60 z-40 flex items-center justify-center p-4">
-          <Card className="w-full max-w-4xl max-h-[90vh] flex flex-col">
+          <Card className="w-full max-w-4xl max-h-[90vh] flex flex-col text-lg sm:text-2xl">
             <CardHeader className="flex flex-row items-center justify-between gap-4">
               <div>
-                <CardTitle className="text-lg sm:text-xl">
+                <CardTitle className="text-2xl sm:text-3xl">
                   {selectedProcess.vehicle.vehicleNumber} / {selectedProcess.process.processName}
                 </CardTitle>
-                <p className="text-sm text-[hsl(var(--muted-foreground))] mt-1">
+                <p className="text-base sm:text-2xl text-[hsl(var(--muted-foreground))] mt-2">
                   誰が・いつ・何分作業したかの一覧
                 </p>
               </div>
@@ -177,20 +178,20 @@ export default function VehicleProductionTime() {
               </Button>
             </CardHeader>
             <CardContent className="flex-1 overflow-auto">
-              <table className="w-full text-xs sm:text-sm">
+              <table className="w-full text-base sm:text-2xl">
                 <thead>
                   <tr className="border-b border-[hsl(var(--border))]">
-                    <th className="text-left py-1 pr-2">日付</th>
-                    <th className="text-left py-1 pr-2">担当者</th>
-                    <th className="text-right py-1">時間</th>
+                    <th className="text-left py-2 pr-4">日付</th>
+                    <th className="text-left py-2 pr-4">担当者</th>
+                    <th className="text-right py-2">時間</th>
                   </tr>
                 </thead>
                 <tbody>
                   {selectedProcess.process.details.map((d: any, idx: number) => (
                     <tr key={idx} className="border-b border-[hsl(var(--border))]">
-                      <td className="py-1 pr-2 whitespace-nowrap">{d.workDate}</td>
-                      <td className="py-1 pr-2 whitespace-nowrap">{d.userName}</td>
-                      <td className="py-1 text-right font-medium">
+                      <td className="py-2 pr-4 whitespace-nowrap">{d.workDate}</td>
+                      <td className="py-2 pr-4 whitespace-nowrap">{d.userName}</td>
+                      <td className="py-2 text-right font-medium">
                         {formatDuration(d.minutes)}
                       </td>
                     </tr>

@@ -49,6 +49,30 @@ function ProtectedRoute({ component: Component }: { component: React.ComponentTy
     );
 }
 
+function FullscreenRoute({ component: Component }: { component: React.ComponentType }) {
+    const { user, loading } = useAuth();
+    const [, setLocation] = useLocation();
+
+    if (loading) {
+        return (
+            <div className="min-h-screen flex items-center justify-center">
+                <div>読み込み中...</div>
+            </div>
+        );
+    }
+
+    if (!user) {
+        setLocation("/login");
+        return null;
+    }
+
+    return (
+        <div className="min-h-screen bg-[hsl(var(--background))] p-2 sm:p-4 md:p-6">
+            <Component />
+        </div>
+    );
+}
+
 export default function App() {
     return (
         <>
@@ -103,7 +127,7 @@ export default function App() {
                     {() => <ProtectedRoute component={BreakTimeManagement} />}
                 </Route>
                 <Route path="/staff-schedule">
-                    {() => <ProtectedRoute component={StaffSchedule} />}
+                    {() => <FullscreenRoute component={StaffSchedule} />}
                 </Route>
                 <Route path="/admin/staff-schedule">
                     {() => <ProtectedRoute component={StaffScheduleManagement} />}

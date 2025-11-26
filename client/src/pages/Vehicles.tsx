@@ -539,6 +539,18 @@ export default function Vehicles() {
         },
     });
 
+    const deleteMutation = trpc.vehicles.delete.useMutation({
+        onSuccess: () => {
+            toast.success("車両を削除しました");
+            setIsEditDialogOpen(false);
+            setEditingVehicle(null);
+            refetch();
+        },
+        onError: (error: any) => {
+            toast.error(error.message || "車両の削除に失敗しました");
+        },
+    });
+
     const createBroadcastMutation = trpc.salesBroadcasts.create.useMutation({
         onSuccess: () => {
             toast.success("拡散項目を送信しました");
@@ -1357,36 +1369,57 @@ export default function Vehicles() {
                                         </Button>
                                     )}
                                 </div>
-                                <div className="flex flex-col sm:flex-row gap-2 pt-2 flex-shrink-0">
-                                    <Button
-                                        className="flex-1 w-full sm:w-auto"
-                                        onClick={handleUpdate}
-                                        disabled={updateMutation.isPending}
-                                    >
-                                        更新
-                                    </Button>
-                                    <Button
-                                        variant="outline"
-                                        className="flex-1 w-full sm:w-auto"
-                                        onClick={() => {
-                                            setIsEditDialogOpen(false);
-                                            setEditingVehicle(null);
-                                            setVehicleNumber("");
-                                            setVehicleTypeId("");
-                                            setCustomerName("");
-                                            setDesiredDeliveryDate("");
-                                            setCheckDueDate("");
-                                            setReserveDate("");
-                                            setReserveRound("");
-                                            setHasCoating("");
-                                            setHasLine("");
-                                            setHasPreferredNumber("");
-                                            setHasTireReplacement("");
-                                            setOutsourcing([{ destination: "", startDate: "", endDate: "" }]);
-                                        }}
-                                    >
-                                        キャンセル
-                                    </Button>
+                                <div className="flex flex-col gap-2 pt-2 flex-shrink-0">
+                                    <div className="flex flex-col sm:flex-row gap-2">
+                                        <Button
+                                            className="flex-1 w-full sm:w-auto"
+                                            onClick={handleUpdate}
+                                            disabled={updateMutation.isPending}
+                                        >
+                                            更新
+                                        </Button>
+                                        <Button
+                                            variant="outline"
+                                            className="flex-1 w-full sm:w-auto"
+                                            onClick={() => {
+                                                setIsEditDialogOpen(false);
+                                                setEditingVehicle(null);
+                                                setVehicleNumber("");
+                                                setVehicleTypeId("");
+                                                setCustomerName("");
+                                                setDesiredDeliveryDate("");
+                                                setCheckDueDate("");
+                                                setReserveDate("");
+                                                setReserveRound("");
+                                                setHasCoating("");
+                                                setHasLine("");
+                                                setHasPreferredNumber("");
+                                                setHasTireReplacement("");
+                                                setOutsourcing([{ destination: "", startDate: "", endDate: "" }]);
+                                            }}
+                                        >
+                                            キャンセル
+                                        </Button>
+                                    </div>
+                                    {user?.role === "admin" && (
+                                        <Button
+                                            variant="destructive"
+                                            className="w-full text-xs"
+                                            onClick={() => {
+                                                if (!editingVehicle) return;
+                                                if (
+                                                    window.confirm(
+                                                        "この車両を削除すると元に戻せません。消せないですけど大丈夫ですか？"
+                                                    )
+                                                ) {
+                                                    deleteMutation.mutate({ id: editingVehicle.id });
+                                                }
+                                            }}
+                                            disabled={deleteMutation.isPending}
+                                        >
+                                            車両を削除
+                                        </Button>
+                                    )}
                                 </div>
                             </CardContent>
                         </Card>
