@@ -6,6 +6,34 @@ import { eq, and, gte, lte, isNull, inArray } from "drizzle-orm";
 import { startOfDay, endOfDay } from "date-fns";
 
 /**
+ * 日本時間（JST, UTC+9）の1日の開始・終了（UTC時刻）を返す
+ * DBに保存されている日時はUTC想定なので、JSTの0:00〜23:59:59に対応するUTC範囲で絞り込む
+ */
+function getJstDayRangeForNow(): { start: Date; end: Date } {
+    const now = new Date();
+    // now を JST に変換（+9時間）
+    const jstNow = new Date(now.getTime() + 9 * 60 * 60 * 1000);
+    const year = jstNow.getUTCFullYear();
+    const month = jstNow.getUTCMonth();
+    const day = jstNow.getUTCDate();
+
+    // JST の 0:00 / 23:59:59 に対応する UTC 時刻を作成
+    const start = new Date(Date.UTC(year, month, day, 0, 0, 0, 0));
+    const end = new Date(Date.UTC(year, month, day, 23, 59, 59, 999));
+    return { start, end };
+}
+
+/**
+ * 指定された日付文字列（YYYY-MM-DD, JST想定）の1日の開始・終了（UTC時刻）を返す
+ */
+function getJstDayRangeFromDateString(dateStr: string): { start: Date; end: Date } {
+    const [year, month, day] = dateStr.split("-").map((v) => parseInt(v, 10));
+    const start = new Date(Date.UTC(year, month - 1, day, 0, 0, 0, 0));
+    const end = new Date(Date.UTC(year, month - 1, day, 23, 59, 59, 999));
+    return { start, end };
+}
+
+/**
  * 出勤時刻と退勤時刻の間に含まれる休憩時間の合計を計算
  */
 export async function calculateBreakTimeMinutes(
@@ -101,9 +129,8 @@ export const attendanceRouter = createTRPCRouter({
             });
         }
 
-        const today = new Date();
-        const start = startOfDay(today);
-        const end = endOfDay(today);
+        // 日本時間の「今日」の0:00〜23:59:59に対応するUTC範囲で絞り込む
+        const { start, end } = getJstDayRangeForNow();
 
         const records = await db
             .select()
@@ -272,9 +299,8 @@ export const attendanceRouter = createTRPCRouter({
                 });
             }
 
-            const today = new Date();
-            const start = startOfDay(today);
-            const end = endOfDay(today);
+            // 日本時間の「今日」の0:00〜23:59:59に対応するUTC範囲で絞り込む
+            const { start, end } = getJstDayRangeForNow();
 
             // 全ユーザーを取得（nameやcategoryカラムが存在しない場合に対応）
             const { selectUsersSafely } = await import("../db");
@@ -365,10 +391,8 @@ export const attendanceRouter = createTRPCRouter({
                     });
                 }
 
-                // 日付文字列をパースして、タイムゾーンを考慮した日付範囲を取得
-                const targetDate = new Date(input.date + "T00:00:00+09:00");
-                const start = startOfDay(targetDate);
-                const end = endOfDay(targetDate);
+                // 入力された日付（YYYY-MM-DD, JST想定）の0:00〜23:59:59に対応するUTC範囲を取得
+                const { start, end } = getJstDayRangeFromDateString(input.date);
 
                 // 全ユーザーを取得（nameやcategoryカラムが存在しない場合に対応）
                 const { selectUsersSafely } = await import("../db");
@@ -784,23 +808,15 @@ export const attendanceRouter = createTRPCRouter({
         }
     }),
 
-    // 出退勤記録を削除（準管理者以上）
+    // 出退勤記録を削除（安全性のため物理削除は無効化）
+    // これ以上「出勤したのに記録が消える」ことを防ぐため、削除は不可とし、編集のみ許可する
     deleteAttendance: subAdminProcedure
         .input(z.object({ attendanceId: z.number() }))
-        .mutation(async ({ input }) => {
-            const db = await getDb();
-            if (!db) {
-                throw new TRPCError({
-                    code: "INTERNAL_SERVER_ERROR",
-                    message: "データベースに接続できません",
-                });
-            }
-
-            await db
-                .delete(schema.attendanceRecords)
-                .where(eq(schema.attendanceRecords.id, input.attendanceId));
-
-            return { success: true };
+        .mutation(async () => {
+            throw new TRPCError({
+                code: "BAD_REQUEST",
+                message: "出退勤記録の削除はできません。時間の修正のみ可能です。",
+            });
         }),
 
     // 編集履歴を取得（準管理者以上）

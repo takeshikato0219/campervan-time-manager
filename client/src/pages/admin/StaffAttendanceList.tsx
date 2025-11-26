@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from "react";
 import { trpc } from "../../lib/trpc";
 import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
-import { Edit, Trash2, Monitor, Smartphone, Plus, History } from "lucide-react";
+import { Edit, Monitor, Smartphone, Plus, History } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/card";
@@ -56,115 +56,24 @@ export default function StaffAttendanceList({ selectedDate }: StaffAttendanceLis
 
     const utils = trpc.useUtils();
 
+    // 出退勤編集は「毎回サーバーから取り直す」安全な方式に変更（他のカードが巻き込まれておかしくなるのを防ぐ）
     const updateMutation = trpc.attendance.updateAttendance.useMutation({
-        // 楽観的更新でラグを減らす
-        onMutate: async (variables) => {
-            const { attendanceId, clockIn, clockOut } = variables;
-
-            // 対象クエリのフェッチを一時停止
-            if (isToday) {
-                await utils.attendance.getAllStaffToday.cancel();
-            } else {
-                await utils.attendance.getAllStaffByDate.cancel({ date: dateStr });
-            }
-
-            // 直前のデータを保存（ロールバック用）
-            const previousToday = utils.attendance.getAllStaffToday.getData();
-            const previousByDate = utils.attendance.getAllStaffByDate.getData({ date: dateStr });
-
-            // 対象のリストだけを更新
-            const updater = (data: typeof previousToday) => {
-                if (!data) return data;
-                return data.map((staff) => {
-                    if (!staff.attendance || staff.attendance.id !== attendanceId) return staff;
-
-                    const current = staff.attendance;
-                    let newClockIn = current.clockIn;
-                    let newClockOut = current.clockOut;
-
-                    if (clockIn) {
-                        newClockIn = new Date(clockIn);
-                    }
-                    if (clockOut !== undefined) {
-                        newClockOut = clockOut ? new Date(clockOut) : null;
-                    }
-
-                    return {
-                        ...staff,
-                        attendance: {
-                            ...current,
-                            clockIn: newClockIn,
-                            clockOut: newClockOut,
-                            // workDuration はサーバー計算に任せ、ここでは一旦そのまま
-                        },
-                    };
-                });
-            };
-
-            if (isToday) {
-                utils.attendance.getAllStaffToday.setData(undefined, updater);
-            } else {
-                utils.attendance.getAllStaffByDate.setData({ date: dateStr }, updater);
-            }
-
-            return { previousToday, previousByDate };
-        },
-        onError: (error, _variables, context) => {
-            // エラー時は元のデータに戻す
-            if (context?.previousToday) {
-                utils.attendance.getAllStaffToday.setData(undefined, context.previousToday);
-            }
-            if (context?.previousByDate) {
-                utils.attendance.getAllStaffByDate.setData({ date: dateStr }, context.previousByDate);
-            }
-            toast.error(error.message || "更新に失敗しました");
-        },
-        onSuccess: (data) => {
-            // サーバーから返ってきた確定値で上書き
-            const attendance = data.attendance;
-            if (attendance) {
-                const updater = (list: any) => {
-                    if (!list) return list;
-                    return list.map((staff: any) =>
-                        staff.attendance && staff.attendance.id === attendance.id
-                            ? {
-                                ...staff,
-                                attendance: {
-                                    ...staff.attendance,
-                                    clockIn: new Date(attendance.clockIn),
-                                    clockOut: attendance.clockOut ? new Date(attendance.clockOut) : null,
-                                    workDuration: attendance.workDuration,
-                                },
-                            }
-                            : staff
-                    );
-                };
-
-                if (isToday) {
-                    utils.attendance.getAllStaffToday.setData(undefined, updater);
-                } else {
-                    utils.attendance.getAllStaffByDate.setData({ date: dateStr }, updater);
-                }
-            }
-
-            toast.success("出退勤記録を更新しました");
-            setEditingId(null);
-        },
-    });
-
-    const deleteMutation = trpc.attendance.deleteAttendance.useMutation({
         onSuccess: () => {
-            toast.success("出退勤記録を削除しました");
+            toast.success("出退勤記録を更新しました");
+            // サーバーの確定値で一覧を再取得
             if (isToday) {
                 utils.attendance.getAllStaffToday.invalidate();
             } else {
-                utils.attendance.getAllStaffByDate.invalidate();
+                utils.attendance.getAllStaffByDate.invalidate({ date: dateStr });
             }
+            setEditingId(null);
         },
         onError: (error) => {
-            toast.error(error.message || "削除に失敗しました");
+            toast.error(error.message || "更新に失敗しました");
         },
     });
+
+    // 安全性のため、物理削除は無効化（バックエンド側でも禁止）
 
     const adminClockInMutation = trpc.attendance.adminClockIn.useMutation({
         onSuccess: () => {
@@ -224,11 +133,9 @@ export default function StaffAttendanceList({ selectedDate }: StaffAttendanceLis
         });
     };
 
-    const handleDelete = (attendanceId: number) => {
-        if (confirm("本当に削除しますか？")) {
-            deleteMutation.mutate({ attendanceId });
-        }
-    };
+    // const handleDelete = (attendanceId: number) => {
+    //     // 物理削除は行わない
+    // };
 
     const getDeviceIcon = (device: string | null) => {
         if (!device) return null;
@@ -427,19 +334,7 @@ export default function StaffAttendanceList({ selectedDate }: StaffAttendanceLis
                                                     >
                                                         キャンセル
                                                     </Button>
-                                                    <Button
-                                                        size="sm"
-                                                        variant="destructive"
-                                                        className="flex-1 text-xs sm:text-sm min-h-[44px]"
-                                                        onClick={(e) => {
-                                                            e.preventDefault();
-                                                            e.stopPropagation();
-                                                            handleDelete(staff.attendance!.id);
-                                                        }}
-                                                    >
-                                                        <Trash2 className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
-                                                        削除
-                                                    </Button>
+                                                    {/* 削除ボタンは安全性のため廃止 */}
                                                 </div>
                                             </div>
                                         ) : (

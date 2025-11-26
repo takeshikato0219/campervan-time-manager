@@ -218,38 +218,6 @@ export default function StaffSchedule() {
                             </tr>
                             <tr className="bg-gray-50">
                                 <td className="border border-[hsl(var(--border))] p-1 sm:p-2 text-[10px] sm:text-xs font-medium sticky left-0 z-10">
-                                    勤務日数
-                                </td>
-                                {filteredSummary.map((s) => (
-                                    <td key={s.userId} className="border border-[hsl(var(--border))] p-1 sm:p-2 text-[10px] sm:text-xs text-center">
-                                        {typeof s.workDays === 'number' && s.workDays % 1 !== 0
-                                            ? s.workDays.toFixed(1)
-                                            : s.workDays}
-                                    </td>
-                                ))}
-                            </tr>
-                            <tr className="bg-gray-50">
-                                <td className="border border-[hsl(var(--border))] p-1 sm:p-2 text-[10px] sm:text-xs font-medium sticky left-0 z-10">
-                                    公休
-                                </td>
-                                {filteredSummary.map((s) => (
-                                    <td key={s.userId} className="border border-[hsl(var(--border))] p-1 sm:p-2 text-[10px] sm:text-xs text-center">
-                                        {s.publicHolidays}
-                                    </td>
-                                ))}
-                            </tr>
-                            <tr className="bg-gray-50">
-                                <td className="border border-[hsl(var(--border))] p-1 sm:p-2 text-[10px] sm:text-xs font-medium sticky left-0 z-10">
-                                    有休
-                                </td>
-                                {filteredSummary.map((s) => (
-                                    <td key={s.userId} className="border border-[hsl(var(--border))] p-1 sm:p-2 text-[10px] sm:text-xs text-center">
-                                        {s.paidLeave}
-                                    </td>
-                                ))}
-                            </tr>
-                            <tr className="bg-gray-50">
-                                <td className="border border-[hsl(var(--border))] p-1 sm:p-2 text-[10px] sm:text-xs font-medium sticky left-0 z-10">
                                     合計
                                 </td>
                                 {filteredSummary.map((s) => (

@@ -245,34 +245,24 @@ async function getScheduleQuery(db: any, baseDateStr?: string) {
             };
         });
 
-        // 調整休テーブルから、この期間の調整値を取得
-        let adjustments: any[] = [];
+        // 調整休テーブルから、この期間の調整値を取得（生SQLでシンプルに取得）
+        const adjustmentMap = new Map<number, number>();
         try {
             const periodStartStr = format(start, "yyyy-MM-dd");
             const periodEndStr = format(end, "yyyy-MM-dd");
-            adjustments = await db
-                .select()
-                .from(sql`staffScheduleAdjustments` as any)
-                .where(
-                    and(
-                        sql`CAST(${sql`staffScheduleAdjustments.periodStart`} AS CHAR) = ${periodStartStr}`,
-                        sql`CAST(${sql`staffScheduleAdjustments.periodEnd`} AS CHAR) = ${periodEndStr}`
-                    )
-                );
+            const [rows]: any = await db.execute(
+                sql`SELECT \`userId\`, \`periodStart\`, \`periodEnd\`, \`adjustment\` FROM \`staffScheduleAdjustments\` WHERE \`periodStart\` = ${periodStartStr} AND \`periodEnd\` = ${periodEndStr}`
+            );
+            for (const row of rows || []) {
+                const value = typeof row.adjustment === "number" ? row.adjustment : 0;
+                adjustmentMap.set(row.userId, value);
+            }
         } catch (error: any) {
-            // テーブルが無い場合などは調整なしとして扱う
             const msg = error?.message || "";
             if (!msg.includes("staffScheduleAdjustments")) {
                 console.warn("[staffSchedule] 調整休テーブル取得エラー（無視）:", msg);
             }
-            adjustments = [];
         }
-
-        const adjustmentMap = new Map<number, number>();
-        adjustments.forEach((adj) => {
-            const value = typeof adj.adjustment === "number" ? adj.adjustment : 0;
-            adjustmentMap.set(adj.userId, value);
-        });
 
         // 集計データを計算
         const summary = limitedUsers.map((user) => {
@@ -337,11 +327,11 @@ async function getScheduleQuery(db: any, baseDateStr?: string) {
             // 有休 = 休み + 希望休（実際に登録されたもの）
             const paidLeave = restDays + requestDays;
 
-            // 調整休（デフォルト0）
+            // 調整休（デフォルト0）※合計とは独立して管理
             const adjustment = adjustmentMap.get(user.id) ?? 0;
 
-            // 合計 = 公休 + 有休 + 調整休
-            const totalRest = publicHolidays + paidLeave + adjustment;
+            // 合計 = 公休 + 有休（調整休は合計には含めず、別枠で表示）
+            const totalRest = publicHolidays + paidLeave;
 
             // 休みの数 = 実際に登録された休み（rest）の日数
             const actualRestDays = restDays;
@@ -1061,23 +1051,16 @@ export const staffScheduleRouter = createTRPCRouter({
                 }
             }
 
-            // 既存レコードを確認
-            const existing = await db
-                .select()
-                .from(sql`staffScheduleAdjustments` as any)
-                .where(
-                    and(
-                        sql`CAST(${sql`staffScheduleAdjustments.userId`} AS SIGNED) = ${input.userId}`,
-                        sql`CAST(${sql`staffScheduleAdjustments.periodStart`} AS CHAR) = ${input.periodStart}`,
-                        sql`CAST(${sql`staffScheduleAdjustments.periodEnd`} AS CHAR) = ${input.periodEnd}`
-                    )
-                )
-                .limit(1);
+            // 既存レコードを確認（生SQLでシンプルに）
+            const [rows]: any = await db.execute(
+                sql`SELECT \`id\`, \`adjustment\` FROM \`staffScheduleAdjustments\` WHERE \`userId\` = ${input.userId} AND \`periodStart\` = ${input.periodStart} AND \`periodEnd\` = ${input.periodEnd} LIMIT 1`
+            );
+            const existing = rows && rows[0] ? rows[0] : null;
 
-            if (existing.length > 0) {
+            if (existing) {
                 await db
                     .execute(
-                        sql`UPDATE \`staffScheduleAdjustments\` SET \`adjustment\` = ${input.adjustment} WHERE \`id\` = ${existing[0].id}`
+                        sql`UPDATE \`staffScheduleAdjustments\` SET \`adjustment\` = ${input.adjustment} WHERE \`id\` = ${existing.id}`
                     );
             } else {
                 await db.execute(

@@ -796,38 +796,6 @@ export default function StaffScheduleManagement() {
                         </tr>
                         <tr className="bg-gray-50">
                             <td className="border border-[hsl(var(--border))] p-1 text-[16px] font-bold">
-                                勤務日数
-                            </td>
-                            {filteredSummary.map((s) => (
-                                <td key={s.userId} className="border border-[hsl(var(--border))] p-1 text-[16px] text-center font-bold">
-                                    {typeof s.workDays === 'number' && s.workDays % 1 !== 0
-                                        ? s.workDays.toFixed(1)
-                                        : s.workDays}
-                                </td>
-                            ))}
-                        </tr>
-                        <tr className="bg-gray-50">
-                            <td className="border border-[hsl(var(--border))] p-1 text-[16px] font-bold">
-                                公休
-                            </td>
-                            {filteredSummary.map((s) => (
-                                <td key={s.userId} className="border border-[hsl(var(--border))] p-1 text-[16px] text-center font-bold">
-                                    {s.publicHolidays}
-                                </td>
-                            ))}
-                        </tr>
-                        <tr className="bg-gray-50">
-                            <td className="border border-[hsl(var(--border))] p-1 text-[16px] font-bold">
-                                有休
-                            </td>
-                            {filteredSummary.map((s) => (
-                                <td key={s.userId} className="border border-[hsl(var(--border))] p-1 text-[16px] text-center font-bold">
-                                    {s.paidLeave}
-                                </td>
-                            ))}
-                        </tr>
-                        <tr className="bg-gray-50">
-                            <td className="border border-[hsl(var(--border))] p-1 text-[16px] font-bold">
                                 調整休
                             </td>
                             {filteredSummary.map((s) => (
