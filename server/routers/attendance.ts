@@ -295,7 +295,7 @@ export const attendanceRouter = createTRPCRouter({
         };
     }),
 
-    // 全スタッフの今日の出退勤状況を取得（準管理者以上・各ユーザーの最新レコードをJST基準で判定）
+    // 全スタッフの「今日」の出退勤状況を取得（準管理者以上・JSTの今日を日付範囲で判定）
     getAllStaffToday: subAdminProcedure.query(async () => {
         try {
             const db = await getDb();
@@ -306,34 +306,29 @@ export const attendanceRouter = createTRPCRouter({
                 });
             }
 
+            // 日本時間の「今日」の0:00〜23:59:59に対応するUTC範囲で絞り込む
+            const { start, end } = getJstDayRangeForNow();
+
             // 全ユーザーを取得（nameやcategoryカラムが存在しない場合に対応）
             const { selectUsersSafely } = await import("../db");
             const allUsers = await selectUsersSafely(db);
-            const { desc } = await import("drizzle-orm");
-            const now = new Date();
 
             // 各ユーザーの出退勤記録を取得
             const result = await Promise.all(
                 allUsers.map(async (user) => {
                     try {
-                        // そのユーザーの最新の出勤レコードを1件取得
-                        const [latest] = await db
+                        const attendanceRecords = await db
                             .select()
                             .from(schema.attendanceRecords)
-                            .where(eq(schema.attendanceRecords.userId, user.id))
-                            .orderBy(desc(schema.attendanceRecords.clockIn))
+                            .where(
+                                and(
+                                    eq(schema.attendanceRecords.userId, user.id),
+                                    gte(schema.attendanceRecords.clockIn, start),
+                                    lte(schema.attendanceRecords.clockIn, end)
+                                )
+                            )
                             .limit(1);
-
-                        // レコードが無い、またはJST基準で今日でなければ未出勤とみなす
-                        if (!latest || !isSameJstDate(latest.clockIn, now)) {
-                            return {
-                                userId: user.id,
-                                userName: user.name || user.username,
-                                attendance: null,
-                            };
-                        }
-
-                        const attendance = latest;
+                        const attendance = attendanceRecords[0] || null;
 
                         // 退勤時刻がある場合、勤務時間を再計算
                         let workDuration = attendance?.workDuration || null;
