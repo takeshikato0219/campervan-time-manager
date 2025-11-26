@@ -267,26 +267,36 @@ export const checksRouter = createTRPCRouter({
                     )
                 );
 
-            if (existingChecks.length > 0) {
-                // 既存のチェックを更新
-                await db
-                    .update(schema.vehicleChecks)
-                    .set({
+            // 「未チェック」に戻す場合はレコード自体を削除して、何もチェックされていない状態にする
+            if (input.status === "unchecked") {
+                if (existingChecks.length > 0) {
+                    await db
+                        .delete(schema.vehicleChecks)
+                        .where(eq(schema.vehicleChecks.id, existingChecks[0].id));
+                }
+            } else {
+                if (existingChecks.length > 0) {
+                    // 既存のチェックを更新
+                    await db
+                        .update(schema.vehicleChecks)
+                        .set({
+                            checkedBy: ctx.user!.id,
+                            status: input.status,
+                            notes: input.notes || null,
+                            checkedAt: new Date(),
+                        })
+                        .where(eq(schema.vehicleChecks.id, existingChecks[0].id));
+                } else {
+                    // 新規チェックを作成
+                    await db.insert(schema.vehicleChecks).values({
+                        vehicleId: input.vehicleId,
+                        checkItemId: input.checkItemId,
                         checkedBy: ctx.user!.id,
                         status: input.status,
                         notes: input.notes || null,
                         checkedAt: new Date(),
-                    })
-                    .where(eq(schema.vehicleChecks.id, existingChecks[0].id));
-            } else {
-                // 新規チェックを作成
-                await db.insert(schema.vehicleChecks).values({
-                    vehicleId: input.vehicleId,
-                    checkItemId: input.checkItemId,
-                    checkedBy: ctx.user!.id,
-                    status: input.status,
-                    notes: input.notes || null,
-                });
+                    });
+                }
             }
 
             return { success: true };

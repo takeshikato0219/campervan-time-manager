@@ -6,7 +6,7 @@ import { z } from "zod";
 import { addDays } from "date-fns";
 
 export const salesBroadcastsRouter = createTRPCRouter({
-    // 営業からの拡散を作成（管理者のみ）
+    // 営業（準管理者以上）からの拡散を作成（元の仕様に戻す）
     create: subAdminProcedure
         .input(
             z.object({

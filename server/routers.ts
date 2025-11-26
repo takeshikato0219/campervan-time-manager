@@ -10,6 +10,7 @@ import { analyticsRouter } from "./routers/analytics";
 import { csvRouter } from "./routers/csv";
 import { checksRouter } from "./routers/checks";
 import { salesBroadcastsRouter } from "./routers/salesBroadcasts";
+import { bulletinRouter } from "./routers/bulletin";
 import { breakTimesRouter } from "./routers/breakTimes";
 import { staffScheduleRouter } from "./routers/staffSchedule";
 import { backupRouter } from "./routers/backup";
@@ -26,6 +27,7 @@ export const appRouter = createTRPCRouter({
     csv: csvRouter,
     checks: checksRouter,
     salesBroadcasts: salesBroadcastsRouter,
+    bulletin: bulletinRouter,
     breakTimes: breakTimesRouter,
     staffSchedule: staffScheduleRouter,
     backup: backupRouter,

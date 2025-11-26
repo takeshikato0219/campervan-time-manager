@@ -313,6 +313,17 @@ function VehicleCheckCard({
                                             <Button
                                                 size="sm"
                                                 variant="outline"
+                                                onClick={() => onCheck(vehicle.id, status.checkItem.id, "unchecked")}
+                                                className={`w-full sm:w-auto text-[10px] sm:text-xs h-7 sm:h-8 ${status.status === "unchecked"
+                                                    ? "bg-gray-600 hover:bg-gray-700 text-white border-gray-600"
+                                                    : ""
+                                                    }`}
+                                            >
+                                                未チェック
+                                            </Button>
+                                            <Button
+                                                size="sm"
+                                                variant="outline"
                                                 onClick={() => onRequestCheck(vehicle.id, status.checkItem.id)}
                                                 className="w-full sm:w-auto text-[10px] sm:text-xs h-7 sm:h-8"
                                             >

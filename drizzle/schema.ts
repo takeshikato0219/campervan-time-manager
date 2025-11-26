@@ -253,7 +253,15 @@ export const vehicleOutsourcing = mysqlTable("vehicleOutsourcing", {
     updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
 
-// 21. staffScheduleEntries: スタッフスケジュールエントリ
+// 21. bulletinMessages: マイダッシュボード掲示板メッセージ
+export const bulletinMessages = mysqlTable("bulletinMessages", {
+    id: int("id").autoincrement().primaryKey(),
+    userId: int("userId").notNull(), // 投稿者ID
+    message: text("message").notNull(), // メッセージ本文
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+// 22. staffScheduleEntries: スタッフスケジュールエントリ
 export const staffScheduleEntries = mysqlTable("staffScheduleEntries", {
     id: int("id").autoincrement().primaryKey(),
     userId: int("userId").notNull(), // スタッフID

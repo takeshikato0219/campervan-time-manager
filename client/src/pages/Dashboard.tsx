@@ -34,6 +34,7 @@ export default function Dashboard() {
     const { data: todayAttendance } = trpc.attendance.getTodayStatus.useQuery();
     const { data: myCheckRequests } = trpc.checks.getMyCheckRequests.useQuery();
     const { data: unreadBroadcasts, refetch: refetchBroadcasts } = trpc.salesBroadcasts.getUnread.useQuery();
+    const { data: bulletinMessages, refetch: refetchBulletin } = trpc.bulletin.list.useQuery();
     const { data: vehicleTypes } = trpc.vehicleTypes.list.useQuery();
     const [selectedVehicleTypeFilter, setSelectedVehicleTypeFilter] = useState<number | "all">("all");
 
@@ -46,12 +47,26 @@ export default function Dashboard() {
         },
     });
 
+    const createBulletinMutation = trpc.bulletin.create.useMutation({
+        onSuccess: () => {
+            toast.success("掲示板に投稿しました");
+            refetchBulletin();
+            setBulletinInput("");
+        },
+        onError: (error) => {
+            toast.error(error.message || "掲示板への投稿に失敗しました");
+        },
+    });
+
     // データ更新用のコールバック
+    const [bulletinInput, setBulletinInput] = useState("");
+
     const refreshData = useCallback(() => {
         console.log("[マイダッシュボード] データを更新します");
         utils.workRecords.getActive.invalidate();
         utils.workRecords.getTodayRecords.invalidate();
         utils.vehicles.list.invalidate();
+        utils.bulletin.list.invalidate();
     }, [utils]);
 
     // 日付が変わったらデータを更新
@@ -133,6 +148,59 @@ export default function Dashboard() {
                     こんにちは、{user?.name || user?.username}さん
                 </p>
             </div>
+
+            {/* 全員向け掲示板（最新3件だけ表示） */}
+            <Card>
+                <CardHeader className="p-4 sm:p-6">
+                    <CardTitle className="text-lg sm:text-xl">全員向け掲示板</CardTitle>
+                </CardHeader>
+                <CardContent className="p-4 sm:p-6 space-y-3">
+                    <div className="flex flex-col sm:flex-row gap-2">
+                        <Input
+                            value={bulletinInput}
+                            onChange={(e) => setBulletinInput(e.target.value)}
+                            placeholder="全員に共有したい一言メッセージを入力（3行程度）"
+                            className="flex-1"
+                        />
+                        <Button
+                            onClick={() => {
+                                if (!bulletinInput.trim()) {
+                                    toast.error("メッセージを入力してください");
+                                    return;
+                                }
+                                createBulletinMutation.mutate({ message: bulletinInput.trim() });
+                            }}
+                            disabled={createBulletinMutation.isPending}
+                            className="w-full sm:w-auto"
+                        >
+                            投稿
+                        </Button>
+                    </div>
+                    <div className="space-y-2 max-h-32 overflow-y-auto">
+                        {bulletinMessages && bulletinMessages.length > 0 ? (
+                            bulletinMessages
+                                .slice(0, 3)
+                                .map((msg) => (
+                                    <div key={msg.id} className="p-2 bg-[hsl(var(--muted))] rounded text-sm">
+                                        <div className="flex items-center justify-between gap-2">
+                                            <span className="font-medium text-xs sm:text-sm">
+                                                {msg.user?.name || msg.user?.username || "不明"} さん
+                                            </span>
+                                            <span className="text-[10px] text-[hsl(var(--muted-foreground))]">
+                                                {format(new Date(msg.createdAt), "MM/dd HH:mm")}
+                                            </span>
+                                        </div>
+                                        <p className="mt-1 text-xs sm:text-sm whitespace-pre-wrap break-words">
+                                            {msg.message}
+                                        </p>
+                                    </div>
+                                ))
+                        ) : (
+                            <p className="text-xs text-[hsl(var(--muted-foreground))]">まだ掲示板のメッセージはありません</p>
+                        )}
+                    </div>
+                </CardContent>
+            </Card>
 
             {/* 営業からの拡散通知 */}
             {unreadBroadcasts && unreadBroadcasts.length > 0 && (
