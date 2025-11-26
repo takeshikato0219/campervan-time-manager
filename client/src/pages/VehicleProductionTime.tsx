@@ -2,6 +2,7 @@ import React, { useMemo, useState, useEffect } from "react";
 import { trpc } from "../lib/trpc";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
+import { format, differenceInCalendarDays } from "date-fns";
 
 export default function VehicleProductionTime() {
   const { data: vehicles } = trpc.analytics.getVehicleProductionTimes.useQuery();
@@ -23,6 +24,43 @@ export default function VehicleProductionTime() {
     const hours = Math.floor(minutes / 60);
     const mins = minutes % 60;
     return hours > 0 ? `${hours}時間${mins}分` : `${mins}分`;
+  };
+
+  const formatDate = (value: string | Date | null | undefined) => {
+    if (!value) return "-";
+    const d = typeof value === "string" ? new Date(value) : value;
+    if (Number.isNaN(d.getTime())) return "-";
+    return format(d, "yyyy-MM-dd");
+  };
+
+  const renderDeliveryInfo = (v: any) => {
+    const desired = v.desiredDeliveryDate ? new Date(v.desiredDeliveryDate) : null;
+    const completed = v.completionDate ? new Date(v.completionDate) : null;
+
+    if (completed) {
+      return (
+        <span className="text-xs text-[hsl(var(--muted-foreground))]">
+          納車日: {format(completed, "yyyy-MM-dd")}
+        </span>
+      );
+    }
+
+    if (desired) {
+      const today = new Date();
+      const days = differenceInCalendarDays(desired, today);
+      const suffix = days > 0 ? `（あと${days}日）` : days === 0 ? "（本日）" : `（${Math.abs(days)}日前）`;
+      return (
+        <span className="text-xs text-[hsl(var(--muted-foreground))]">
+          納車予定: {format(desired, "yyyy-MM-dd")} {suffix}
+        </span>
+      );
+    }
+
+    return (
+      <span className="text-xs text-[hsl(var(--muted-foreground))]">
+        納車予定: 未設定
+      </span>
+    );
   };
 
   const pagedVehicles = useMemo(() => {
@@ -78,6 +116,7 @@ export default function VehicleProductionTime() {
                   <span className="text-sm sm:text-base text-blue-600 font-semibold">
                     合計 {formatDuration(v.totalMinutes)}
                   </span>
+                  {renderDeliveryInfo(v)}
                 </CardTitle>
               </CardHeader>
               <CardContent className="flex-1 overflow-auto">

@@ -109,8 +109,9 @@ export default function StaffAttendanceList({ selectedDate }: StaffAttendanceLis
         updateMutation.mutate({
             attendanceId,
             workDate: dateStr,
-            clockInTime: editClockIn || null,
-            clockOutTime: editClockOut || null,
+            // 空欄のときは undefined を送ってサーバー側の既存値を維持する
+            clockInTime: editClockIn === "" ? undefined : editClockIn,
+            clockOutTime: editClockOut === "" ? undefined : editClockOut,
         });
     };
 

@@ -123,5 +123,128 @@ export const analyticsRouter = createTRPCRouter({
             };
         });
     }),
+
+    /**
+     * 車両ごとの制作時間を集計する
+     * - 1台あたりの総作業時間（全期間）
+     * - 工程ごとの総作業時間
+     * - 工程をクリックしたときに表示する「誰が・いつ・何分」単位の明細
+     */
+    getVehicleProductionTimes: protectedProcedure.query(async () => {
+        const db = await getDb();
+        if (!db) {
+            return [];
+        }
+
+        const rows = await db
+            .select({
+                vehicleId: schema.workRecords.vehicleId,
+                vehicleNumber: schema.vehicles.vehicleNumber,
+                customerName: schema.vehicles.customerName,
+                desiredDeliveryDate: schema.vehicles.desiredDeliveryDate,
+                completionDate: schema.vehicles.completionDate,
+                processId: schema.workRecords.processId,
+                processName: schema.processes.name,
+                userId: schema.workRecords.userId,
+                userName: schema.users.name,
+                userUsername: schema.users.username,
+                workDate: sql<string>`DATE(${schema.workRecords.startTime})`.as("workDate"),
+                // 進行中の作業も含めて「今までにかかった時間」を見る
+                minutes: sql<number>`COALESCE(TIMESTAMPDIFF(MINUTE, ${schema.workRecords.startTime}, COALESCE(${schema.workRecords.endTime}, NOW())), 0)`.as(
+                    "minutes",
+                ),
+            })
+            .from(schema.workRecords)
+            .innerJoin(schema.vehicles, eq(schema.workRecords.vehicleId, schema.vehicles.id))
+            .innerJoin(schema.processes, eq(schema.workRecords.processId, schema.processes.id))
+            .innerJoin(schema.users, eq(schema.workRecords.userId, schema.users.id));
+
+        type VehicleAgg = {
+            vehicleId: number;
+            vehicleNumber: string;
+            customerName: string | null;
+            totalMinutes: number;
+            desiredDeliveryDate: Date | null;
+            completionDate: Date | null;
+            processes: {
+                processId: number;
+                processName: string;
+                totalMinutes: number;
+                details: {
+                    userId: number;
+                    userName: string;
+                    workDate: string;
+                    minutes: number;
+                }[];
+            }[];
+        };
+
+        const vehicleMap = new Map<number, VehicleAgg>();
+
+        for (const row of rows) {
+            const minutes = Number(row.minutes) || 0;
+            if (minutes <= 0) continue;
+
+            let vehicle = vehicleMap.get(row.vehicleId);
+            if (!vehicle) {
+                vehicle = {
+                    vehicleId: row.vehicleId,
+                    vehicleNumber: row.vehicleNumber,
+                    customerName: row.customerName ?? null,
+                    desiredDeliveryDate: (row as any).desiredDeliveryDate ?? null,
+                    completionDate: (row as any).completionDate ?? null,
+                    totalMinutes: 0,
+                    processes: [],
+                };
+                vehicleMap.set(row.vehicleId, vehicle);
+            }
+
+            vehicle.totalMinutes += minutes;
+
+            let process = vehicle.processes.find((p) => p.processId === row.processId);
+            if (!process) {
+                process = {
+                    processId: row.processId,
+                    processName: row.processName,
+                    totalMinutes: 0,
+                    details: [],
+                };
+                vehicle.processes.push(process);
+            }
+
+            process.totalMinutes += minutes;
+            process.details.push({
+                userId: row.userId,
+                userName: row.userName || row.userUsername,
+                workDate: row.workDate,
+                minutes,
+            });
+        }
+
+        // 各車両ごとに工程・明細をソート
+        const vehicles = Array.from(vehicleMap.values()).map((v) => {
+            const processes = [...v.processes]
+                .map((p) => ({
+                    ...p,
+                    details: [...p.details].sort((a, b) => {
+                        if (a.workDate === b.workDate) {
+                            return a.userId - b.userId;
+                        }
+                        return a.workDate < b.workDate ? -1 : 1;
+                    }),
+                }))
+                .sort((a, b) => b.totalMinutes - a.totalMinutes);
+
+            return {
+                ...v,
+                processes,
+            };
+        });
+
+        // 総時間が長い順にソートして返す
+        vehicles.sort((a, b) => b.totalMinutes - a.totalMinutes);
+
+        return vehicles;
+    }),
 });
 
