@@ -238,11 +238,16 @@ async function startServer() {
   app.use(express.json({ limit: "50mb" }));
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
-  // アップロードファイルを配信
+  // アップロードファイルを配信（ディレクトリが無くても必ずルートを登録）
   const uploadsDir = path.resolve(process.cwd(), "uploads");
-  if (fs.existsSync(uploadsDir)) {
-    app.use("/uploads", express.static(uploadsDir));
+  try {
+    if (!fs.existsSync(uploadsDir)) {
+      fs.mkdirSync(uploadsDir, { recursive: true });
+    }
+  } catch (error) {
+    console.error("[server] アップロードディレクトリ作成に失敗しました:", error);
   }
+  app.use("/uploads", express.static(uploadsDir));
 
   // OAuth callback under /api/oauth/callback
   registerOAuthRoutes(app);

@@ -140,6 +140,30 @@ export default function Dashboard() {
         return isSameDay(recordDate, yesterday);
     }) || [];
 
+    // 「作業追加」ダイアログを開くとき、直前の作業の終了時刻を開始時刻に自動セット
+    const handleOpenAddDialog = () => {
+        if (todayRecordsFiltered.length > 0) {
+            // 終了時間が入っているレコードの中から一番新しいものを探す
+            const lastWithEnd = [...todayRecordsFiltered]
+                .filter((r) => r.endTime)
+                .sort((a, b) => {
+                    const aEnd = a.endTime ? new Date(a.endTime as any) : new Date(a.startTime as any);
+                    const bEnd = b.endTime ? new Date(b.endTime as any) : new Date(b.startTime as any);
+                    return aEnd.getTime() - bEnd.getTime();
+                })
+                .pop();
+
+            if (lastWithEnd && lastWithEnd.endTime) {
+                const end = typeof lastWithEnd.endTime === "string"
+                    ? new Date(lastWithEnd.endTime)
+                    : lastWithEnd.endTime;
+                setWorkDate(format(end, "yyyy-MM-dd"));
+                setStartTime(format(end, "HH:mm"));
+            }
+        }
+        setIsAddDialogOpen(true);
+    };
+
     return (
         <div className="space-y-6">
             <div>
@@ -467,7 +491,7 @@ export default function Dashboard() {
                         <Button
                             size="sm"
                             variant="outline"
-                            onClick={() => setIsAddDialogOpen(true)}
+                            onClick={handleOpenAddDialog}
                             className="w-full sm:w-auto"
                         >
                             <Plus className="h-4 w-4 mr-2" />

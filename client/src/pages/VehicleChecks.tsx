@@ -391,16 +391,24 @@ export default function VehicleChecks() {
     const [requestedToUserId, setRequestedToUserId] = useState("");
     const [requestMessage, setRequestMessage] = useState("");
     const [requestDueDate, setRequestDueDate] = useState("");
+    // 上段の一覧で選択中の車両ID（その車両だけのチェックを1ページに表示）
+    const [activeVehicleId, setActiveVehicleId] = useState<number | null>(null);
 
-    const { data: vehicles } = trpc.vehicles.list.useQuery({});
+    // 現在製作中（in_progress）の車両のみ取得
+    const { data: vehicles } = trpc.vehicles.list.useQuery({ status: "in_progress" });
     const { data: users } = trpc.users.list.useQuery(undefined, { enabled: user?.role === "admin" || user?.role === "sub_admin" });
     const { data: myCheckRequests } = trpc.checks.getMyCheckRequests.useQuery();
 
     // カテゴリでフィルタリング
-    const filteredVehicles = vehicles?.filter((v) => {
+    const filteredVehicles = (vehicles || []).filter((v) => {
         if (selectedCategory === "all") return true;
         return v.category === selectedCategory;
     });
+
+    const activeVehicle =
+        activeVehicleId != null
+            ? filteredVehicles.find((v) => v.id === activeVehicleId) || null
+            : null;
 
     const utils = trpc.useUtils();
     const checkMutation = trpc.checks.checkVehicle.useMutation({
@@ -516,7 +524,75 @@ export default function VehicleChecks() {
                 </p>
             </div>
 
-            {/* チェック依頼通知（どの車両のどの項目か分かるように表示） */}
+            {/* 上段：現在製作中の車両一覧（選択するとその車のチェックだけ表示） */}
+            <Card>
+                <CardHeader className="p-3 sm:p-4">
+                    <CardTitle className="text-sm sm:text-base">現在製作中の車両</CardTitle>
+                </CardHeader>
+                <CardContent className="p-3 sm:p-4">
+                    {filteredVehicles.length > 0 ? (
+                        <div className="flex gap-2 overflow-x-auto">
+                            {filteredVehicles.map((v) => (
+                                <button
+                                    key={v.id}
+                                    type="button"
+                                    onClick={() => setActiveVehicleId(v.id)}
+                                    className={`px-3 py-2 rounded-lg border text-left min-w-[140px] text-xs sm:text-sm ${activeVehicleId === v.id
+                                        ? "bg-blue-600 text-white border-blue-600"
+                                        : "bg-white text-[hsl(var(--foreground))] border-[hsl(var(--border))]"
+                                        }`}
+                                >
+                                    <div className="font-semibold truncate">{v.vehicleNumber}</div>
+                                    {v.customerName && (
+                                        <div className="text-[10px] sm:text-xs text-[hsl(var(--muted-foreground))] truncate">
+                                            {v.customerName}
+                                        </div>
+                                    )}
+                                </button>
+                            ))}
+                        </div>
+                    ) : (
+                        <p className="text-xs sm:text-sm text-[hsl(var(--muted-foreground))]">
+                            現在、製作中の車両はありません
+                        </p>
+                    )}
+                </CardContent>
+            </Card>
+
+            {/* カテゴリタブ */}
+            <Tabs value={selectedCategory} onValueChange={(v) => setSelectedCategory(v as any)}>
+                <TabsList className="grid w-full grid-cols-3 sm:grid-cols-3 md:grid-cols-6 gap-1 sm:gap-2 overflow-x-auto">
+                    <TabsTrigger value="all" className="text-xs sm:text-sm px-2 sm:px-3 whitespace-nowrap">全て</TabsTrigger>
+                    {CATEGORIES.map((cat) => (
+                        <TabsTrigger key={cat} value={cat} className="text-xs sm:text-sm px-2 sm:px-3 whitespace-nowrap">
+                            {cat}
+                        </TabsTrigger>
+                    ))}
+                </TabsList>
+
+                <TabsContent value={selectedCategory} className="mt-4">
+                    {activeVehicle ? (
+                        <div className="space-y-4">
+                            <VehicleCheckCard
+                                vehicle={activeVehicle}
+                                onCheck={handleCheck}
+                                onRequestCheck={handleRequestCheck}
+                                onCheckAll={handleCheckAll}
+                                isAdmin={(user?.role === "admin" || user?.role === "sub_admin") || false}
+                                pendingRequests={pendingCheckRequests}
+                            />
+                        </div>
+                    ) : (
+                        <Card>
+                            <CardContent className="p-4 text-center text-[hsl(var(--muted-foreground))]">
+                                上の「現在製作中の車両」から車両を選択してください
+                            </CardContent>
+                        </Card>
+                    )}
+                </TabsContent>
+            </Tabs>
+
+            {/* 下段：チェック依頼通知（どの車両のどの項目か分かるように表示） */}
             {pendingCheckRequests.length > 0 && (
                 <Card className="border-orange-300 bg-orange-50">
                     <CardContent className="p-4">
@@ -560,42 +636,6 @@ export default function VehicleChecks() {
                     </CardContent>
                 </Card>
             )}
-
-            {/* カテゴリタブ */}
-            <Tabs value={selectedCategory} onValueChange={(v) => setSelectedCategory(v as any)}>
-                <TabsList className="grid w-full grid-cols-3 sm:grid-cols-3 md:grid-cols-6 gap-1 sm:gap-2 overflow-x-auto">
-                    <TabsTrigger value="all" className="text-xs sm:text-sm px-2 sm:px-3 whitespace-nowrap">全て</TabsTrigger>
-                    {CATEGORIES.map((cat) => (
-                        <TabsTrigger key={cat} value={cat} className="text-xs sm:text-sm px-2 sm:px-3 whitespace-nowrap">
-                            {cat}
-                        </TabsTrigger>
-                    ))}
-                </TabsList>
-
-                <TabsContent value={selectedCategory} className="mt-4">
-                    {filteredVehicles && filteredVehicles.length > 0 ? (
-                        <div className="space-y-4">
-                            {filteredVehicles.map((vehicle) => (
-                                <VehicleCheckCard
-                                    key={vehicle.id}
-                                    vehicle={vehicle}
-                                    onCheck={handleCheck}
-                                    onRequestCheck={handleRequestCheck}
-                                    onCheckAll={handleCheckAll}
-                                    isAdmin={(user?.role === "admin" || user?.role === "sub_admin") || false}
-                                    pendingRequests={pendingCheckRequests}
-                                />
-                            ))}
-                        </div>
-                    ) : (
-                        <Card>
-                            <CardContent className="p-4 text-center text-[hsl(var(--muted-foreground))]">
-                                車両が登録されていません
-                            </CardContent>
-                        </Card>
-                    )}
-                </TabsContent>
-            </Tabs>
 
             {/* チェック実行ダイアログ */}
             {checkingVehicleId && checkingItemId && (
