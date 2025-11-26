@@ -3,16 +3,20 @@ import { trpc } from "../lib/trpc";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { toast } from "sonner";
+import { format } from "date-fns";
 
 export default function MyAttendance() {
     const { user } = useAuth();
     const utils = trpc.useUtils();
-    const { data: todayAttendance } = trpc.attendance.getTodayStatus.useQuery();
+    const todayStr = format(new Date(), "yyyy-MM-dd");
+    const { data: todayAttendance } = trpc.attendance.getTodayStatus.useQuery({
+        workDate: todayStr,
+    });
 
     const clockInMutation = trpc.attendance.clockIn.useMutation({
         onSuccess: () => {
             toast.success("出勤を打刻しました");
-            utils.attendance.getTodayStatus.invalidate();
+            utils.attendance.getTodayStatus.invalidate({ workDate: todayStr });
         },
         onError: (error) => {
             toast.error(error.message || "出勤打刻に失敗しました");
@@ -22,7 +26,7 @@ export default function MyAttendance() {
     const clockOutMutation = trpc.attendance.clockOut.useMutation({
         onSuccess: () => {
             toast.success("退勤を打刻しました");
-            utils.attendance.getTodayStatus.invalidate();
+            utils.attendance.getTodayStatus.invalidate({ workDate: todayStr });
         },
         onError: (error) => {
             toast.error(error.message || "退勤打刻に失敗しました");
@@ -96,6 +100,7 @@ export default function MyAttendance() {
                                     className="w-full sm:w-auto"
                                     onClick={() =>
                                         clockInMutation.mutate({
+                                            workDate: todayStr,
                                             deviceType: "pc",
                                         })
                                     }

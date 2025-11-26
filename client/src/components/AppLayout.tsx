@@ -20,6 +20,7 @@ import {
     Coffee,
     CalendarDays,
     Database,
+    Timer,
 } from "lucide-react";
 
 interface AppLayoutProps {
@@ -44,6 +45,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
         { icon: Car, label: "車両管理", path: "/vehicles", admin: false },
         { icon: ClipboardCheck, label: "車両チェック", path: "/vehicle-checks", admin: false },
         { icon: CalendarDays, label: "スタッフ休み予定一覧", path: "/staff-schedule", admin: false },
+        { icon: Timer, label: "車両制作時間確認", path: "/vehicle-production", admin: false },
         { icon: BarChart3, label: "統計・分析", path: "/analytics", admin: false },
     ];
 

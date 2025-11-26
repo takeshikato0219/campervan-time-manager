@@ -1,0 +1,168 @@
+import React, { useMemo, useState, useEffect } from "react";
+import { trpc } from "../lib/trpc";
+import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
+import { Button } from "../components/ui/button";
+
+export default function VehicleProductionTime() {
+  const { data: vehicles } = trpc.analytics.getVehicleProductionTimes.useQuery();
+  const [isListMode, setIsListMode] = useState(false);
+  const [pageIndex, setPageIndex] = useState(0);
+
+  // 10秒ごとにページ送り（一覧モード時のみ）
+  useEffect(() => {
+    if (!isListMode || !vehicles || vehicles.length === 0) return;
+    const timer = setInterval(() => {
+      const pageCount = Math.ceil(vehicles.length / 4) || 1;
+      setPageIndex((prev) => (prev + 1) % pageCount);
+    }, 10000);
+    return () => clearInterval(timer);
+  }, [isListMode, vehicles]);
+
+  const formatDuration = (minutes: number) => {
+    if (!minutes) return "0分";
+    const hours = Math.floor(minutes / 60);
+    const mins = minutes % 60;
+    return hours > 0 ? `${hours}時間${mins}分` : `${mins}分`;
+  };
+
+  const pagedVehicles = useMemo(() => {
+    if (!vehicles) return [];
+    if (!isListMode) return vehicles;
+    const start = pageIndex * 4;
+    return vehicles.slice(start, start + 4);
+  }, [vehicles, isListMode, pageIndex]);
+
+  const [selected, setSelected] = useState<{
+    vehicleId: number;
+    processId: number;
+  } | null>(null);
+
+  const selectedProcess = useMemo(() => {
+    if (!vehicles || !selected) return null;
+    const v = vehicles.find((x) => x.vehicleId === selected.vehicleId);
+    const p = v?.processes.find((pp: any) => pp.processId === selected.processId);
+    return v && p ? { vehicle: v, process: p } : null;
+  }, [vehicles, selected]);
+
+  return (
+    <div className="w-full h-full flex flex-col gap-4">
+      <div className="flex items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl sm:text-3xl font-bold">車両制作時間確認</h1>
+          <p className="text-[hsl(var(--muted-foreground))] mt-1 text-sm sm:text-base">
+            1台ごとの累計作業時間と工程別時間を確認できます（全期間）。
+          </p>
+        </div>
+        <Button
+          variant={isListMode ? "default" : "outline"}
+          onClick={() => setIsListMode((v) => !v)}
+        >
+          {isListMode ? "通常モード" : "一覧モード"}
+        </Button>
+      </div>
+
+      <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-4">
+        {pagedVehicles && pagedVehicles.length > 0 ? (
+          pagedVehicles.map((v: any) => (
+            <Card key={v.vehicleId} className="flex flex-col h-full">
+              <CardHeader className="pb-2">
+                <CardTitle className="flex flex-col gap-1">
+                  <span className="text-lg sm:text-xl font-bold">
+                    {v.vehicleNumber}
+                  </span>
+                  {v.customerName && (
+                    <span className="text-sm text-[hsl(var(--muted-foreground))]">
+                      {v.customerName}
+                    </span>
+                  )}
+                  <span className="text-sm sm:text-base text-blue-600 font-semibold">
+                    合計 {formatDuration(v.totalMinutes)}
+                  </span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="flex-1 overflow-auto">
+                {v.processes && v.processes.length > 0 ? (
+                  <table className="w-full text-xs sm:text-sm">
+                    <thead>
+                      <tr className="border-b border-[hsl(var(--border))]">
+                        <th className="text-left py-1 pr-2">工程</th>
+                        <th className="text-right py-1">時間</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {v.processes.map((p: any) => (
+                        <tr
+                          key={p.processId}
+                          className="border-b border-[hsl(var(--border))] hover:bg-[hsl(var(--muted))] cursor-pointer"
+                          onClick={() => setSelected({ vehicleId: v.vehicleId, processId: p.processId })}
+                        >
+                          <td className="py-1 pr-2 whitespace-nowrap">
+                            {p.processName}
+                          </td>
+                          <td className="py-1 text-right font-medium">
+                            {formatDuration(p.totalMinutes)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                ) : (
+                  <p className="text-[hsl(var(--muted-foreground))] text-sm">
+                    作業記録がありません
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+          ))
+        ) : (
+          <div className="col-span-full flex items-center justify-center text-[hsl(var(--muted-foreground))]">
+            データがありません
+          </div>
+        )}
+      </div>
+
+      {selectedProcess && (
+        <div className="fixed inset-0 bg-black/60 z-40 flex items-center justify-center p-4">
+          <Card className="w-full max-w-4xl max-h-[90vh] flex flex-col">
+            <CardHeader className="flex flex-row items-center justify-between gap-4">
+              <div>
+                <CardTitle className="text-lg sm:text-xl">
+                  {selectedProcess.vehicle.vehicleNumber} / {selectedProcess.process.processName}
+                </CardTitle>
+                <p className="text-sm text-[hsl(var(--muted-foreground))] mt-1">
+                  誰が・いつ・何分作業したかの一覧
+                </p>
+              </div>
+              <Button variant="outline" onClick={() => setSelected(null)}>
+                閉じる
+              </Button>
+            </CardHeader>
+            <CardContent className="flex-1 overflow-auto">
+              <table className="w-full text-xs sm:text-sm">
+                <thead>
+                  <tr className="border-b border-[hsl(var(--border))]">
+                    <th className="text-left py-1 pr-2">日付</th>
+                    <th className="text-left py-1 pr-2">担当者</th>
+                    <th className="text-right py-1">時間</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {selectedProcess.process.details.map((d: any, idx: number) => (
+                    <tr key={idx} className="border-b border-[hsl(var(--border))]">
+                      <td className="py-1 pr-2 whitespace-nowrap">{d.workDate}</td>
+                      <td className="py-1 pr-2 whitespace-nowrap">{d.userName}</td>
+                      <td className="py-1 text-right font-medium">
+                        {formatDuration(d.minutes)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+    </div>
+  );
+}
+

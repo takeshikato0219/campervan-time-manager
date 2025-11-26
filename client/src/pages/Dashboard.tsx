@@ -31,7 +31,10 @@ export default function Dashboard() {
         trpc.workRecords.getTodayRecords.useQuery();
     const { data: vehicles } = trpc.vehicles.list.useQuery({});
     const { data: processes } = trpc.processes.list.useQuery();
-    const { data: todayAttendance } = trpc.attendance.getTodayStatus.useQuery();
+    const todayStrForAttendance = format(new Date(), "yyyy-MM-dd");
+    const { data: todayAttendance } = trpc.attendance.getTodayStatus.useQuery({
+        workDate: todayStrForAttendance,
+    });
     const { data: myCheckRequests } = trpc.checks.getMyCheckRequests.useQuery();
     const { data: unreadBroadcasts, refetch: refetchBroadcasts } = trpc.salesBroadcasts.getUnread.useQuery();
     const { data: bulletinMessages, refetch: refetchBulletin } = trpc.bulletin.list.useQuery();

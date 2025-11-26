@@ -36,27 +36,14 @@ export default function StaffAttendanceList({ selectedDate }: StaffAttendanceLis
         return format(selectedDate, "yyyy-MM-dd") === format(currentDate, "yyyy-MM-dd");
     }, [selectedDate, currentDate]);
 
-    // 今日の場合はgetAllStaffToday、それ以外はgetAllStaffByDateを使用
+    // すべての日付で getAllStaffByDate を使用（フロント側の日付を優先）
     const {
-        data: staffListToday,
-        isLoading: isLoadingToday,
-        error: errorToday
-    } = trpc.attendance.getAllStaffToday.useQuery(
-        undefined,
-        { enabled: isToday }
-    );
-    const {
-        data: staffListByDate,
-        isLoading: isLoadingByDate,
-        error: errorByDate
-    } = trpc.attendance.getAllStaffByDate.useQuery(
-        { date: dateStr },
-        { enabled: !isToday }
-    );
-
-    const staffList = isToday ? staffListToday : staffListByDate;
-    const isLoading = isToday ? isLoadingToday : isLoadingByDate;
-    const error = isToday ? errorToday : errorByDate;
+        data: staffList,
+        isLoading,
+        error,
+    } = trpc.attendance.getAllStaffByDate.useQuery({
+        date: dateStr,
+    });
 
     const utils = trpc.useUtils();
 
@@ -65,11 +52,7 @@ export default function StaffAttendanceList({ selectedDate }: StaffAttendanceLis
         onSuccess: () => {
             toast.success("出退勤記録を更新しました");
             // サーバーの確定値で一覧を再取得
-            if (isToday) {
-                utils.attendance.getAllStaffToday.invalidate();
-            } else {
-                utils.attendance.getAllStaffByDate.invalidate({ date: dateStr });
-            }
+            utils.attendance.getAllStaffByDate.invalidate({ date: dateStr });
             setEditingId(null);
         },
         onError: (error) => {
@@ -81,11 +64,7 @@ export default function StaffAttendanceList({ selectedDate }: StaffAttendanceLis
     const deleteMutation = trpc.attendance.deleteAttendance.useMutation({
         onSuccess: () => {
             toast.success("出退勤記録を削除しました");
-            if (isToday) {
-                utils.attendance.getAllStaffToday.invalidate();
-            } else {
-                utils.attendance.getAllStaffByDate.invalidate({ date: dateStr });
-            }
+            utils.attendance.getAllStaffByDate.invalidate({ date: dateStr });
         },
         onError: (error) => {
             toast.error(error.message || "削除に失敗しました");
@@ -97,11 +76,7 @@ export default function StaffAttendanceList({ selectedDate }: StaffAttendanceLis
     const adminClockInMutation = trpc.attendance.adminClockIn.useMutation({
         onSuccess: () => {
             toast.success("出勤を打刻しました");
-            if (isToday) {
-                utils.attendance.getAllStaffToday.invalidate();
-            } else {
-                utils.attendance.getAllStaffByDate.invalidate();
-            }
+            utils.attendance.getAllStaffByDate.invalidate({ date: dateStr });
         },
         onError: (error) => {
             toast.error(error.message || "出勤打刻に失敗しました");
@@ -111,11 +86,7 @@ export default function StaffAttendanceList({ selectedDate }: StaffAttendanceLis
     const adminClockOutMutation = trpc.attendance.adminClockOut.useMutation({
         onSuccess: () => {
             toast.success("退勤を打刻しました");
-            if (isToday) {
-                utils.attendance.getAllStaffToday.invalidate();
-            } else {
-                utils.attendance.getAllStaffByDate.invalidate();
-            }
+            utils.attendance.getAllStaffByDate.invalidate({ date: dateStr });
         },
         onError: (error) => {
             toast.error(error.message || "退勤打刻に失敗しました");
