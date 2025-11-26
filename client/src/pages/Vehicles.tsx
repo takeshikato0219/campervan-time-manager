@@ -124,7 +124,7 @@ function VehicleDetailContent({
                                             <p className="text-[10px] sm:text-xs text-[hsl(var(--muted-foreground))] truncate flex-1 min-w-0">
                                                 {format(new Date(ap.createdAt), "yyyy-MM-dd HH:mm")} - {ap.userName}
                                             </p>
-                                            {(user?.role === "admin" || user?.role === "sub_admin") && (
+                                            {user?.role === "admin" && (
                                                 <Button
                                                     size="sm"
                                                     variant="ghost"
@@ -180,7 +180,7 @@ function VehicleDetailContent({
             </Card>
 
             {/* アクションボタン（一番下） */}
-            {(user?.role === "admin" || user?.role === "sub_admin") && vehicleStatus && completeMutation && archiveMutation && uncompleteMutation && unarchiveMutation && (
+            {user?.role === "admin" && vehicleStatus && completeMutation && archiveMutation && uncompleteMutation && unarchiveMutation && (
                 <div className="flex flex-col gap-1.5 sm:gap-2 pt-2 border-t">
                     {vehicleStatus === "in_progress" && (
                         <div className="flex gap-1.5 sm:gap-2">

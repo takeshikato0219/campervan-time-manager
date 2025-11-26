@@ -20,7 +20,7 @@ export default function WorkRecordManagement() {
     const { user } = useAuth();
 
     // 管理者のみアクセス可能
-    if (user?.role !== "admin" && user?.role !== "sub_admin") {
+    if (user?.role !== "admin") {
         return (
             <div className="flex items-center justify-center min-h-[400px]">
                 <div className="text-center">
@@ -408,4 +408,3 @@ export default function WorkRecordManagement() {
         </div>
     );
 }
-

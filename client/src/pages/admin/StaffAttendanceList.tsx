@@ -18,7 +18,7 @@ export default function StaffAttendanceList({ selectedDate }: StaffAttendanceLis
     const [showEditLogs, setShowEditLogs] = useState<number | null>(null);
 
     const dateStr = format(selectedDate, "yyyy-MM-dd");
-    
+
     // リアルタイムで今日かどうかを判定（1分ごとに更新）
     const [currentDate, setCurrentDate] = useState(new Date());
     useEffect(() => {
@@ -57,17 +57,98 @@ export default function StaffAttendanceList({ selectedDate }: StaffAttendanceLis
     const utils = trpc.useUtils();
 
     const updateMutation = trpc.attendance.updateAttendance.useMutation({
-        onSuccess: () => {
+        // 楽観的更新でラグを減らす
+        onMutate: async (variables) => {
+            const { attendanceId, clockIn, clockOut } = variables;
+
+            // 対象クエリのフェッチを一時停止
+            if (isToday) {
+                await utils.attendance.getAllStaffToday.cancel();
+            } else {
+                await utils.attendance.getAllStaffByDate.cancel({ date: dateStr });
+            }
+
+            // 直前のデータを保存（ロールバック用）
+            const previousToday = utils.attendance.getAllStaffToday.getData();
+            const previousByDate = utils.attendance.getAllStaffByDate.getData({ date: dateStr });
+
+            // 対象のリストだけを更新
+            const updater = (data: typeof previousToday) => {
+                if (!data) return data;
+                return data.map((staff) => {
+                    if (!staff.attendance || staff.attendance.id !== attendanceId) return staff;
+
+                    const current = staff.attendance;
+                    let newClockIn = current.clockIn;
+                    let newClockOut = current.clockOut;
+
+                    if (clockIn) {
+                        newClockIn = new Date(clockIn);
+                    }
+                    if (clockOut !== undefined) {
+                        newClockOut = clockOut ? new Date(clockOut) : null;
+                    }
+
+                    return {
+                        ...staff,
+                        attendance: {
+                            ...current,
+                            clockIn: newClockIn,
+                            clockOut: newClockOut,
+                            // workDuration はサーバー計算に任せ、ここでは一旦そのまま
+                        },
+                    };
+                });
+            };
+
+            if (isToday) {
+                utils.attendance.getAllStaffToday.setData(undefined, updater);
+            } else {
+                utils.attendance.getAllStaffByDate.setData({ date: dateStr }, updater);
+            }
+
+            return { previousToday, previousByDate };
+        },
+        onError: (error, _variables, context) => {
+            // エラー時は元のデータに戻す
+            if (context?.previousToday) {
+                utils.attendance.getAllStaffToday.setData(undefined, context.previousToday);
+            }
+            if (context?.previousByDate) {
+                utils.attendance.getAllStaffByDate.setData({ date: dateStr }, context.previousByDate);
+            }
+            toast.error(error.message || "更新に失敗しました");
+        },
+        onSuccess: (data) => {
+            // サーバーから返ってきた確定値で上書き
+            const attendance = data.attendance;
+            if (attendance) {
+                const updater = (list: any) => {
+                    if (!list) return list;
+                    return list.map((staff: any) =>
+                        staff.attendance && staff.attendance.id === attendance.id
+                            ? {
+                                ...staff,
+                                attendance: {
+                                    ...staff.attendance,
+                                    clockIn: new Date(attendance.clockIn),
+                                    clockOut: attendance.clockOut ? new Date(attendance.clockOut) : null,
+                                    workDuration: attendance.workDuration,
+                                },
+                            }
+                            : staff
+                    );
+                };
+
+                if (isToday) {
+                    utils.attendance.getAllStaffToday.setData(undefined, updater);
+                } else {
+                    utils.attendance.getAllStaffByDate.setData({ date: dateStr }, updater);
+                }
+            }
+
             toast.success("出退勤記録を更新しました");
             setEditingId(null);
-            if (isToday) {
-                utils.attendance.getAllStaffToday.invalidate();
-            } else {
-                utils.attendance.getAllStaffByDate.invalidate();
-            }
-        },
-        onError: (error) => {
-            toast.error(error.message || "更新に失敗しました");
         },
     });
 
@@ -128,12 +209,13 @@ export default function StaffAttendanceList({ selectedDate }: StaffAttendanceLis
     const handleSave = (attendanceId: number) => {
         const dateStr = format(selectedDate, "yyyy-MM-dd");
         const clockInDateTime = editClockIn ? `${dateStr}T${editClockIn}:00+09:00` : undefined;
-        // editClockOutが空文字列の場合はnullを送信（出勤中に戻す）
-        const clockOutDateTime = editClockOut === "" 
-            ? null 
-            : editClockOut 
-                ? `${dateStr}T${editClockOut}:00+09:00` 
-                : undefined;
+        // editClockOutが空文字列の場合はundefinedを送信（サーバー側で既存値を維持 or null処理）
+        const clockOutDateTime =
+            editClockOut === ""
+                ? undefined
+                : editClockOut
+                    ? `${dateStr}T${editClockOut}:00+09:00`
+                    : undefined;
 
         updateMutation.mutate({
             attendanceId,
@@ -192,18 +274,6 @@ export default function StaffAttendanceList({ selectedDate }: StaffAttendanceLis
             clockOut: clockOutDateTime,
         });
     };
-
-    // デバッグ用: データの状態を確認
-    console.log("StaffAttendanceList Debug:", {
-        isToday,
-        dateStr,
-        isLoading,
-        error,
-        staffListToday,
-        staffListByDate,
-        staffList,
-        staffListLength: staffList?.length,
-    });
 
     if (isLoading) {
         return <div className="text-center py-4">読み込み中...</div>;

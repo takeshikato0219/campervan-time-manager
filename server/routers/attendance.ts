@@ -590,7 +590,8 @@ export const attendanceRouter = createTRPCRouter({
             z.object({
                 attendanceId: z.number(),
                 clockIn: z.string().optional(),
-                clockOut: z.string().optional(),
+                // 退勤時刻は「文字列 or null or 未指定」を許可
+                clockOut: z.string().nullable().optional(),
             })
         )
         .mutation(async ({ input, ctx }) => {

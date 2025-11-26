@@ -1,4 +1,4 @@
-import { useState } from "react";
+import React, { useState, useMemo } from "react";
 import { useAuth } from "../../hooks/useAuth";
 import { trpc } from "../../lib/trpc";
 import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/card";
@@ -35,7 +35,7 @@ const STATUS_LABELS: Record<ScheduleStatus, string> = {
 export default function StaffScheduleManagement() {
     const { user } = useAuth();
 
-    if (user?.role !== "admin" && user?.role !== "sub_admin") {
+    if (user?.role !== "admin") {
         return (
             <div className="flex items-center justify-center min-h-[400px]">
                 <div className="text-center">
@@ -97,10 +97,6 @@ export default function StaffScheduleManagement() {
     });
 
     const updateMutation = trpc.staffSchedule.updateSchedule.useMutation({
-        onMutate: async () => {
-            // 楽観的更新: 即座にUIを更新
-            await refetch();
-        },
         onSuccess: () => {
             // 成功時は静かに更新（toastは表示しない）
             refetch();
@@ -226,19 +222,27 @@ export default function StaffScheduleManagement() {
     }
 
     // フィルタリングされたユーザーリスト（現状は全員）
-    const filteredUsers = scheduleData.users;
+    const filteredUsers = useMemo(() => scheduleData.users, [scheduleData]);
 
-    // フィルタリングされたスケジュールデータ
-    const filteredScheduleData = scheduleData.scheduleData.map((day) => ({
-        ...day,
-        userEntries: day.userEntries.filter((entry) =>
-            filteredUsers.some((u) => u.id === entry.userId)
-        ),
-    }));
+    // フィルタリングされたスケジュールデータ（useMemoで再計算を最小限に）
+    const filteredScheduleData = useMemo(
+        () =>
+            scheduleData.scheduleData.map((day) => ({
+                ...day,
+                userEntries: day.userEntries.filter((entry) =>
+                    filteredUsers.some((u) => u.id === entry.userId)
+                ),
+            })),
+        [scheduleData, filteredUsers]
+    );
 
-    // フィルタリングされた集計データ
-    const filteredSummary = scheduleData.summary.filter((s) =>
-        filteredUsers.some((u) => u.id === s.userId)
+    // フィルタリングされた集計データ（useMemoで再計算を最小限に）
+    const filteredSummary = useMemo(
+        () =>
+            scheduleData.summary.filter((s) =>
+                filteredUsers.some((u) => u.id === s.userId)
+            ),
+        [scheduleData, filteredUsers]
     );
 
     return (

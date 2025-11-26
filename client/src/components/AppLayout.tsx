@@ -122,7 +122,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
                             );
                         })}
 
-                        {(user?.role === "admin" || user?.role === "sub_admin") && (
+                        {user?.role === "admin" && (
                             <>
                                 <div className="pt-4 mt-4 border-t border-[hsl(var(--border))]">
                                     <p className="px-3 text-xs font-semibold text-[hsl(var(--muted-foreground))] uppercase">
