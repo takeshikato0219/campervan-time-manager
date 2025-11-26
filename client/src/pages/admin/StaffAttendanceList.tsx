@@ -1,8 +1,8 @@
 import { useState, useEffect, useMemo } from "react";
 import { trpc } from "../../lib/trpc";
 import { Button } from "../../components/ui/button";
-import { Input } from "../../components/ui/input";
 import { Edit, Monitor, Smartphone, Plus, History } from "lucide-react";
+import { TimePicker } from "../../components/TimePicker";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/card";
@@ -365,19 +365,15 @@ export default function StaffAttendanceList({ selectedDate }: StaffAttendanceLis
                                             <>
                                                 {pastEditUserId === staff.userId ? (
                                                     <div className="space-y-2">
-                                                        <Input
-                                                            type="time"
-                                                            value={pastEditClockIn}
-                                                            onChange={(e) => setPastEditClockIn(e.target.value)}
+                                                        <TimePicker
+                                                            value={pastEditClockIn || "08:30"}
+                                                            onChange={(v) => setPastEditClockIn(v)}
                                                             className="w-full"
-                                                            placeholder="出勤時刻"
                                                         />
-                                                        <Input
-                                                            type="time"
-                                                            value={pastEditClockOut}
-                                                            onChange={(e) => setPastEditClockOut(e.target.value)}
+                                                        <TimePicker
+                                                            value={pastEditClockOut || ""}
+                                                            onChange={(v) => setPastEditClockOut(v)}
                                                             className="w-full"
-                                                            placeholder="退勤時刻"
                                                         />
                                                         <div className="flex gap-1 sm:gap-2">
                                                             <Button
@@ -435,19 +431,15 @@ export default function StaffAttendanceList({ selectedDate }: StaffAttendanceLis
                                     <>
                                         {editingId === staff.attendance.id ? (
                                             <div className="w-full space-y-2">
-                                                <Input
-                                                    type="time"
-                                                    value={editClockIn}
-                                                    onChange={(e) => setEditClockIn(e.target.value)}
+                                                <TimePicker
+                                                    value={editClockIn || "08:30"}
+                                                    onChange={(v) => setEditClockIn(v)}
                                                     className="w-full"
-                                                    placeholder="出勤時刻"
                                                 />
-                                                <Input
-                                                    type="time"
-                                                    value={editClockOut}
-                                                    onChange={(e) => setEditClockOut(e.target.value)}
+                                                <TimePicker
+                                                    value={editClockOut || ""}
+                                                    onChange={(v) => setEditClockOut(v)}
                                                     className="w-full"
-                                                    placeholder="退勤時刻"
                                                 />
                                                 <div className="flex gap-1 sm:gap-2">
                                                     <Button
