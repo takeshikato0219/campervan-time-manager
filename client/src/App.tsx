@@ -8,6 +8,7 @@ import Vehicles from "./pages/Vehicles";
 import MyAttendance from "./pages/MyAttendance";
 import WorkRecords from "./pages/WorkRecords";
 import Analytics from "./pages/Analytics";
+import VehicleProductionTime from "./pages/VehicleProductionTime";
 import VehicleChecks from "./pages/VehicleChecks";
 import AttendanceManagement from "./pages/admin/AttendanceManagement";
 import WorkRecordManagement from "./pages/admin/WorkRecordManagement";
@@ -67,6 +68,9 @@ export default function App() {
                 </Route>
                 <Route path="/work-records">
                     {() => <ProtectedRoute component={WorkRecords} />}
+                </Route>
+                <Route path="/vehicle-production">
+                    {() => <ProtectedRoute component={VehicleProductionTime} />}
                 </Route>
                 <Route path="/analytics">
                     {() => <ProtectedRoute component={Analytics} />}
