@@ -16,6 +16,10 @@ export default function StaffAttendanceList({ selectedDate }: StaffAttendanceLis
     const [editClockIn, setEditClockIn] = useState("");
     const [editClockOut, setEditClockOut] = useState("");
     const [showEditLogs, setShowEditLogs] = useState<number | null>(null);
+    // 過去日の「未出勤」カード用の編集状態
+    const [pastEditUserId, setPastEditUserId] = useState<number | null>(null);
+    const [pastEditClockIn, setPastEditClockIn] = useState("");
+    const [pastEditClockOut, setPastEditClockOut] = useState("");
 
     const dateStr = format(selectedDate, "yyyy-MM-dd");
 
@@ -133,13 +137,19 @@ export default function StaffAttendanceList({ selectedDate }: StaffAttendanceLis
     const handleSave = (attendanceId: number) => {
         const dateStr = format(selectedDate, "yyyy-MM-dd");
         const clockInDateTime = editClockIn ? `${dateStr}T${editClockIn}:00+09:00` : undefined;
-        // editClockOutが空文字列の場合はundefinedを送信（サーバー側で既存値を維持 or null処理）
-        const clockOutDateTime =
-            editClockOut === ""
-                ? undefined
-                : editClockOut
-                    ? `${dateStr}T${editClockOut}:00+09:00`
-                    : undefined;
+
+        let clockOutDateTime: string | undefined;
+        if (editClockOut === "") {
+            if (isToday) {
+                // 今日：空欄ならサーバー側で既存値維持 or 出勤中扱い（従来どおり）
+                clockOutDateTime = undefined;
+            } else {
+                // 前日・過去日：退勤なしの「作業中」は紛らわしいので 23:59 に強制退勤
+                clockOutDateTime = `${dateStr}T23:59:00+09:00`;
+            }
+        } else {
+            clockOutDateTime = `${dateStr}T${editClockOut}:00+09:00`;
+        }
 
         updateMutation.mutate({
             attendanceId,
@@ -197,6 +207,45 @@ export default function StaffAttendanceList({ selectedDate }: StaffAttendanceLis
             userId,
             clockOut: clockOutDateTime,
         });
+    };
+
+    // 過去日の未出勤ユーザーに対して、編集から出勤＋退勤を一括登録
+    const handlePastSave = async (userId: number) => {
+        const dateStr = format(selectedDate, "yyyy-MM-dd");
+        if (!pastEditClockIn || !pastEditClockOut) {
+            toast.error("出勤時刻と退勤時刻を両方入力してください");
+            return;
+        }
+        // 出勤 <= 退勤 であることを簡単にチェック
+        if (pastEditClockIn >= pastEditClockOut) {
+            toast.error("退勤時刻は出勤時刻より後の時間を入力してください");
+            return;
+        }
+
+        const clockInDateTime = `${dateStr}T${pastEditClockIn}:00+09:00`;
+        const clockOutDateTime = `${dateStr}T${pastEditClockOut}:00+09:00`;
+
+        try {
+            // まず指定日の出勤を登録
+            await adminClockInMutation.mutateAsync({
+                userId,
+                clockIn: clockInDateTime,
+                deviceType: "pc",
+            });
+            // 続けて同じ日の退勤を登録
+            await adminClockOutMutation.mutateAsync({
+                userId,
+                clockOut: clockOutDateTime,
+            });
+
+            toast.success("出勤・退勤を登録しました");
+            setPastEditUserId(null);
+            setPastEditClockIn("");
+            setPastEditClockOut("");
+        } catch (error: any) {
+            console.error("過去日の出勤・退勤登録エラー:", error);
+            toast.error(error?.message || "出勤・退勤の登録に失敗しました");
+        }
     };
 
     if (isLoading) {
@@ -269,41 +318,115 @@ export default function StaffAttendanceList({ selectedDate }: StaffAttendanceLis
                                             </>
                                         ) : (
                                             <div className="space-y-2">
-                                                <span className="inline-block px-2 py-1 text-xs font-medium text-orange-500 bg-orange-50 rounded">
-                                                    作業中
-                                                </span>
-                                                <Button
-                                                    size="sm"
-                                                    variant="outline"
-                                                    className="w-full text-xs sm:text-sm min-h-[44px]"
-                                                    onClick={(e) => {
-                                                        e.preventDefault();
-                                                        e.stopPropagation();
-                                                        handleAdminClockOut(staff.userId);
-                                                    }}
-                                                >
-                                                    <Plus className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
-                                                    退勤
-                                                </Button>
+                                                {/* 今日の場合のみ「作業中 + 退勤ボタン」を出す（過去日はボタンもラベルも出さない） */}
+                                                {isToday && (
+                                                    <>
+                                                        <span className="inline-block px-2 py-1 text-xs font-medium text-orange-500 bg-orange-50 rounded">
+                                                            作業中
+                                                        </span>
+                                                        <Button
+                                                            size="sm"
+                                                            variant="outline"
+                                                            className="w-full text-xs sm:text-sm min-h-[44px]"
+                                                            onClick={(e) => {
+                                                                e.preventDefault();
+                                                                e.stopPropagation();
+                                                                handleAdminClockOut(staff.userId);
+                                                            }}
+                                                        >
+                                                            <Plus className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
+                                                            退勤
+                                                        </Button>
+                                                    </>
+                                                )}
                                             </div>
                                         )}
                                     </div>
                                 ) : (
                                     <div className="space-y-2">
                                         <p className="text-sm text-[hsl(var(--muted-foreground))]">未出勤</p>
-                                        <Button
-                                            size="sm"
-                                            variant="outline"
-                                            className="w-full text-xs sm:text-sm min-h-[44px]"
-                                            onClick={(e) => {
-                                                e.preventDefault();
-                                                e.stopPropagation();
-                                                handleAdminClockIn(staff.userId);
-                                            }}
-                                        >
-                                            <Plus className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
-                                            出勤
-                                        </Button>
+                                        {isToday ? (
+                                            // 今日：これまで通り「出勤」ボタンで登録
+                                            <Button
+                                                size="sm"
+                                                variant="outline"
+                                                className="w-full text-xs sm:text-sm min-h-[44px]"
+                                                onClick={(e) => {
+                                                    e.preventDefault();
+                                                    e.stopPropagation();
+                                                    handleAdminClockIn(staff.userId);
+                                                }}
+                                            >
+                                                <Plus className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
+                                                出勤
+                                            </Button>
+                                        ) : (
+                                            // 前日・過去日：編集から出勤＋退勤をまとめて登録できるようにする
+                                            <>
+                                                {pastEditUserId === staff.userId ? (
+                                                    <div className="space-y-2">
+                                                        <Input
+                                                            type="time"
+                                                            value={pastEditClockIn}
+                                                            onChange={(e) => setPastEditClockIn(e.target.value)}
+                                                            className="w-full"
+                                                            placeholder="出勤時刻"
+                                                        />
+                                                        <Input
+                                                            type="time"
+                                                            value={pastEditClockOut}
+                                                            onChange={(e) => setPastEditClockOut(e.target.value)}
+                                                            className="w-full"
+                                                            placeholder="退勤時刻"
+                                                        />
+                                                        <div className="flex gap-1 sm:gap-2">
+                                                            <Button
+                                                                size="sm"
+                                                                className="flex-1 text-xs sm:text-sm min-h-[44px]"
+                                                                onClick={(e) => {
+                                                                    e.preventDefault();
+                                                                    e.stopPropagation();
+                                                                    handlePastSave(staff.userId);
+                                                                }}
+                                                                disabled={adminClockInMutation.isPending || adminClockOutMutation.isPending}
+                                                            >
+                                                                保存
+                                                            </Button>
+                                                            <Button
+                                                                size="sm"
+                                                                variant="outline"
+                                                                className="flex-1 text-xs sm:text-sm min-h-[44px]"
+                                                                onClick={(e) => {
+                                                                    e.preventDefault();
+                                                                    e.stopPropagation();
+                                                                    setPastEditUserId(null);
+                                                                    setPastEditClockIn("");
+                                                                    setPastEditClockOut("");
+                                                                }}
+                                                                disabled={adminClockInMutation.isPending || adminClockOutMutation.isPending}
+                                                            >
+                                                                キャンセル
+                                                            </Button>
+                                                        </div>
+                                                    </div>
+                                                ) : (
+                                                    <Button
+                                                        size="sm"
+                                                        variant="outline"
+                                                        className="w-full text-xs sm:text-sm min-h-[44px]"
+                                                        onClick={(e) => {
+                                                            e.preventDefault();
+                                                            e.stopPropagation();
+                                                            setPastEditUserId(staff.userId);
+                                                            setPastEditClockIn("");
+                                                            setPastEditClockOut("");
+                                                        }}
+                                                    >
+                                                        編集（出勤・退勤を登録）
+                                                    </Button>
+                                                )}
+                                            </>
+                                        )}
                                     </div>
                                 )}
                             </div>

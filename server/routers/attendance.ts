@@ -585,29 +585,23 @@ export const attendanceRouter = createTRPCRouter({
                 });
             }
 
-            const clockOutTime = new Date(input.clockOut);
+            const requestedClockOut = new Date(input.clockOut);
 
-            // 出勤日の23:59:59を超えないように制限
+            // 出勤日の23:59:59を超える場合は、23:59:59に丸める（夜勤は無い前提）
             const maxClockOut = new Date(record.clockIn);
             maxClockOut.setHours(23, 59, 59, 0);
-
-            if (clockOutTime > maxClockOut) {
-                throw new TRPCError({
-                    code: "BAD_REQUEST",
-                    message: "退勤時刻は23:59:59を超えることはできません（夜勤はありません）",
-                });
-            }
+            const effectiveClockOut = requestedClockOut > maxClockOut ? maxClockOut : requestedClockOut;
 
             const totalMinutes = Math.floor(
-                (clockOutTime.getTime() - record.clockIn.getTime()) / 1000 / 60
+                (effectiveClockOut.getTime() - record.clockIn.getTime()) / 1000 / 60
             );
-            const breakMinutes = await calculateBreakTimeMinutes(record.clockIn, clockOutTime, db);
+            const breakMinutes = await calculateBreakTimeMinutes(record.clockIn, effectiveClockOut, db);
             const workDuration = Math.max(0, totalMinutes - breakMinutes); // 負の値にならないようにする
 
             await db
                 .update(schema.attendanceRecords)
                 .set({
-                    clockOut: clockOutTime,
+                        clockOut: effectiveClockOut,
                     clockOutDevice: "pc",
                     workDuration,
                 })
@@ -668,18 +662,12 @@ export const attendanceRouter = createTRPCRouter({
                     const clockOutTime = new Date(input.clockOut);
                     const clockInTime = input.clockIn ? new Date(input.clockIn) : record.clockIn;
 
-                    // 出勤日の23:59:59を超えないように制限
+                    // 出勤日の23:59:59を超える場合は、23:59:59に丸める（夜勤は無い前提）
                     const maxClockOut = new Date(clockInTime);
                     maxClockOut.setHours(23, 59, 59, 0);
+                    const effectiveClockOut = clockOutTime > maxClockOut ? maxClockOut : clockOutTime;
 
-                    if (clockOutTime > maxClockOut) {
-                        throw new TRPCError({
-                            code: "BAD_REQUEST",
-                            message: "退勤時刻は23:59:59を超えることはできません（夜勤はありません）",
-                        });
-                    }
-
-                    updateData.clockOut = clockOutTime;
+                    updateData.clockOut = effectiveClockOut;
                 } else {
                     // 空文字列の場合はnullに設定（出勤中に戻す）
                     updateData.clockOut = null;
@@ -690,7 +678,7 @@ export const attendanceRouter = createTRPCRouter({
             if (input.clockIn || input.clockOut !== undefined) {
                 const clockIn = input.clockIn ? new Date(input.clockIn) : record.clockIn;
                 const clockOut = input.clockOut !== undefined
-                    ? (input.clockOut ? new Date(input.clockOut) : null)
+                    ? (input.clockOut ? (updateData.clockOut ?? new Date(input.clockOut)) : null)
                     : record.clockOut;
 
                 if (clockOut) {
