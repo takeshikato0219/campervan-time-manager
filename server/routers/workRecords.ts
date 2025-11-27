@@ -287,11 +287,28 @@ export const workRecordsRouter = createTRPCRouter({
                 });
             }
 
-            if (record.userId !== ctx.user!.id) {
+            // 準管理者以上はいつでも編集可能
+            if (record.userId !== ctx.user!.id && ctx.user!.role !== "admin" && ctx.user!.role !== "sub_admin") {
                 throw new TRPCError({
                     code: "FORBIDDEN",
                     message: "自分の記録のみ編集できます",
                 });
+            }
+
+            // 一般ユーザーは「今日・昨日」の記録のみ編集可能
+            if (record.userId === ctx.user!.id && ctx.user!.role === "field_worker") {
+                const now = new Date();
+                const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+                const yesterday = new Date(today);
+                yesterday.setDate(yesterday.getDate() - 1);
+                const limit = startOfDay(yesterday); // 昨日の0時
+
+                if (record.startTime < limit) {
+                    throw new TRPCError({
+                        code: "FORBIDDEN",
+                        message: "自分の作業記録は「今日・昨日」の分のみ編集できます",
+                    });
+                }
             }
 
             const updateData: any = {};
@@ -387,11 +404,28 @@ export const workRecordsRouter = createTRPCRouter({
                 });
             }
 
-            if (record.userId !== ctx.user!.id) {
+            // 準管理者以上はいつでも削除可能
+            if (record.userId !== ctx.user!.id && ctx.user!.role !== "admin" && ctx.user!.role !== "sub_admin") {
                 throw new TRPCError({
                     code: "FORBIDDEN",
                     message: "自分の記録のみ削除できます",
                 });
+            }
+
+            // 一般ユーザーは「今日・昨日」の記録のみ削除可能
+            if (record.userId === ctx.user!.id && ctx.user!.role === "field_worker") {
+                const now = new Date();
+                const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+                const yesterday = new Date(today);
+                yesterday.setDate(yesterday.getDate() - 1);
+                const limit = startOfDay(yesterday); // 昨日の0時
+
+                if (record.startTime < limit) {
+                    throw new TRPCError({
+                        code: "FORBIDDEN",
+                        message: "自分の作業記録は「今日・昨日」の分のみ削除できます",
+                    });
+                }
             }
 
             console.log(`[workRecords.deleteMyRecord] 作業記録を削除します: ID=${input.id}, ユーザーID=${record.userId}, 車両ID=${record.vehicleId}`);

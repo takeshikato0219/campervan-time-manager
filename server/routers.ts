@@ -14,6 +14,8 @@ import { bulletinRouter } from "./routers/bulletin";
 import { breakTimesRouter } from "./routers/breakTimes";
 import { staffScheduleRouter } from "./routers/staffSchedule";
 import { backupRouter } from "./routers/backup";
+import { deliverySchedulesRouter } from "./routers/deliverySchedules";
+import { notificationsRouter } from "./routers/notifications";
 
 export const appRouter = createTRPCRouter({
     auth: authRouter,
@@ -31,6 +33,8 @@ export const appRouter = createTRPCRouter({
     breakTimes: breakTimesRouter,
     staffSchedule: staffScheduleRouter,
     backup: backupRouter,
+    deliverySchedules: deliverySchedulesRouter,
+    notifications: notificationsRouter,
 });
 
 export type AppRouter = typeof appRouter;

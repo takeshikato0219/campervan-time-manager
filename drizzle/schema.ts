@@ -93,6 +93,34 @@ export const vehicles = mysqlTable("vehicles", {
     updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
 
+// 5-2. deliverySchedules: 納車スケジュール（ワングラムデザイン共有用）
+export const deliverySchedules = mysqlTable("deliverySchedules", {
+    id: int("id").autoincrement().primaryKey(),
+    vehicleName: varchar("vehicleName", { length: 255 }).notNull(), // 車両の名前
+    vehicleType: varchar("vehicleType", { length: 255 }), // 車両の種類
+    customerName: varchar("customerName", { length: 255 }), // お客様名
+    optionName: varchar("optionName", { length: 255 }), // オプション名
+    optionCategory: varchar("optionCategory", { length: 255 }), // オプションの種類（その他／補足）
+    prefecture: varchar("prefecture", { length: 100 }), // 納車県
+    baseCarReady: mysqlEnum("baseCarReady", ["yes", "no"]), // ベース車◯✕
+    furnitureReady: mysqlEnum("furnitureReady", ["yes", "no"]), // 家具◯✕
+    inCharge: varchar("inCharge", { length: 100 }), // 担当
+    // 日付系
+    dueDate: date("dueDate"), // ワングラム入庫予定（遅れ日数計算の基準日）
+    incomingPlannedDate: date("incomingPlannedDate"), // ワングラム完成予定
+    shippingPlannedDate: date("shippingPlannedDate"), // 引き取り予定日
+    deliveryPlannedDate: date("deliveryPlannedDate"), // 納車予定
+    // コメント・クレーム・共有事項
+    comment: text("comment"), // 一般的なコメント
+    claimComment: text("claimComment"), // 納車チェック後のクレーム・傷など
+    photosJson: text("photosJson"), // 写真URLのJSON配列文字列
+    oemComment: text("oemComment"), // ワングラム側メモ（任意）
+    pickupConfirmed: mysqlEnum("pickupConfirmed", ["true", "false"]).default("false"), // 引き取り予定日の確定フラグ
+    specSheetUrl: text("specSheetUrl"), // 製造注意仕様書（PDF/JPG）のURL
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
 // 6. vehicleTypes: 車種マスタ
 export const vehicleTypes = mysqlTable("vehicleTypes", {
     id: int("id").autoincrement().primaryKey(),

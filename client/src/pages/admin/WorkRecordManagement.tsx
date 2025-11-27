@@ -19,8 +19,8 @@ import {
 export default function WorkRecordManagement() {
     const { user } = useAuth();
 
-    // 管理者のみアクセス可能
-    if (user?.role !== "admin") {
+    // 管理者・準管理者のみアクセス可能
+    if (user?.role !== "admin" && user?.role !== "sub_admin") {
         return (
             <div className="flex items-center justify-center min-h-[400px]">
                 <div className="text-center">
@@ -151,7 +151,7 @@ export default function WorkRecordManagement() {
     return (
         <div className="space-y-6">
             <div>
-                <h1 className="text-3xl font-bold">作業記録管理（管理者）</h1>
+                <h1 className="text-3xl font-bold">作業記録管理（管理者・準管理者）</h1>
                 <p className="text-[hsl(var(--muted-foreground))] mt-2">
                     全スタッフの作業記録を閲覧・編集・削除します
                 </p>

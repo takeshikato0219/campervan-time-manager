@@ -52,7 +52,7 @@ export default function StaffAttendanceList({ selectedDate }: StaffAttendanceLis
         onSuccess: () => {
             toast.success("出退勤記録を更新しました");
             // サーバーの確定値で一覧を再取得
-            utils.attendance.getAllStaffByDate.invalidate({ date: dateStr });
+                utils.attendance.getAllStaffByDate.invalidate({ date: dateStr });
             setEditingId(null);
         },
         onError: (error) => {
@@ -64,7 +64,7 @@ export default function StaffAttendanceList({ selectedDate }: StaffAttendanceLis
     const deleteMutation = trpc.attendance.deleteAttendance.useMutation({
         onSuccess: () => {
             toast.success("出退勤記録を削除しました");
-            utils.attendance.getAllStaffByDate.invalidate({ date: dateStr });
+                utils.attendance.getAllStaffByDate.invalidate({ date: dateStr });
         },
         onError: (error) => {
             toast.error(error.message || "削除に失敗しました");

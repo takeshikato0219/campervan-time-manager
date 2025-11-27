@@ -350,18 +350,18 @@ export default function ProcessManagement() {
                                     <option value="__custom__">新しい区分を追加</option>
                                 </select>
                                 {useCustomMajor && (
-                                        <Input
-                                            className="mt-2"
-                                            value={editingProcess.majorCategory}
-                                            onChange={(e) =>
-                                                setEditingProcess({
-                                                    ...editingProcess,
-                                                    majorCategory: e.target.value,
-                                                })
-                                            }
-                                            placeholder="大分類を入力"
-                                        />
-                                    )}
+                                    <Input
+                                        className="mt-2"
+                                        value={editingProcess.majorCategory}
+                                        onChange={(e) =>
+                                            setEditingProcess({
+                                                ...editingProcess,
+                                                majorCategory: e.target.value,
+                                            })
+                                        }
+                                        placeholder="大分類を入力"
+                                    />
+                                )}
                             </div>
                             <div>
                                 <label className="text-sm font-medium">小分類</label>

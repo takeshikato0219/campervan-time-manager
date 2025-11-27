@@ -69,11 +69,11 @@ export default function MyAttendance() {
                             </div>
                             {todayAttendance.clockOutTime ? (
                                 <div className="space-y-2">
-                                    <div>
-                                        <p className="text-sm text-[hsl(var(--muted-foreground))]">退勤時刻</p>
-                                        <p className="text-2xl font-semibold mt-1">
-                                            {formatAttendanceTime(todayAttendance.clockOutTime)}
-                                        </p>
+                                <div>
+                                    <p className="text-sm text-[hsl(var(--muted-foreground))]">退勤時刻</p>
+                                    <p className="text-2xl font-semibold mt-1">
+                                        {formatAttendanceTime(todayAttendance.clockOutTime)}
+                                    </p>
                                     </div>
                                     <p className="text-sm text-[hsl(var(--muted-foreground))]">
                                         勤務時間: {formatDuration(todayAttendance.workMinutes)}
@@ -81,7 +81,7 @@ export default function MyAttendance() {
                                 </div>
                             ) : (
                                 <div className="space-y-3">
-                                    <p className="text-sm text-orange-500">作業中</p>
+                                <p className="text-sm text-orange-500">作業中</p>
                                     <Button
                                         className="w-full sm:w-auto"
                                         onClick={() => clockOutMutation.mutate()}

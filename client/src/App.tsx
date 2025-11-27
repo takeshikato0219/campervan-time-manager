@@ -9,6 +9,8 @@ import MyAttendance from "./pages/MyAttendance";
 import WorkRecords from "./pages/WorkRecords";
 import Analytics from "./pages/Analytics";
 import VehicleProductionTime from "./pages/VehicleProductionTime";
+import DeliverySchedules from "./pages/DeliverySchedules";
+import DeliverySchedulesPublic from "./pages/DeliverySchedulesPublic";
 import VehicleChecks from "./pages/VehicleChecks";
 import AttendanceManagement from "./pages/admin/AttendanceManagement";
 import WorkRecordManagement from "./pages/admin/WorkRecordManagement";
@@ -78,6 +80,8 @@ export default function App() {
         <>
             <Switch>
                 <Route path="/login" component={Login} />
+                {/* 社外公開用（パスワードなし）の納車スケジュールページ */}
+                <Route path="/delivery-schedules-public" component={DeliverySchedulesPublic} />
                 <Route path="/">
                     {() => <ProtectedRoute component={Dashboard} />}
                 </Route>
@@ -95,6 +99,9 @@ export default function App() {
                 </Route>
                 <Route path="/vehicle-production">
                     {() => <ProtectedRoute component={VehicleProductionTime} />}
+                </Route>
+                <Route path="/delivery-schedules">
+                    {() => <ProtectedRoute component={DeliverySchedules} />}
                 </Route>
                 <Route path="/analytics">
                     {() => <ProtectedRoute component={Analytics} />}

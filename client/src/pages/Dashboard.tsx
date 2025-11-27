@@ -40,6 +40,7 @@ export default function Dashboard() {
     const { data: bulletinMessages, refetch: refetchBulletin } = trpc.bulletin.list.useQuery();
     const { data: vehicleTypes } = trpc.vehicleTypes.list.useQuery();
     const { data: recentLowWorkUsers } = trpc.analytics.getRecentLowWorkUsers.useQuery();
+    const { data: myNotifications, refetch: refetchNotifications } = trpc.notifications.getMyUnread.useQuery();
     const [selectedVehicleTypeFilter, setSelectedVehicleTypeFilter] = useState<number | "all">("all");
 
     // 未完了のチェック依頼を取得
@@ -48,6 +49,12 @@ export default function Dashboard() {
     const markBroadcastAsReadMutation = trpc.salesBroadcasts.markAsRead.useMutation({
         onSuccess: () => {
             refetchBroadcasts();
+        },
+    });
+
+    const markNotificationAsReadMutation = trpc.notifications.markAsRead.useMutation({
+        onSuccess: () => {
+            refetchNotifications();
         },
     });
 
@@ -207,6 +214,48 @@ export default function Dashboard() {
                 </p>
             </div>
 
+            {/* 納車スケジュールなどのシステム通知（自分宛） */}
+            {myNotifications && myNotifications.length > 0 && (
+                <Card className="border-blue-300 bg-blue-50">
+                    <CardContent className="p-4 sm:p-6 space-y-2">
+                        <p className="font-semibold text-blue-900 text-sm sm:text-base">
+                            お知らせが{myNotifications.length}件あります
+                        </p>
+                        <div className="space-y-1.5">
+                            {myNotifications.slice(0, 3).map((n) => (
+                                <div
+                                    key={n.id}
+                                    className="flex items-start justify-between gap-2 text-xs sm:text-sm"
+                                >
+                                    <div className="min-w-0">
+                                        <p className="font-semibold break-words">{n.title}</p>
+                                        <p className="text-[hsl(var(--muted-foreground))] break-words">
+                                            {n.message}
+                                        </p>
+                                        <p className="mt-0.5 text-[10px] text-[hsl(var(--muted-foreground))]">
+                                            {format(new Date(n.createdAt), "MM/dd HH:mm")}
+                                        </p>
+                                    </div>
+                                    <Button
+                                        size="xs"
+                                        variant="outline"
+                                        className="flex-shrink-0 h-6 px-2 text-[10px]"
+                                        onClick={() => markNotificationAsReadMutation.mutate({ id: n.id })}
+                                    >
+                                        確認
+                                    </Button>
+                                </div>
+                            ))}
+                            {myNotifications.length > 3 && (
+                                <p className="text-[10px] sm:text-xs text-blue-900">
+                                    他{myNotifications.length - 3}件のお知らせがあります
+                                </p>
+                            )}
+                        </div>
+                    </CardContent>
+                </Card>
+            )}
+
             {/* 過去3日以内で「勤務時間-1時間」より作業記録が少ない現場スタッフの注意喚起 */}
             {recentLowWorkUsers && recentLowWorkUsers.length > 0 && (
                 <Card className="border-yellow-300 bg-yellow-50">
@@ -283,15 +332,15 @@ export default function Dashboard() {
                                             <span className="font-medium text-xs sm:text-sm">
                                                 {msg.user?.name || msg.user?.username || "不明"} さん
                                             </span>
-                                        <div className="flex items-center gap-2">
-                                            <span className="text-[10px] text-[hsl(var(--muted-foreground))]">
-                                                {format(new Date(msg.createdAt), "MM/dd HH:mm")}
-                                            </span>
-                                            {typeof (msg as any).expireDays === "number" && (
+                                            <div className="flex items-center gap-2">
                                                 <span className="text-[10px] text-[hsl(var(--muted-foreground))]">
-                                                    {(msg as any).expireDays}日表示
+                                                    {format(new Date(msg.createdAt), "MM/dd HH:mm")}
                                                 </span>
-                                            )}
+                                                {typeof (msg as any).expireDays === "number" && (
+                                                    <span className="text-[10px] text-[hsl(var(--muted-foreground))]">
+                                                        {(msg as any).expireDays}日表示
+                                                    </span>
+                                                )}
                                             {(msg.userId === user?.id || user?.role === "admin") && (
                                                 <Button
                                                     variant="outline"
@@ -305,7 +354,7 @@ export default function Dashboard() {
                                                     削除
                                                 </Button>
                                             )}
-                                        </div>
+                                            </div>
                                         </div>
                                         <p className="mt-1 text-xs sm:text-sm whitespace-pre-wrap break-words">
                                             {msg.message}

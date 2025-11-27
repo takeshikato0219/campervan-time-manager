@@ -97,7 +97,7 @@ function VehicleDetailContent({
                     <CardHeader className="p-2 sm:p-3">
                         <CardTitle className="text-xs sm:text-sm">指示書</CardTitle>
                     </CardHeader>
-                    <CardContent className="p-2 sm:p-3">
+                    <CardContent className="p-2 sm:p-3 space-y-1.5">
                         {vehicle.instructionSheetUrl ? (
                             <a
                                 href={vehicle.instructionSheetUrl}
@@ -109,7 +109,16 @@ function VehicleDetailContent({
                                 指示書を表示
                             </a>
                         ) : (
-                            <p className="text-[10px] sm:text-xs text-[hsl(var(--muted-foreground))]">指示書がアップロードされていません</p>
+                            <p className="text-[10px] sm:text-xs text-[hsl(var(--muted-foreground))]">
+                                指示書がアップロードされていません
+                            </p>
+                        )}
+                        {(user?.role === "admin" || user?.role === "sub_admin") && (
+                            <p className="text-[9px] sm:text-[10px] text-[hsl(var(--muted-foreground))] leading-tight">
+                                指示書ファイルはサーバー更新のタイミングで消えることがあります。
+                                消えていた場合は「車両編集」画面の指示書欄から
+                                再アップロードしてください。
+                            </p>
                         )}
                     </CardContent>
                 </Card>
@@ -1286,7 +1295,7 @@ export default function Vehicles() {
                                 {user?.role === "admin" && (
                                     <div className="min-w-0">
                                         <label className="text-sm font-medium block mb-1">指示書（PDF/JPG）</label>
-                                        <div className="flex items-center gap-2">
+                                        <div className="flex flex-col sm:flex-row sm:items-center gap-2">
                                             <Input
                                                 type="file"
                                                 accept=".pdf,.jpg,.jpeg"
@@ -1309,6 +1318,11 @@ export default function Vehicles() {
                                                 </a>
                                             )}
                                         </div>
+                                        <p className="mt-1 text-[10px] text-[hsl(var(--muted-foreground))] leading-snug">
+                                            サーバーの入れ替えや再デプロイの際に、アップロード済みの指示書ファイルが
+                                            消えてしまう場合があります。その場合は、お手数ですがここから
+                                            再度アップロードしてください。
+                                        </p>
                                     </div>
                                 )}
                                 <div className="min-w-0 space-y-3">
@@ -1392,35 +1406,35 @@ export default function Vehicles() {
                                 </div>
                                 <div className="flex flex-col gap-2 pt-2 flex-shrink-0">
                                     <div className="flex flex-col sm:flex-row gap-2">
-                                        <Button
-                                            className="flex-1 w-full sm:w-auto"
-                                            onClick={handleUpdate}
-                                            disabled={updateMutation.isPending}
-                                        >
-                                            更新
-                                        </Button>
-                                        <Button
-                                            variant="outline"
-                                            className="flex-1 w-full sm:w-auto"
-                                            onClick={() => {
-                                                setIsEditDialogOpen(false);
-                                                setEditingVehicle(null);
-                                                setVehicleNumber("");
-                                                setVehicleTypeId("");
-                                                setCustomerName("");
-                                                setDesiredDeliveryDate("");
-                                                setCheckDueDate("");
-                                                setReserveDate("");
-                                                setReserveRound("");
-                                                setHasCoating("");
-                                                setHasLine("");
-                                                setHasPreferredNumber("");
-                                                setHasTireReplacement("");
-                                                setOutsourcing([{ destination: "", startDate: "", endDate: "" }]);
-                                            }}
-                                        >
-                                            キャンセル
-                                        </Button>
+                                    <Button
+                                        className="flex-1 w-full sm:w-auto"
+                                        onClick={handleUpdate}
+                                        disabled={updateMutation.isPending}
+                                    >
+                                        更新
+                                    </Button>
+                                    <Button
+                                        variant="outline"
+                                        className="flex-1 w-full sm:w-auto"
+                                        onClick={() => {
+                                            setIsEditDialogOpen(false);
+                                            setEditingVehicle(null);
+                                            setVehicleNumber("");
+                                            setVehicleTypeId("");
+                                            setCustomerName("");
+                                            setDesiredDeliveryDate("");
+                                            setCheckDueDate("");
+                                            setReserveDate("");
+                                            setReserveRound("");
+                                            setHasCoating("");
+                                            setHasLine("");
+                                            setHasPreferredNumber("");
+                                            setHasTireReplacement("");
+                                            setOutsourcing([{ destination: "", startDate: "", endDate: "" }]);
+                                        }}
+                                    >
+                                        キャンセル
+                                    </Button>
                                     </div>
                                     {user?.role === "admin" && (
                                         <Button
