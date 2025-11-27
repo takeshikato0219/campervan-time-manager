@@ -40,6 +40,7 @@ export default function ProcessManagement() {
     const majorCategoryOptions = [
         "キャンパー",
         "一般",
+        "家具",
         "修理",
         "クレーム",
         "外注管理",
@@ -323,7 +324,7 @@ export default function ProcessManagement() {
                                             {opt}
                                         </option>
                                     ))}
-                                    <option value="__custom__">その他（自由入力）</option>
+                                    <option value="__custom__">新しい区分を追加</option>
                                 </select>
                                 {editingProcess.majorCategory &&
                                     !majorCategoryOptions.includes(editingProcess.majorCategory) && (
