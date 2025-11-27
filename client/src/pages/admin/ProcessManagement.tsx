@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useAuth } from "../../hooks/useAuth";
 import { trpc } from "../../lib/trpc";
 import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/card";
@@ -33,6 +33,29 @@ export default function ProcessManagement() {
     }
 
     const { data: processes, refetch } = trpc.processes.list.useQuery();
+    const [localProcesses, setLocalProcesses] = useState<any[]>([]);
+    const [draggingId, setDraggingId] = useState<number | null>(null);
+
+    // 大区分の候補
+    const majorCategoryOptions = [
+        "キャンパー",
+        "一般",
+        "修理",
+        "クレーム",
+        "外注管理",
+        "車移動",
+        "その他",
+    ];
+
+    useEffect(() => {
+        if (processes) {
+            // 表示順でソートしつつローカル状態にコピー
+            const sorted = [...processes].sort(
+                (a, b) => (a.displayOrder || 0) - (b.displayOrder || 0)
+            );
+            setLocalProcesses(sorted);
+        }
+    }, [processes]);
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [editingProcess, setEditingProcess] = useState<{
         id?: number;
@@ -74,6 +97,12 @@ export default function ProcessManagement() {
         },
         onError: (error) => {
             toast.error(error.message || "工程の削除に失敗しました");
+        },
+    });
+
+    const reorderMutation = trpc.processes.reorder.useMutation({
+        onError: (error) => {
+            toast.error(error.message || "並び順の更新に失敗しました");
         },
     });
 
@@ -135,7 +164,8 @@ export default function ProcessManagement() {
                         setEditingProcess({
                             name: "",
                             description: "",
-                            majorCategory: "",
+                            // デフォルトで「キャンパー」
+                            majorCategory: "キャンパー",
                             minorCategory: "",
                             displayOrder: "0",
                         });
@@ -149,13 +179,14 @@ export default function ProcessManagement() {
 
             <Card>
                 <CardHeader>
-                    <CardTitle>工程一覧</CardTitle>
+                    <CardTitle className="text-xl sm:text-2xl">工程一覧</CardTitle>
                 </CardHeader>
-                <CardContent>
-                    {processes && processes.length > 0 ? (
+                <CardContent className="text-base sm:text-lg">
+                    {localProcesses && localProcesses.length > 0 ? (
                         <Table>
-                            <TableHeader>
+                            <TableHeader className="text-base sm:text-lg">
                                 <TableRow>
+                                    <TableHead className="w-8">並び替え</TableHead>
                                     <TableHead>表示順</TableHead>
                                     <TableHead>工程名</TableHead>
                                     <TableHead>大分類</TableHead>
@@ -165,9 +196,49 @@ export default function ProcessManagement() {
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {processes.map((process) => (
-                                    <TableRow key={process.id}>
-                                        <TableCell>{process.displayOrder || 0}</TableCell>
+                                {localProcesses.map((process, index) => (
+                                    <TableRow
+                                        key={process.id}
+                                        draggable
+                                        onDragStart={() => setDraggingId(process.id)}
+                                        onDragOver={(e) => e.preventDefault()}
+                                        onDrop={() => {
+                                            if (draggingId == null || draggingId === process.id) return;
+                                            const sourceId = draggingId;
+                                            const targetId = process.id;
+                                            setDraggingId(null);
+
+                                            setLocalProcesses((current) => {
+                                                const list = [...current];
+                                                const fromIndex = list.findIndex((p) => p.id === sourceId);
+                                                const toIndex = list.findIndex((p) => p.id === targetId);
+                                                if (fromIndex === -1 || toIndex === -1) return current;
+
+                                                const [moved] = list.splice(fromIndex, 1);
+                                                list.splice(toIndex, 0, moved);
+
+                                                const withOrder = list.map((p, i) => ({
+                                                    ...p,
+                                                    displayOrder: i + 1,
+                                                }));
+
+                                                // サーバー側の表示順も更新
+                                                reorderMutation.mutate({
+                                                    items: withOrder.map((p) => ({
+                                                        id: p.id,
+                                                        displayOrder: p.displayOrder || 0,
+                                                    })),
+                                                });
+
+                                                return withOrder;
+                                            });
+                                        }}
+                                        className={draggingId === process.id ? "bg-blue-50" : ""}
+                                    >
+                                        <TableCell className="cursor-move text-center text-xs text-[hsl(var(--muted-foreground))]">
+                                            ⋮⋮
+                                        </TableCell>
+                                        <TableCell>{process.displayOrder || index + 1}</TableCell>
                                         <TableCell className="font-medium">{process.name}</TableCell>
                                         <TableCell>{process.majorCategory || "-"}</TableCell>
                                         <TableCell>{process.minorCategory || "-"}</TableCell>
@@ -222,13 +293,52 @@ export default function ProcessManagement() {
                             </div>
                             <div>
                                 <label className="text-sm font-medium">大分類</label>
-                                <Input
-                                    value={editingProcess.majorCategory}
-                                    onChange={(e) =>
-                                        setEditingProcess({ ...editingProcess, majorCategory: e.target.value })
+                                <select
+                                    className="flex h-10 w-full rounded-md border border-[hsl(var(--input))] bg-[hsl(var(--background))] px-3 py-2 text-sm"
+                                    value={
+                                        editingProcess.majorCategory &&
+                                        !majorCategoryOptions.includes(editingProcess.majorCategory)
+                                            ? "__custom__"
+                                            : editingProcess.majorCategory || ""
                                     }
-                                    placeholder="大分類を入力"
-                                />
+                                    onChange={(e) => {
+                                        const value = e.target.value;
+                                        if (value === "__custom__") {
+                                            // 「その他（自由入力）」が選ばれたら中身は空で、下のテキスト入力で指定
+                                            setEditingProcess({
+                                                ...editingProcess,
+                                                majorCategory: "",
+                                            });
+                                        } else {
+                                            setEditingProcess({
+                                                ...editingProcess,
+                                                majorCategory: value,
+                                            });
+                                        }
+                                    }}
+                                >
+                                    <option value="">選択してください</option>
+                                    {majorCategoryOptions.map((opt) => (
+                                        <option key={opt} value={opt}>
+                                            {opt}
+                                        </option>
+                                    ))}
+                                    <option value="__custom__">その他（自由入力）</option>
+                                </select>
+                                {editingProcess.majorCategory &&
+                                    !majorCategoryOptions.includes(editingProcess.majorCategory) && (
+                                        <Input
+                                            className="mt-2"
+                                            value={editingProcess.majorCategory}
+                                            onChange={(e) =>
+                                                setEditingProcess({
+                                                    ...editingProcess,
+                                                    majorCategory: e.target.value,
+                                                })
+                                            }
+                                            placeholder="大分類を入力"
+                                        />
+                                    )}
                             </div>
                             <div>
                                 <label className="text-sm font-medium">小分類</label>

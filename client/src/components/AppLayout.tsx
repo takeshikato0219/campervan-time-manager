@@ -117,8 +117,10 @@ export default function AppLayout({ children }: AppLayoutProps) {
                                             }`}
                                         onClick={() => setIsMobileMenuOpen(false)}
                                     >
-                                        <Icon className="h-5 w-5" />
-                                        <span>{item.label}</span>
+                                        <Icon className="h-6 w-6" />
+                                        <span className="text-base sm:text-lg font-semibold">
+                                            {item.label}
+                                        </span>
                                     </div>
                                 </Link>
                             );
@@ -127,7 +129,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
                         {user?.role === "admin" && (
                             <>
                                 <div className="pt-4 mt-4 border-t border-[hsl(var(--border))]">
-                                    <p className="px-3 text-xs font-semibold text-[hsl(var(--muted-foreground))] uppercase">
+                                    <p className="px-3 text-xs sm:text-sm font-semibold text-[hsl(var(--muted-foreground))] uppercase">
                                         管理者メニュー
                                     </p>
                                 </div>
@@ -143,8 +145,10 @@ export default function AppLayout({ children }: AppLayoutProps) {
                                                     }`}
                                                 onClick={() => setIsMobileMenuOpen(false)}
                                             >
-                                                <Icon className="h-5 w-5" />
-                                                <span>{item.label}</span>
+                                                <Icon className="h-6 w-6" />
+                                                <span className="text-base sm:text-lg font-semibold">
+                                                    {item.label}
+                                                </span>
                                             </div>
                                         </Link>
                                     );

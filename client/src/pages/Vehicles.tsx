@@ -573,6 +573,23 @@ export default function Vehicles() {
         },
     });
 
+    const getCategoryBadgeClass = (category?: string | null) => {
+        switch (category) {
+            case "キャンパー":
+                return "bg-orange-500 text-white";
+            case "一般":
+                return "bg-blue-600 text-white";
+            case "中古":
+                return "bg-purple-600 text-white";
+            case "修理":
+                return "bg-red-600 text-white";
+            case "クレーム":
+                return "bg-gray-700 text-white";
+            default:
+                return "bg-gray-300 text-gray-900";
+        }
+    };
+
     const filteredVehicles = vehicles?.filter((vehicle) => {
         const query = searchQuery.toLowerCase();
         const vehicleTypeName =
@@ -610,7 +627,7 @@ export default function Vehicles() {
         setEditingVehicle(vehicle);
         setVehicleNumber(vehicle.vehicleNumber);
         setVehicleTypeId(vehicle.vehicleTypeId.toString());
-        setCategory(vehicle.category || "一般");
+        setCategory(vehicle.category || "キャンパー");
         setCustomerName(vehicle.customerName || "");
         setDesiredDeliveryDate(
             vehicle.desiredDeliveryDate
@@ -826,7 +843,11 @@ export default function Vehicles() {
                                                         {vehicleTypes?.find((vt) => vt.id === vehicle.vehicleTypeId)?.name || "不明"}
                                                     </span>
                                                     {vehicle.category && (
-                                                        <span className="inline-flex items-center max-w-full px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-md text-[10px] sm:text-xs font-semibold bg-blue-600 text-white break-words">
+                                                        <span
+                                                            className={`inline-flex items-center max-w-full px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-md text-[10px] sm:text-xs font-semibold break-words ${getCategoryBadgeClass(
+                                                                vehicle.category
+                                                            )}`}
+                                                        >
                                                             {vehicle.category}
                                                         </span>
                                                     )}
@@ -1161,8 +1182,8 @@ export default function Vehicles() {
                                         onChange={(e) => setCategory(e.target.value as any)}
                                         required
                                     >
-                                        <option value="一般">一般</option>
                                         <option value="キャンパー">キャンパー</option>
+                                        <option value="一般">一般</option>
                                         <option value="中古">中古</option>
                                         <option value="修理">修理</option>
                                         <option value="クレーム">クレーム</option>

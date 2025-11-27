@@ -109,6 +109,51 @@ export const bulletinRouter = createTRPCRouter({
             }
         }),
 
+    // 掲示板メッセージ削除（投稿者本人 or 管理者）
+    delete: protectedProcedure
+        .input(
+            z.object({
+                id: z.number().int(),
+            })
+        )
+        .mutation(async ({ input, ctx }) => {
+            const db = await getDb();
+            if (!db) {
+                throw new TRPCError({
+                    code: "INTERNAL_SERVER_ERROR",
+                    message: "データベースに接続できません",
+                });
+            }
+
+            await ensureBulletinTable(db);
+
+            // 対象メッセージ取得
+            const [rows]: any = await db.execute(
+                sql`SELECT * FROM \`bulletinMessages\` WHERE \`id\` = ${input.id} LIMIT 1`
+            );
+            const msg = rows && rows[0];
+            if (!msg) {
+                throw new TRPCError({
+                    code: "NOT_FOUND",
+                    message: "メッセージが見つかりません",
+                });
+            }
+
+            // 投稿者本人か管理者のみ削除可能
+            if (msg.userId !== ctx.user!.id && ctx.user!.role !== "admin") {
+                throw new TRPCError({
+                    code: "FORBIDDEN",
+                    message: "このメッセージを削除する権限がありません",
+                });
+            }
+
+            await db.execute(
+                sql`DELETE FROM \`bulletinMessages\` WHERE \`id\` = ${input.id}`
+            );
+
+            return { success: true };
+        }),
+
     // 最新の掲示板メッセージを取得（上位20件）
     list: protectedProcedure.query(async () => {
         const db = await getDb();

@@ -173,7 +173,11 @@ export default function AttendanceManagement() {
                                 onChange={(e) => setSelectedDate(new Date(e.target.value))}
                                 className="flex-1 sm:w-auto"
                             />
-                            <Button variant="outline" size="sm" onClick={handleToday} className="hidden sm:inline-flex">
+                            <Button
+                                size="sm"
+                                onClick={handleToday}
+                                className="hidden sm:inline-flex bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:opacity-90 font-semibold px-6"
+                            >
                                 今日
                             </Button>
                         </div>

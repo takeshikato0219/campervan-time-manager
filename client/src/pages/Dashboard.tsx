@@ -50,6 +50,16 @@ export default function Dashboard() {
         },
     });
 
+    const deleteBulletinMutation = trpc.bulletin.delete.useMutation({
+        onSuccess: () => {
+            toast.success("掲示板の投稿を削除しました");
+            refetchBulletin();
+        },
+        onError: (error) => {
+            toast.error(error.message || "掲示板の削除に失敗しました");
+        },
+    });
+
     const createBulletinMutation = trpc.bulletin.create.useMutation({
         onSuccess: () => {
             toast.success("掲示板に投稿しました");
@@ -247,16 +257,29 @@ export default function Dashboard() {
                                             <span className="font-medium text-xs sm:text-sm">
                                                 {msg.user?.name || msg.user?.username || "不明"} さん
                                             </span>
-                                            <div className="flex items-center gap-2">
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-[10px] text-[hsl(var(--muted-foreground))]">
+                                                {format(new Date(msg.createdAt), "MM/dd HH:mm")}
+                                            </span>
+                                            {typeof (msg as any).expireDays === "number" && (
                                                 <span className="text-[10px] text-[hsl(var(--muted-foreground))]">
-                                                    {format(new Date(msg.createdAt), "MM/dd HH:mm")}
+                                                    {(msg as any).expireDays}日表示
                                                 </span>
-                                                {typeof (msg as any).expireDays === "number" && (
-                                                    <span className="text-[10px] text-[hsl(var(--muted-foreground))]">
-                                                        {(msg as any).expireDays}日表示
-                                                    </span>
-                                                )}
-                                            </div>
+                                            )}
+                                            {(msg.userId === user?.id || user?.role === "admin") && (
+                                                <Button
+                                                    variant="outline"
+                                                    size="xs"
+                                                    className="h-6 px-2 text-[10px]"
+                                                    onClick={() => {
+                                                        if (!window.confirm("この掲示板の投稿を削除しますか？")) return;
+                                                        deleteBulletinMutation.mutate({ id: msg.id });
+                                                    }}
+                                                >
+                                                    削除
+                                                </Button>
+                                            )}
+                                        </div>
                                         </div>
                                         <p className="mt-1 text-xs sm:text-sm whitespace-pre-wrap break-words">
                                             {msg.message}

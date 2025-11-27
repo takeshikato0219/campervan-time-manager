@@ -100,5 +100,36 @@ export const processesRouter = createTRPCRouter({
 
             return { success: true };
         }),
+
+    // 表示順をまとめて更新（管理者専用）
+    reorder: subAdminProcedure
+        .input(
+            z.object({
+                items: z.array(
+                    z.object({
+                        id: z.number(),
+                        displayOrder: z.number(),
+                    })
+                ),
+            })
+        )
+        .mutation(async ({ input }) => {
+            const db = await getDb();
+            if (!db) {
+                throw new TRPCError({
+                    code: "INTERNAL_SERVER_ERROR",
+                    message: "データベースに接続できません",
+                });
+            }
+
+            for (const item of input.items) {
+                await db
+                    .update(schema.processes)
+                    .set({ displayOrder: item.displayOrder })
+                    .where(eq(schema.processes.id, item.id));
+            }
+
+            return { success: true };
+        }),
 });
 
