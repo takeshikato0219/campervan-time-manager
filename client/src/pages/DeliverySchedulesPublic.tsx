@@ -35,10 +35,10 @@ export default function DeliverySchedulesPublic() {
             <div className="w-full max-w-3xl">
                 <header className="mb-3 sm:mb-4 flex flex-col gap-2">
                     <h1 className="text-xl sm:text-2xl font-bold text-center">
-                        納車スケジュール（ワングラムデザイン様向け）
+                        ワングラム様製造スケジュール（外部公開）
                     </h1>
                     <p className="text-[11px] sm:text-xs text-[hsl(var(--muted-foreground))] text-center">
-                        このページは社外から閲覧できる納車予定一覧です。スマホ・PC両対応です。
+                        このページは社外から閲覧できる製造・納車スケジュールです。スマホ・PC両対応です。
                     </p>
                 </header>
 
@@ -56,7 +56,9 @@ export default function DeliverySchedulesPublic() {
 
                 <Card>
                     <CardHeader className="p-3 sm:p-4">
-                        <CardTitle className="text-base sm:text-lg">今月の納車スケジュール</CardTitle>
+                        <CardTitle className="text-base sm:text-lg">
+                            今月のワングラム様製造スケジュール
+                        </CardTitle>
                     </CardHeader>
                     <CardContent className="p-3 sm:p-4 space-y-2 sm:space-y-3">
                         {isLoading ? (
@@ -90,7 +92,7 @@ export default function DeliverySchedulesPublic() {
                                             <div className="flex flex-col items-end gap-1 flex-shrink-0">
                                                 {item.deliveryPlannedDate && (
                                                     <span className="text-[11px] sm:text-xs font-semibold">
-                                                        納車予定:{" "}
+                                                        katomotor完成予定:{" "}
                                                         {format(new Date(item.deliveryPlannedDate), "M月d日")}
                                                     </span>
                                                 )}

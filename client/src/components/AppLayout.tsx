@@ -47,7 +47,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
         { icon: ClipboardCheck, label: "車両チェック", path: "/vehicle-checks", admin: false },
         { icon: CalendarDays, label: "スタッフ休み予定一覧", path: "/staff-schedule", admin: false },
         { icon: Timer, label: "車両制作時間確認", path: "/vehicle-production", admin: false },
-        { icon: Truck, label: "納車スケジュール", path: "/delivery-schedules", admin: false },
+        { icon: Truck, label: "ワングラム様製造スケジュール", path: "/delivery-schedules", admin: false },
         { icon: BarChart3, label: "統計・分析", path: "/analytics", admin: false },
     ];
 

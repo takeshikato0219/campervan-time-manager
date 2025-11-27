@@ -226,9 +226,9 @@ export default function DeliverySchedules() {
         <div className="space-y-4 sm:space-y-6">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                 <div>
-                    <h1 className="text-2xl sm:text-3xl font-bold">納車スケジュール</h1>
+                    <h1 className="text-2xl sm:text-3xl font-bold">ワングラム様製造スケジュール</h1>
                     <p className="text-[hsl(var(--muted-foreground))] mt-1 sm:mt-2 text-sm sm:text-base">
-                        ワングラムデザインさんと共有する納車予定一覧です（スマホ表示対応）。
+                        ワングラムデザインさんと共有する製造・納車スケジュールです（スマホ表示対応）。
                         オプション・注意事項・仕様書もまとめて管理できます。
                     </p>
                 </div>
@@ -271,7 +271,7 @@ export default function DeliverySchedules() {
                                 一覧ビューモード
                             </>
                         ) : (
-                            <>今月の納車スケジュール</>
+                            <>今月のワングラム様製造スケジュール</>
                         )}
                     </CardTitle>
                 </CardHeader>
@@ -464,7 +464,7 @@ export default function DeliverySchedules() {
                                             </div>
                                             {item.deliveryPlannedDate && (
                                                 <span className="text-[11px] sm:text-xs font-semibold">
-                                                    納車予定:{" "}
+                                                    katomotor完成予定:{" "}
                                                     {format(new Date(item.deliveryPlannedDate), "M月d日")}
                                                 </span>
                                             )}
@@ -708,7 +708,7 @@ export default function DeliverySchedules() {
                                     />
                                 </div>
                                 <div>
-                                    <label className="text-xs font-medium block mb-1">納車予定</label>
+                                    <label className="text-xs font-medium block mb-1">katomotor完成予定</label>
                                     <Input
                                         type="date"
                                         value={editing.deliveryPlannedDate}
