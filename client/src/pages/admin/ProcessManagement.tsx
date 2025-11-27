@@ -41,6 +41,8 @@ export default function ProcessManagement() {
         "キャンパー",
         "一般",
         "家具",
+        "開発",
+        "展示車",
         "修理",
         "クレーム",
         "外注管理",

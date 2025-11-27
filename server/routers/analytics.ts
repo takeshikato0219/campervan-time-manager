@@ -125,6 +125,126 @@ export const analyticsRouter = createTRPCRouter({
     }),
 
     /**
+     * 現場スタッフ（field_worker）で、
+     * - 過去3日間のいずれかの日に出勤していて
+     * - 「出勤記録の勤務時間 - 1時間(休憩) - 30分」の作業記録が入っていない日があるユーザーを取得
+     *
+     * 勤務時間は以下の優先順位で算出する:
+     *  1. attendanceRecords.workMinutes が入っていればそれを使用
+     *  2. なければ workDate + clockInTime / clockOutTime から TIMESTAMPDIFF で分数計算
+     *
+     * 例:
+     *  - 出勤記録: 9時間（540分）
+     *  - 期待する作業記録: 540 - 90 = 450分（7.5時間）
+     *  - 作業記録合計が 450分 未満なら「作業報告未入力」とみなす
+     *
+     * この条件から外れれば（作業記録が増えて条件を満たせば）、自動的に一覧から消える。
+     */
+    getRecentLowWorkUsers: protectedProcedure.query(async () => {
+        const db = await getDb();
+        if (!db) {
+            return [];
+        }
+
+        // attendanceRecords と workRecords を結合して、「過去3日間の出勤日 × ユーザー」の作業時間を集計
+        const [rows]: any = await db.execute(
+            sql`
+                SELECT
+                    ar.userId AS userId,
+                    COALESCE(u.name, u.username) AS userName,
+                    ar.workDate AS workDate,
+                    COALESCE(
+                        SUM(
+                            CASE
+                                WHEN wr.id IS NOT NULL
+                                THEN TIMESTAMPDIFF(
+                                    MINUTE,
+                                    wr.startTime,
+                                    COALESCE(wr.endTime, NOW())
+                                )
+                                ELSE 0
+                            END
+                        ),
+                        0
+                    ) AS workMinutes,
+                    -- 勤務分数: workMinutes があればそれを使い、なければ clockIn/clockOut から計算
+                    GREATEST(
+                        COALESCE(
+                            ar.workMinutes,
+                            TIMESTAMPDIFF(
+                                MINUTE,
+                                STR_TO_DATE(CONCAT(ar.workDate, ' ', ar.clockInTime), '%Y-%m-%d %H:%i'),
+                                STR_TO_DATE(CONCAT(ar.workDate, ' ', ar.clockOutTime), '%Y-%m-%d %H:%i')
+                            ),
+                            0
+                        ) - 90,
+                        0
+                    ) AS expectedWorkMinutes
+                FROM \`attendanceRecords\` ar
+                INNER JOIN \`users\` u ON u.id = ar.userId
+                LEFT JOIN \`workRecords\` wr
+                    ON wr.userId = ar.userId
+                    AND DATE(wr.startTime) = ar.workDate
+                WHERE
+                    ar.workDate BETWEEN (CURDATE() - INTERVAL 3 DAY) AND (CURDATE() - INTERVAL 1 DAY)
+                    AND ar.clockInTime IS NOT NULL
+                    AND u.role = 'field_worker'
+                GROUP BY
+                    ar.userId,
+                    u.name,
+                    u.username,
+                    ar.workDate,
+                    expectedWorkMinutes
+                HAVING
+                    expectedWorkMinutes > 0
+                    AND workMinutes < expectedWorkMinutes
+            `
+        );
+
+        type Row = {
+            userId: number;
+            userName: string;
+            workDate: string | Date;
+            workMinutes: number;
+            expectedWorkMinutes: number;
+        };
+
+        const map = new Map<
+            number,
+            {
+                userId: number;
+                userName: string;
+                dates: string[];
+            }
+        >();
+
+        for (const r of rows as Row[]) {
+            const userId = Number((r as any).userId);
+            const userName = (r as any).userName as string;
+            const workDate =
+                typeof r.workDate === "string"
+                    ? r.workDate
+                    : (r.workDate as Date).toISOString().slice(0, 10);
+
+            if (!map.has(userId)) {
+                map.set(userId, { userId, userName, dates: [] });
+            }
+            const entry = map.get(userId)!;
+            if (!entry.dates.includes(workDate)) {
+                entry.dates.push(workDate);
+            }
+        }
+
+        // 日付は新しい順に並べる
+        const result = Array.from(map.values()).map((v) => ({
+            ...v,
+            dates: v.dates.sort((a, b) => (a < b ? 1 : a > b ? -1 : 0)),
+        }));
+
+        return result;
+    }),
+
+    /**
      * 車両ごとの制作時間を集計する
      * - 1台あたりの総作業時間（全期間）
      * - 工程ごとの総作業時間

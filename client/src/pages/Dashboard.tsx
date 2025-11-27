@@ -39,6 +39,7 @@ export default function Dashboard() {
     const { data: unreadBroadcasts, refetch: refetchBroadcasts } = trpc.salesBroadcasts.getUnread.useQuery();
     const { data: bulletinMessages, refetch: refetchBulletin } = trpc.bulletin.list.useQuery();
     const { data: vehicleTypes } = trpc.vehicleTypes.list.useQuery();
+    const { data: recentLowWorkUsers } = trpc.analytics.getRecentLowWorkUsers.useQuery();
     const [selectedVehicleTypeFilter, setSelectedVehicleTypeFilter] = useState<number | "all">("all");
 
     // 未完了のチェック依頼を取得
@@ -205,6 +206,31 @@ export default function Dashboard() {
                     こんにちは、{user?.name || user?.username}さん
                 </p>
             </div>
+
+            {/* 過去3日以内で「勤務時間-1時間」より作業記録が少ない現場スタッフの注意喚起 */}
+            {recentLowWorkUsers && recentLowWorkUsers.length > 0 && (
+                <Card className="border-yellow-300 bg-yellow-50">
+                    <CardContent className="p-4 sm:p-6 space-y-1">
+                        <p className="font-semibold text-yellow-900 text-sm sm:text-base">
+                            作業報告が不足している可能性があります（過去3日間）
+                        </p>
+                        <ul className="list-disc pl-5 space-y-0.5 text-xs sm:text-sm text-yellow-900">
+                            {recentLowWorkUsers.flatMap((u) =>
+                                u.dates.map((d: string) => (
+                                    <li key={`${u.userId}-${d}`}>
+                                        <span className="font-semibold">{u.userName}</span>
+                                        <span>
+                                            さんが
+                                            {format(new Date(d), "MM/dd")}
+                                            日の作業報告を入れていません
+                                        </span>
+                                    </li>
+                                ))
+                            )}
+                        </ul>
+                    </CardContent>
+                </Card>
+            )}
 
             {/* 全員向け掲示板（最新3件だけ表示） */}
             <Card>
