@@ -25,6 +25,42 @@ function calcDelayDays(dueDate: Date | null): number {
     return diffDays > 0 ? diffDays : 0;
 }
 
+// 本番環境でテーブルが無い場合に自動で作成するヘルパー
+async function ensureDeliverySchedulesTable(db: any) {
+    try {
+        await db.execute(
+            `
+            CREATE TABLE IF NOT EXISTS \`deliverySchedules\` (
+              \`id\` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+              \`vehicleName\` VARCHAR(255) NOT NULL,
+              \`vehicleType\` VARCHAR(255),
+              \`customerName\` VARCHAR(255),
+              \`optionName\` VARCHAR(255),
+              \`optionCategory\` VARCHAR(255),
+              \`prefecture\` VARCHAR(100),
+              \`baseCarReady\` ENUM('yes','no'),
+              \`furnitureReady\` ENUM('yes','no'),
+              \`inCharge\` VARCHAR(100),
+              \`dueDate\` DATE,
+              \`incomingPlannedDate\` DATE,
+              \`shippingPlannedDate\` DATE,
+              \`deliveryPlannedDate\` DATE,
+              \`comment\` TEXT,
+              \`claimComment\` TEXT,
+              \`photosJson\` TEXT,
+              \`oemComment\` TEXT,
+              \`pickupConfirmed\` ENUM('true','false') NOT NULL DEFAULT 'false',
+              \`specSheetUrl\` TEXT,
+              \`createdAt\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+              \`updatedAt\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+            )
+            `
+        );
+    } catch (e) {
+        console.error("[deliverySchedules] ensureDeliverySchedulesTable failed:", e);
+    }
+}
+
 export const deliverySchedulesRouter = createTRPCRouter({
     // 公開（パスワードなし）用の一覧取得
     publicList: publicProcedure
@@ -42,6 +78,8 @@ export const deliverySchedulesRouter = createTRPCRouter({
                     message: "データベースに接続できません",
                 });
             }
+
+            await ensureDeliverySchedulesTable(db);
 
             const { start, end } = getMonthRange(input.year, input.month);
 
@@ -85,6 +123,8 @@ export const deliverySchedulesRouter = createTRPCRouter({
                 });
             }
 
+            await ensureDeliverySchedulesTable(db);
+
             const { start, end } = getMonthRange(input.year, input.month);
 
             const records = await db
@@ -121,6 +161,8 @@ export const deliverySchedulesRouter = createTRPCRouter({
                     message: "データベースに接続できません",
                 });
             }
+
+            await ensureDeliverySchedulesTable(db);
 
             const [record] = await db
                 .select()
@@ -172,6 +214,8 @@ export const deliverySchedulesRouter = createTRPCRouter({
                     message: "データベースに接続できません",
                 });
             }
+
+            await ensureDeliverySchedulesTable(db);
 
             const parseDate = (value?: string) => {
                 if (!value) return null;
@@ -235,6 +279,8 @@ export const deliverySchedulesRouter = createTRPCRouter({
                 });
             }
 
+            await ensureDeliverySchedulesTable(db);
+
             const parseDate = (value?: string) => {
                 if (!value) return undefined;
                 const d = new Date(value);
@@ -289,6 +335,8 @@ export const deliverySchedulesRouter = createTRPCRouter({
                 });
             }
 
+            await ensureDeliverySchedulesTable(db);
+
             await db.delete(schema.deliverySchedules).where(eq(schema.deliverySchedules.id, input.id));
 
             return { success: true };
@@ -305,6 +353,8 @@ export const deliverySchedulesRouter = createTRPCRouter({
                     message: "データベースに接続できません",
                 });
             }
+
+            await ensureDeliverySchedulesTable(db);
 
             await db
                 .update(schema.deliverySchedules)
@@ -377,6 +427,8 @@ export const deliverySchedulesRouter = createTRPCRouter({
                     message: "データベースに接続できません",
                 });
             }
+
+            await ensureDeliverySchedulesTable(db);
 
             // ディレクトリ作成
             const uploadDir = path.resolve(process.cwd(), "uploads", "delivery-specs");
