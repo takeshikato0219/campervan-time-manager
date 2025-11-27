@@ -184,6 +184,25 @@ export default function WorkRecords() {
         return hours > 0 ? `${hours}時間${mins}分` : `${mins}分`;
     };
 
+    // 日付ごとに「今日 / 昨日 / 一昨日」の3つに分ける
+    const today = new Date();
+    const todayKey = format(today, "yyyy-MM-dd");
+    const yesterdayDate = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 1);
+    const dayBeforeDate = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 2);
+    const yesterdayKey = format(yesterdayDate, "yyyy-MM-dd");
+    const dayBeforeKey = format(dayBeforeDate, "yyyy-MM-dd");
+
+    const getRecordsByDateKey = (key: string) =>
+        (workRecords || []).filter((record) => {
+            const d = typeof record.startTime === "string" ? new Date(record.startTime) : record.startTime;
+            const recordKey = format(d, "yyyy-MM-dd");
+            return recordKey === key;
+        });
+
+    const todayRecords = getRecordsByDateKey(todayKey);
+    const yesterdayRecords = getRecordsByDateKey(yesterdayKey);
+    const dayBeforeRecords = getRecordsByDateKey(dayBeforeKey);
+
     return (
         <div className="space-y-6">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -203,54 +222,162 @@ export default function WorkRecords() {
                 <CardHeader className="p-4 sm:p-6">
                     <CardTitle className="text-lg sm:text-xl">今日の作業記録</CardTitle>
                 </CardHeader>
-                <CardContent className="p-4 sm:p-6">
-                    {workRecords && workRecords.length > 0 ? (
-                        <div className="space-y-2 sm:space-y-3">
-                            {workRecords.map((record) => (
-                                <div
-                                    key={record.id}
-                                    className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3 p-2 sm:p-3 border border-[hsl(var(--border))] rounded-lg"
-                                >
-                                    <div className="flex-1">
-                                        <p className="font-semibold text-base">{record.vehicleNumber}</p>
-                                        <p className="text-sm text-[hsl(var(--muted-foreground))]">
-                                            {record.processName}
-                                        </p>
-                                        <p className="text-xs text-[hsl(var(--muted-foreground))]">
-                                            {formatTime(record.startTime)}
-                                            {record.endTime ? ` - ${formatTime(record.endTime)}` : " (作業中)"}
-                                        </p>
-                                    </div>
-                                    <div className="flex items-center justify-between sm:justify-end gap-2 sm:gap-4">
-                                        <div className="text-right sm:text-left">
-                                            <p className="font-semibold text-sm sm:text-base">{formatDuration(record.durationMinutes)}</p>
+                <CardContent className="p-4 sm:p-6 space-y-6">
+                    {/* 今日 */}
+                    <div>
+                        <p className="font-semibold mb-2">今日</p>
+                        {todayRecords.length > 0 ? (
+                            <div className="space-y-2 sm:space-y-3">
+                                {todayRecords.map((record) => (
+                                    <div
+                                        key={record.id}
+                                        className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3 p-2 sm:p-3 border border-[hsl(var(--border))] rounded-lg"
+                                    >
+                                        <div className="flex-1">
+                                            <p className="font-semibold text-base">{record.vehicleNumber}</p>
+                                            <p className="text-sm text-[hsl(var(--muted-foreground))]">
+                                                {record.processName}
+                                            </p>
+                                            <p className="text-xs text-[hsl(var(--muted-foreground))]">
+                                                {formatTime(record.startTime)}
+                                                {record.endTime ? ` - ${formatTime(record.endTime)}` : " (作業中)"}
+                                            </p>
                                         </div>
-                                        <div className="flex gap-1 sm:gap-2">
-                                            <Button
-                                                size="sm"
-                                                variant="outline"
-                                                onClick={() => handleEdit(record)}
-                                            >
-                                                <Edit className="h-4 w-4" />
-                                            </Button>
-                                            <Button
-                                                size="sm"
-                                                variant="destructive"
-                                                onClick={() => handleDelete(record.id)}
-                                                disabled={deleteWorkRecordMutation.isPending}
-                                            >
-                                                <Trash2 className="h-4 w-4" />
-                                            </Button>
+                                        <div className="flex items-center justify-between sm:justify-end gap-2 sm:gap-4">
+                                            <div className="text-right sm:text-left">
+                                                <p className="font-semibold text-sm sm:text-base">
+                                                    {formatDuration(record.durationMinutes)}
+                                                </p>
+                                            </div>
+                                            <div className="flex gap-1 sm:gap-2">
+                                                <Button
+                                                    size="sm"
+                                                    variant="outline"
+                                                    onClick={() => handleEdit(record)}
+                                                >
+                                                    <Edit className="h-4 w-4" />
+                                                </Button>
+                                                <Button
+                                                    size="sm"
+                                                    variant="destructive"
+                                                    onClick={() => handleDelete(record.id)}
+                                                    disabled={deleteWorkRecordMutation.isPending}
+                                                >
+                                                    <Trash2 className="h-4 w-4" />
+                                                </Button>
+                                            </div>
                                         </div>
                                     </div>
-                                </div>
-                            ))}
-                        </div>
-                    ) : (
-                        <p className="text-[hsl(var(--muted-foreground))] text-center py-4">
-                            今日の作業記録はありません
-                        </p>
-                    )}
+                                ))}
+                            </div>
+                        ) : (
+                            <p className="text-[hsl(var(--muted-foreground))] text-sm">今日の作業記録はありません</p>
+                        )}
+                    </div>
+
+                    {/* 昨日 */}
+                    <div>
+                        <p className="font-semibold mb-2">昨日</p>
+                        {yesterdayRecords.length > 0 ? (
+                            <div className="space-y-2 sm:space-y-3">
+                                {yesterdayRecords.map((record) => (
+                                    <div
+                                        key={record.id}
+                                        className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3 p-2 sm:p-3 border border-[hsl(var(--border))] rounded-lg"
+                                    >
+                                        <div className="flex-1">
+                                            <p className="font-semibold text-base">{record.vehicleNumber}</p>
+                                            <p className="text-sm text-[hsl(var(--muted-foreground))]">
+                                                {record.processName}
+                                            </p>
+                                            <p className="text-xs text-[hsl(var(--muted-foreground))]">
+                                                {formatTime(record.startTime)}
+                                                {record.endTime ? ` - ${formatTime(record.endTime)}` : " (作業中)"}
+                                            </p>
+                                        </div>
+                                        <div className="flex items-center justify-between sm:justify-end gap-2 sm:gap-4">
+                                            <div className="text-right sm:text-left">
+                                                <p className="font-semibold text-sm sm:text-base">
+                                                    {formatDuration(record.durationMinutes)}
+                                                </p>
+                                            </div>
+                                            <div className="flex gap-1 sm:gap-2">
+                                                <Button
+                                                    size="sm"
+                                                    variant="outline"
+                                                    onClick={() => handleEdit(record)}
+                                                >
+                                                    <Edit className="h-4 w-4" />
+                                                </Button>
+                                                <Button
+                                                    size="sm"
+                                                    variant="destructive"
+                                                    onClick={() => handleDelete(record.id)}
+                                                    disabled={deleteWorkRecordMutation.isPending}
+                                                >
+                                                    <Trash2 className="h-4 w-4" />
+                                                </Button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : (
+                            <p className="text-[hsl(var(--muted-foreground))] text-sm">昨日の作業記録はありません</p>
+                        )}
+                    </div>
+
+                    {/* 一昨日 */}
+                    <div>
+                        <p className="font-semibold mb-2">一昨日</p>
+                        {dayBeforeRecords.length > 0 ? (
+                            <div className="space-y-2 sm:space-y-3">
+                                {dayBeforeRecords.map((record) => (
+                                    <div
+                                        key={record.id}
+                                        className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3 p-2 sm:p-3 border border-[hsl(var(--border))] rounded-lg"
+                                    >
+                                        <div className="flex-1">
+                                            <p className="font-semibold text-base">{record.vehicleNumber}</p>
+                                            <p className="text-sm text-[hsl(var(--muted-foreground))]">
+                                                {record.processName}
+                                            </p>
+                                            <p className="text-xs text-[hsl(var(--muted-foreground))]">
+                                                {formatTime(record.startTime)}
+                                                {record.endTime ? ` - ${formatTime(record.endTime)}` : " (作業中)"}
+                                            </p>
+                                        </div>
+                                        <div className="flex items-center justify-between sm:justify-end gap-2 sm:gap-4">
+                                            <div className="text-right sm:text-left">
+                                                <p className="font-semibold text-sm sm:text-base">
+                                                    {formatDuration(record.durationMinutes)}
+                                                </p>
+                                            </div>
+                                            <div className="flex gap-1 sm:gap-2">
+                                                <Button
+                                                    size="sm"
+                                                    variant="outline"
+                                                    onClick={() => handleEdit(record)}
+                                                >
+                                                    <Edit className="h-4 w-4" />
+                                                </Button>
+                                                <Button
+                                                    size="sm"
+                                                    variant="destructive"
+                                                    onClick={() => handleDelete(record.id)}
+                                                    disabled={deleteWorkRecordMutation.isPending}
+                                                >
+                                                    <Trash2 className="h-4 w-4" />
+                                                </Button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : (
+                            <p className="text-[hsl(var(--muted-foreground))] text-sm">一昨日の作業記録はありません</p>
+                        )}
+                    </div>
                 </CardContent>
             </Card>
 
