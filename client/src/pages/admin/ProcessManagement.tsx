@@ -47,8 +47,18 @@ export default function ProcessManagement() {
         "クレーム",
         "外注管理",
         "車移動",
+        "掃除",
         "その他",
     ];
+
+    // 小分類の候補（既存データから自動生成）
+    const minorCategoryOptions = Array.from(
+        new Set(
+            (localProcesses || [])
+                .map((p) => p.minorCategory as string | undefined)
+                .filter((v): v is string => !!v)
+        )
+    );
 
     useEffect(() => {
         if (processes) {
@@ -68,6 +78,8 @@ export default function ProcessManagement() {
         minorCategory: string;
         displayOrder: string;
     } | null>(null);
+    const [useCustomMajor, setUseCustomMajor] = useState(false);
+    const [useCustomMinor, setUseCustomMinor] = useState(false);
 
     const createMutation = trpc.processes.create.useMutation({
         onSuccess: () => {
@@ -118,6 +130,12 @@ export default function ProcessManagement() {
             minorCategory: process.minorCategory || "",
             displayOrder: process.displayOrder?.toString() || "0",
         });
+        setUseCustomMajor(
+            !!process.majorCategory && !majorCategoryOptions.includes(process.majorCategory)
+        );
+        setUseCustomMinor(
+            !!process.minorCategory && !minorCategoryOptions.includes(process.minorCategory)
+        );
         setIsDialogOpen(true);
     };
 
@@ -172,6 +190,8 @@ export default function ProcessManagement() {
                             minorCategory: "",
                             displayOrder: "0",
                         });
+                        setUseCustomMajor(false);
+                        setUseCustomMinor(false);
                         setIsDialogOpen(true);
                     }}
                 >
@@ -299,20 +319,21 @@ export default function ProcessManagement() {
                                 <select
                                     className="flex h-10 w-full rounded-md border border-[hsl(var(--input))] bg-[hsl(var(--background))] px-3 py-2 text-sm"
                                     value={
-                                        editingProcess.majorCategory &&
-                                        !majorCategoryOptions.includes(editingProcess.majorCategory)
+                                        useCustomMajor
                                             ? "__custom__"
                                             : editingProcess.majorCategory || ""
                                     }
                                     onChange={(e) => {
                                         const value = e.target.value;
                                         if (value === "__custom__") {
-                                            // 「その他（自由入力）」が選ばれたら中身は空で、下のテキスト入力で指定
+                                            // 「新しい区分を追加」が選ばれたら、下のテキスト入力で指定
+                                            setUseCustomMajor(true);
                                             setEditingProcess({
                                                 ...editingProcess,
                                                 majorCategory: "",
                                             });
                                         } else {
+                                            setUseCustomMajor(false);
                                             setEditingProcess({
                                                 ...editingProcess,
                                                 majorCategory: value,
@@ -328,8 +349,7 @@ export default function ProcessManagement() {
                                     ))}
                                     <option value="__custom__">新しい区分を追加</option>
                                 </select>
-                                {editingProcess.majorCategory &&
-                                    !majorCategoryOptions.includes(editingProcess.majorCategory) && (
+                                {useCustomMajor && (
                                         <Input
                                             className="mt-2"
                                             value={editingProcess.majorCategory}
@@ -345,13 +365,51 @@ export default function ProcessManagement() {
                             </div>
                             <div>
                                 <label className="text-sm font-medium">小分類</label>
-                                <Input
-                                    value={editingProcess.minorCategory}
-                                    onChange={(e) =>
-                                        setEditingProcess({ ...editingProcess, minorCategory: e.target.value })
+                                <select
+                                    className="flex h-10 w-full rounded-md border border-[hsl(var(--input))] bg-[hsl(var(--background))] px-3 py-2 text-sm"
+                                    value={
+                                        useCustomMinor
+                                            ? "__custom__"
+                                            : editingProcess.minorCategory || ""
                                     }
-                                    placeholder="小分類を入力"
-                                />
+                                    onChange={(e) => {
+                                        const value = e.target.value;
+                                        if (value === "__custom__") {
+                                            setUseCustomMinor(true);
+                                            setEditingProcess({
+                                                ...editingProcess,
+                                                minorCategory: "",
+                                            });
+                                        } else {
+                                            setUseCustomMinor(false);
+                                            setEditingProcess({
+                                                ...editingProcess,
+                                                minorCategory: value,
+                                            });
+                                        }
+                                    }}
+                                >
+                                    <option value="">選択してください</option>
+                                    {minorCategoryOptions.map((opt) => (
+                                        <option key={opt} value={opt}>
+                                            {opt}
+                                        </option>
+                                    ))}
+                                    <option value="__custom__">新しい小分類を追加</option>
+                                </select>
+                                {useCustomMinor && (
+                                    <Input
+                                        className="mt-2"
+                                        value={editingProcess.minorCategory}
+                                        onChange={(e) =>
+                                            setEditingProcess({
+                                                ...editingProcess,
+                                                minorCategory: e.target.value,
+                                            })
+                                        }
+                                        placeholder="小分類を入力"
+                                    />
+                                )}
                             </div>
                             <div>
                                 <label className="text-sm font-medium">説明</label>
