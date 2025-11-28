@@ -1,5 +1,5 @@
 import { createTRPCRouter, protectedProcedure } from "../_core/trpc";
-import { getDb, schema } from "../db";
+import { getDb, getPool, schema } from "../db";
 import { eq, sql, inArray } from "drizzle-orm";
 import { z } from "zod";
 
@@ -193,6 +193,11 @@ export const analyticsRouter = createTRPCRouter({
         }
 
         // attendanceRecords と workRecords を結合して、「過去3営業日の出勤日 × ユーザー」の作業時間を集計
+        const pool = getPool();
+        if (!pool) {
+            return [];
+        }
+
         const datePlaceholders = businessDates.map(() => "?").join(",");
         const query = `
             SELECT
@@ -244,7 +249,7 @@ export const analyticsRouter = createTRPCRouter({
                 expectedWorkMinutes > 0
                 AND workMinutes < expectedWorkMinutes
         `;
-        const [rows]: any = await db.execute(sql.raw(query), businessDates);
+        const [rows]: any = await pool.execute(query, businessDates);
 
         type Row = {
             userId: number;
@@ -320,6 +325,11 @@ export const analyticsRouter = createTRPCRouter({
             return [];
         }
 
+        const pool = getPool();
+        if (!pool) {
+            return [];
+        }
+
         const datePlaceholders = businessDates.map(() => "?").join(",");
         const query = `
             SELECT
@@ -368,7 +378,7 @@ export const analyticsRouter = createTRPCRouter({
                 attendanceMinutes > 0
                 AND workMinutes > attendanceMinutes
         `;
-        const [rows]: any = await db.execute(sql.raw(query), businessDates);
+        const [rows]: any = await pool.execute(query, businessDates);
 
         type Row = {
             userId: number;

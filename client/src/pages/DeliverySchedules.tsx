@@ -399,11 +399,31 @@ export default function DeliverySchedules() {
                     </p>
                 </div>
 
-                {/* 日付ナビゲーションとアクションボタン */}
+                {/* 日付ナビゲーション */}
                 <Card className="bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200">
                     <CardContent className="p-4">
                         <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-                            {/* 日付ナビゲーション */}
+                            {/* 左側: 年月表示と今月ボタン */}
+                            <div className="flex items-center gap-1">
+                                <div className="flex flex-col items-start">
+                                    <span className={`text-lg sm:text-xl font-bold ${isCurrentMonth ? "text-blue-600" : "text-gray-800"}`}>
+                                        {year}年{month}月
+                                    </span>
+                                    {isCurrentMonth && (
+                                        <span className="text-xs text-blue-500 font-medium">（今月）</span>
+                                    )}
+                                </div>
+                                <Button
+                                    variant={isCurrentMonth ? "default" : "secondary"}
+                                    size="sm"
+                                    onClick={handleCurrentMonth}
+                                    className="h-10 px-4 font-semibold shadow-sm hover:shadow-md transition-shadow ml-1"
+                                >
+                                    今月
+                                </Button>
+                            </div>
+
+                            {/* 右側: 矢印ボタン */}
                             <div className="flex items-center gap-3">
                                 <Button
                                     variant="outline"
@@ -413,14 +433,6 @@ export default function DeliverySchedules() {
                                 >
                                     <ChevronLeft className="h-5 w-5" />
                                 </Button>
-                                <div className="flex flex-col items-center min-w-[10rem]">
-                                    <span className={`text-lg sm:text-xl font-bold ${isCurrentMonth ? "text-blue-600" : "text-gray-800"}`}>
-                                        {year}年{month}月
-                                    </span>
-                                    {isCurrentMonth && (
-                                        <span className="text-xs text-blue-500 font-medium">（今月）</span>
-                                    )}
-                                </div>
                                 <Button
                                     variant="outline"
                                     size="icon"
@@ -429,42 +441,25 @@ export default function DeliverySchedules() {
                                 >
                                     <ChevronRight className="h-5 w-5" />
                                 </Button>
-                                <Button
-                                    variant={isCurrentMonth ? "default" : "secondary"}
-                                    size="sm"
-                                    onClick={handleCurrentMonth}
-                                    className="h-10 px-4 font-semibold shadow-sm hover:shadow-md transition-shadow"
-                                >
-                                    今月
-                                </Button>
-                            </div>
-
-                            {/* アクションボタン */}
-                            <div className="flex items-center gap-2">
-                                <Button
-                                    variant={isCalendarMode ? "secondary" : "outline"}
-                                    size="sm"
-                                    onClick={() => setIsCalendarMode((v) => !v)}
-                                    className="h-10 px-4 font-semibold shadow-sm hover:shadow-md transition-shadow"
-                                >
-                                    <CalendarDays className="h-4 w-4 mr-2" />
-                                    {isCalendarMode ? "カード表示" : "一覧ビューモード"}
-                                </Button>
-                                {canEdit && (
-                                    <Button
-                                        size="sm"
-                                        onClick={openNewDialog}
-                                        className="h-10 px-4 font-semibold bg-blue-600 hover:bg-blue-700 text-white shadow-md hover:shadow-lg transition-all"
-                                    >
-                                        <Plus className="h-4 w-4 mr-2" />
-                                        追加
-                                    </Button>
-                                )}
                             </div>
                         </div>
                     </CardContent>
                 </Card>
             </div>
+
+            {/* 追加ボタン（タブの上） */}
+            {canEdit && (
+                <div className="flex justify-end mb-2">
+                    <Button
+                        size="sm"
+                        onClick={openNewDialog}
+                        className="h-10 px-4 font-semibold bg-blue-600 hover:bg-blue-700 text-white shadow-md hover:shadow-lg transition-all"
+                    >
+                        <Plus className="h-4 w-4 mr-2" />
+                        追加
+                    </Button>
+                </div>
+            )}
 
             <Card>
                 <CardHeader className="p-3 sm:p-4">
@@ -1551,6 +1546,19 @@ export default function DeliverySchedules() {
                     )}
                 </CardContent>
             </Card>
+
+            {/* 一覧ビューモードボタン（タブの下） */}
+            <div className="flex justify-center mt-2">
+                <Button
+                    variant={isCalendarMode ? "secondary" : "outline"}
+                    size="sm"
+                    onClick={() => setIsCalendarMode((v) => !v)}
+                    className="h-10 px-4 font-semibold shadow-sm hover:shadow-md transition-shadow"
+                >
+                    <CalendarDays className="h-4 w-4 mr-2" />
+                    {isCalendarMode ? "カード表示" : "一覧ビューモード"}
+                </Button>
+            </div>
 
             {/* 納車遅れリスト */}
             {delayedItems.length > 0 && (

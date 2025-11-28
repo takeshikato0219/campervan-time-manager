@@ -85,26 +85,26 @@ export default function DeliverySchedulesPublic() {
                     </p>
                 </header>
 
-                <div className="flex items-center justify-center gap-2 mb-3">
-                    <Button variant="outline" size="icon" onClick={handlePrevMonth}>
-                        <ChevronLeft className="h-4 w-4" />
-                    </Button>
-                    <Button variant="outline" size="sm" onClick={handleCurrentMonth}>
-                        今月
-                    </Button>
-                    <span className="min-w-[7rem] text-center font-semibold">
-                        {year}年{month}月
-                    </span>
-                    <Button variant="outline" size="icon" onClick={handleNextMonth}>
-                        <ChevronRight className="h-4 w-4" />
-                    </Button>
-                    <Button
-                        variant={isCalendarMode ? "secondary" : "outline"}
-                        size="sm"
-                        onClick={() => setIsCalendarMode((v) => !v)}
-                    >
-                        {isCalendarMode ? "カード表示" : "一覧ビューモード"}
-                    </Button>
+                <div className="flex items-center justify-between gap-2 mb-3 flex-wrap">
+                    {/* 左側: 年月表示と今月ボタン */}
+                    <div className="flex items-center gap-1">
+                        <span className="font-semibold text-lg whitespace-nowrap">
+                            {year}年{month}月
+                        </span>
+                        <Button variant="outline" size="sm" onClick={handleCurrentMonth} className="ml-1">
+                            今月
+                        </Button>
+                    </div>
+
+                    {/* 右側: 矢印ボタン */}
+                    <div className="flex items-center gap-2">
+                        <Button variant="outline" size="icon" onClick={handlePrevMonth}>
+                            <ChevronLeft className="h-4 w-4" />
+                        </Button>
+                        <Button variant="outline" size="icon" onClick={handleNextMonth}>
+                            <ChevronRight className="h-4 w-4" />
+                        </Button>
+                    </div>
                 </div>
 
                 <Card>
@@ -347,6 +347,17 @@ export default function DeliverySchedulesPublic() {
                         )}
                     </CardContent>
                 </Card>
+
+                {/* 一覧ビューモードボタン（タブの下） */}
+                <div className="flex justify-center mt-2">
+                    <Button
+                        variant={isCalendarMode ? "secondary" : "outline"}
+                        size="sm"
+                        onClick={() => setIsCalendarMode((v) => !v)}
+                    >
+                        {isCalendarMode ? "カード表示" : "一覧ビューモード"}
+                    </Button>
+                </div>
             </div>
         </div>
     );
