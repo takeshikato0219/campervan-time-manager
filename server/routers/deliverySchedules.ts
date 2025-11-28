@@ -1,8 +1,8 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { createTRPCRouter, publicProcedure, protectedProcedure, subAdminProcedure } from "../_core/trpc";
-import { getDb, schema } from "../db";
-import { and, gte, lte, eq, or, isNull } from "drizzle-orm";
+import { getDb, getPool, schema } from "../db";
+import { and, gte, lte, eq, or, isNull, desc, sql, inArray } from "drizzle-orm";
 import fs from "fs";
 import path from "path";
 import { nanoid } from "nanoid";
@@ -42,6 +42,7 @@ async function ensureDeliverySchedulesTable(db: any) {
               \`furnitureReady\` ENUM('yes','no'),
               \`inCharge\` VARCHAR(100),
               \`dueDate\` DATE,
+              \`desiredIncomingPlannedDate\` DATE,
               \`incomingPlannedDate\` DATE,
               \`shippingPlannedDate\` DATE,
               \`deliveryPlannedDate\` DATE,
@@ -49,7 +50,9 @@ async function ensureDeliverySchedulesTable(db: any) {
               \`claimComment\` TEXT,
               \`photosJson\` TEXT,
               \`oemComment\` TEXT,
+              \`status\` ENUM('katomo_stock','wg_storage','wg_production','wg_wait_pickup','katomo_checked','completed') NOT NULL DEFAULT 'katomo_stock',
               \`pickupConfirmed\` ENUM('true','false') NOT NULL DEFAULT 'false',
+              \`incomingPlannedDateConfirmed\` ENUM('true','false') NOT NULL DEFAULT 'false',
               \`specSheetUrl\` TEXT,
               \`createdAt\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
               \`updatedAt\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
@@ -82,28 +85,123 @@ export const deliverySchedulesRouter = createTRPCRouter({
             await ensureDeliverySchedulesTable(db);
 
             const { start, end } = getMonthRange(input.year, input.month);
+            const startStr = `${input.year}-${String(input.month).padStart(2, "0")}-01`;
+            const endStr = `${input.year}-${String(input.month).padStart(2, "0")}-${new Date(input.year, input.month, 0).getDate()}`;
 
-            const records = await db
-                .select()
-                .from(schema.deliverySchedules)
-                .where(
-                    or(
-                        and(
-                            gte(schema.deliverySchedules.deliveryPlannedDate, start),
-                            lte(schema.deliverySchedules.deliveryPlannedDate, end)
-                        ),
-                        and(
-                            isNull(schema.deliverySchedules.deliveryPlannedDate),
-                            gte(schema.deliverySchedules.dueDate, start),
-                            lte(schema.deliverySchedules.dueDate, end)
-                        )
-                    )
-                );
+            try {
+                console.log(`[deliverySchedules.publicList] Fetching records for ${input.year}-${input.month}`);
 
-            return records.map((r) => ({
-                ...r,
-                delayDays: calcDelayDays(r.dueDate),
-            }));
+                // すべてのレコードを取得してから、JavaScript側でフィルタリング（より安全）
+                let allRecords: any[] = [];
+                try {
+                    // テーブルが存在するか確認してからselectを実行
+                    const pool = getPool();
+                    if (pool) {
+                        const [tables]: any = await pool.execute(
+                            "SHOW TABLES LIKE 'deliverySchedules'"
+                        );
+                        if (tables.length === 0) {
+                            console.warn("[deliverySchedules.publicList] Table doesn't exist, returning empty array");
+                            return [];
+                        }
+                    }
+
+                    allRecords = await db.select().from(schema.deliverySchedules);
+                    console.log(`[deliverySchedules.publicList] Fetched ${allRecords.length} total records`);
+                } catch (selectError: any) {
+                    console.error("[deliverySchedules.publicList] Select error:", selectError);
+                    console.error("[deliverySchedules.publicList] Select error message:", selectError?.message);
+                    console.error("[deliverySchedules.publicList] Select error code:", selectError?.code);
+                    // エラーが発生した場合は空配列を返す（安全のため）
+                    console.warn("[deliverySchedules.publicList] Error during select, returning empty array");
+                    return [];
+                }
+
+                // 安全な日付比較関数
+                const isDateInRange = (dateValue: any, startStr: string, endStr: string): boolean => {
+                    if (!dateValue) return false;
+                    try {
+                        const date = dateValue instanceof Date ? dateValue : new Date(dateValue);
+                        if (isNaN(date.getTime())) return false;
+                        const dateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+                        return dateStr >= startStr && dateStr <= endStr;
+                    } catch (e) {
+                        console.warn("[deliverySchedules.publicList] Date parsing error:", e, dateValue);
+                        return false;
+                    }
+                };
+
+                // フィルタリング: 完成していない車両は常に表示、完成した車両は納期範囲内のみ表示
+                const records = allRecords.filter((r: any) => {
+                    try {
+                        // 完成していない車両（status !== "completed"）は、納期が過ぎていても常に表示
+                        if (r.status !== "completed" && r.status !== null) {
+                            return true;
+                        }
+
+                        // 完成した車両（status === "completed"）は、従来通りのフィルタリングロジックを適用
+                        // deliveryPlannedDateが指定月の範囲内
+                        if (r.deliveryPlannedDate && isDateInRange(r.deliveryPlannedDate, startStr, endStr)) {
+                            return true;
+                        }
+
+                        // deliveryPlannedDateがnull/未設定で、dueDateが指定月の範囲内
+                        if ((!r.deliveryPlannedDate || r.deliveryPlannedDate === null) && r.dueDate && isDateInRange(r.dueDate, startStr, endStr)) {
+                            return true;
+                        }
+
+                        // 両方null/未設定の場合は、すべて表示（新規登録された車両も含む）
+                        if ((!r.deliveryPlannedDate || r.deliveryPlannedDate === null) && (!r.dueDate || r.dueDate === null)) {
+                            return true;
+                        }
+
+                        // その他の日付が指定月の範囲外の場合でも、最近作成されたレコード（30日以内）は表示
+                        const createdAt = r.createdAt ? new Date(r.createdAt) : null;
+                        if (createdAt && !isNaN(createdAt.getTime())) {
+                            const daysSinceCreation = Math.floor((Date.now() - createdAt.getTime()) / (1000 * 60 * 60 * 24));
+                            if (daysSinceCreation <= 30) {
+                                return true; // 最近作成されたレコードは表示
+                            }
+                        }
+
+                        return false;
+                    } catch (e) {
+                        console.warn("[deliverySchedules.publicList] Filter error for record:", r.id, e);
+                        // エラーが発生した場合は表示する（安全のため）
+                        return true;
+                    }
+                });
+
+                console.log(`[deliverySchedules.publicList] Total records fetched: ${allRecords.length}`);
+                console.log(`[deliverySchedules.publicList] Filtered to ${records.length} records`);
+                console.log(`[deliverySchedules.publicList] Completed items: ${allRecords.filter((r: any) => r.status === "completed").length}`);
+                console.log(`[deliverySchedules.publicList] Incomplete items: ${allRecords.filter((r: any) => r.status !== "completed").length}`);
+
+                const finalRecords = records;
+                console.log(`[deliverySchedules.publicList] Returning ${finalRecords.length} records`);
+
+                return finalRecords.map((r) => {
+                    try {
+                        return {
+                            ...r,
+                            delayDays: calcDelayDays(r.dueDate),
+                        };
+                    } catch (e) {
+                        console.warn("[deliverySchedules.publicList] Mapping error for record:", r.id, e);
+                        return {
+                            ...r,
+                            delayDays: 0,
+                        };
+                    }
+                });
+            } catch (error: any) {
+                console.error("[deliverySchedules.publicList] Error:", error);
+                console.error("[deliverySchedules.publicList] Error message:", error?.message);
+                console.error("[deliverySchedules.publicList] Error stack:", error?.stack);
+                // エラーが発生した場合は空配列を返す（安全のため）
+                console.warn("[deliverySchedules.publicList] Returning empty array due to error");
+                return [];
+            }
         }),
 
     // アプリ側（ログイン後）の一覧取得
@@ -126,28 +224,131 @@ export const deliverySchedulesRouter = createTRPCRouter({
             await ensureDeliverySchedulesTable(db);
 
             const { start, end } = getMonthRange(input.year, input.month);
+            const startStr = `${input.year}-${String(input.month).padStart(2, "0")}-01`;
+            const endStr = `${input.year}-${String(input.month).padStart(2, "0")}-${new Date(input.year, input.month, 0).getDate()}`;
 
-            const records = await db
-                .select()
-                .from(schema.deliverySchedules)
-                .where(
-                    or(
-                        and(
-                            gte(schema.deliverySchedules.deliveryPlannedDate, start),
-                            lte(schema.deliverySchedules.deliveryPlannedDate, end)
-                        ),
-                        and(
-                            isNull(schema.deliverySchedules.deliveryPlannedDate),
-                            gte(schema.deliverySchedules.dueDate, start),
-                            lte(schema.deliverySchedules.dueDate, end)
-                        )
-                    )
-                );
+            try {
+                console.log(`[deliverySchedules.list] Fetching records for ${input.year}-${input.month}`);
 
-            return records.map((r) => ({
-                ...r,
-                delayDays: calcDelayDays(r.dueDate),
-            }));
+                // すべてのレコードを取得してから、JavaScript側でフィルタリング（より安全）
+                let allRecords: any[] = [];
+                try {
+                    console.log("[deliverySchedules.list] Attempting to fetch records...");
+
+                    // 直接selectを実行（テーブル存在確認をスキップ）
+                    allRecords = await db.select().from(schema.deliverySchedules);
+                    console.log(`[deliverySchedules.list] ✅ Successfully fetched ${allRecords.length} total records`);
+
+                    if (allRecords.length > 0) {
+                        console.log("[deliverySchedules.list] First record sample:", JSON.stringify(allRecords[0], null, 2));
+                    }
+                } catch (selectError: any) {
+                    console.error("[deliverySchedules.list] ❌ Select error:", selectError);
+                    console.error("[deliverySchedules.list] ❌ Select error message:", selectError?.message);
+                    console.error("[deliverySchedules.list] ❌ Select error code:", selectError?.code);
+                    console.error("[deliverySchedules.list] ❌ Select error stack:", selectError?.stack);
+
+                    // エラーが発生した場合でも、生SQLクエリで試行
+                    try {
+                        console.log("[deliverySchedules.list] Attempting raw SQL query...");
+                        const pool = getPool();
+                        if (pool) {
+                            const [rows]: any = await pool.execute("SELECT * FROM deliverySchedules ORDER BY id DESC");
+                            allRecords = rows || [];
+                            console.log(`[deliverySchedules.list] ✅ Raw SQL fetched ${allRecords.length} records`);
+                        }
+                    } catch (rawSqlError: any) {
+                        console.error("[deliverySchedules.list] ❌ Raw SQL error:", rawSqlError);
+                        // エラーでも空配列を返す
+                        return [];
+                    }
+                }
+
+                // 安全な日付比較関数
+                const isDateInRange = (dateValue: any, startStr: string, endStr: string): boolean => {
+                    if (!dateValue) return false;
+                    try {
+                        const date = dateValue instanceof Date ? dateValue : new Date(dateValue);
+                        if (isNaN(date.getTime())) return false;
+                        const dateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+                        return dateStr >= startStr && dateStr <= endStr;
+                    } catch (e) {
+                        console.warn("[deliverySchedules.list] Date parsing error:", e, dateValue);
+                        return false;
+                    }
+                };
+
+                // フィルタリング: 完成していない車両は常に表示、完成した車両は納期範囲内のみ表示
+                const records = allRecords.filter((r: any) => {
+                    try {
+                        // 完成していない車両（status !== "completed"）は、納期が過ぎていても常に表示
+                        if (r.status !== "completed" && r.status !== null) {
+                            return true;
+                        }
+
+                        // 完成した車両（status === "completed"）は、従来通りのフィルタリングロジックを適用
+                        // deliveryPlannedDateが指定月の範囲内
+                        if (r.deliveryPlannedDate && isDateInRange(r.deliveryPlannedDate, startStr, endStr)) {
+                            return true;
+                        }
+
+                        // deliveryPlannedDateがnull/未設定で、dueDateが指定月の範囲内
+                        if ((!r.deliveryPlannedDate || r.deliveryPlannedDate === null) && r.dueDate && isDateInRange(r.dueDate, startStr, endStr)) {
+                            return true;
+                        }
+
+                        // 両方null/未設定の場合は、すべて表示（新規登録された車両も含む）
+                        if ((!r.deliveryPlannedDate || r.deliveryPlannedDate === null) && (!r.dueDate || r.dueDate === null)) {
+                            return true;
+                        }
+
+                        // その他の日付が指定月の範囲外の場合でも、最近作成されたレコード（30日以内）は表示
+                        const createdAt = r.createdAt ? new Date(r.createdAt) : null;
+                        if (createdAt && !isNaN(createdAt.getTime())) {
+                            const daysSinceCreation = Math.floor((Date.now() - createdAt.getTime()) / (1000 * 60 * 60 * 24));
+                            if (daysSinceCreation <= 30) {
+                                return true; // 最近作成されたレコードは表示
+                            }
+                        }
+
+                        return false;
+                    } catch (e) {
+                        console.warn("[deliverySchedules.list] Filter error for record:", r.id, e);
+                        // エラーが発生した場合は表示する（安全のため）
+                        return true;
+                    }
+                });
+
+                console.log(`[deliverySchedules.list] Total records fetched: ${allRecords.length}`);
+                console.log(`[deliverySchedules.list] Filtered to ${records.length} records`);
+                console.log(`[deliverySchedules.list] Completed items: ${allRecords.filter((r: any) => r.status === "completed").length}`);
+                console.log(`[deliverySchedules.list] Incomplete items: ${allRecords.filter((r: any) => r.status !== "completed").length}`);
+
+                const finalRecords = records;
+                console.log(`[deliverySchedules.list] Returning ${finalRecords.length} records`);
+
+                return finalRecords.map((r) => {
+                    try {
+                        return {
+                            ...r,
+                            delayDays: calcDelayDays(r.dueDate),
+                        };
+                    } catch (e) {
+                        console.warn("[deliverySchedules.list] Mapping error for record:", r.id, e);
+                        return {
+                            ...r,
+                            delayDays: 0,
+                        };
+                    }
+                });
+            } catch (error: any) {
+                console.error("[deliverySchedules.list] Error:", error);
+                console.error("[deliverySchedules.list] Error message:", error?.message);
+                console.error("[deliverySchedules.list] Error stack:", error?.stack);
+                // エラーが発生した場合は空配列を返す（安全のため）
+                console.warn("[deliverySchedules.list] Returning empty array due to error");
+                return [];
+            }
         }),
 
     // 1件取得
@@ -197,6 +398,7 @@ export const deliverySchedulesRouter = createTRPCRouter({
                 furnitureReady: z.enum(["yes", "no"]).optional(),
                 inCharge: z.string().optional(),
                 dueDate: z.string().optional(), // yyyy-MM-dd（ワングラム入庫予定）
+                desiredIncomingPlannedDate: z.string().optional(), // yyyy-MM-dd（希望ワングラム完成予定日・katomo入力）
                 incomingPlannedDate: z.string().optional(),
                 shippingPlannedDate: z.string().optional(),
                 deliveryPlannedDate: z.string().optional(),
@@ -217,33 +419,180 @@ export const deliverySchedulesRouter = createTRPCRouter({
 
             await ensureDeliverySchedulesTable(db);
 
-            const parseDate = (value?: string) => {
-                if (!value) return null;
+            const parseDate = (value?: string): string | undefined => {
+                if (!value) return undefined;
+                // YYYY-MM-DD形式の文字列をそのまま返す
+                if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+                    return value;
+                }
+                // それ以外の場合はDateオブジェクトに変換してからYYYY-MM-DD形式に
                 const d = new Date(value);
-                return isNaN(d.getTime()) ? null : d;
+                if (isNaN(d.getTime())) return undefined;
+                const year = d.getFullYear();
+                const month = String(d.getMonth() + 1).padStart(2, "0");
+                const day = String(d.getDate()).padStart(2, "0");
+                return `${year}-${month}-${day}`;
             };
 
-            await db.insert(schema.deliverySchedules).values({
-                vehicleName: input.vehicleName,
-                vehicleType: input.vehicleType,
-                customerName: input.customerName,
-                optionName: input.optionName,
-                optionCategory: input.optionCategory,
-                prefecture: input.prefecture,
-                baseCarReady: input.baseCarReady,
-                furnitureReady: input.furnitureReady,
-                inCharge: input.inCharge,
-                dueDate: parseDate(input.dueDate) as any,
-                incomingPlannedDate: parseDate(input.incomingPlannedDate) as any,
-                shippingPlannedDate: parseDate(input.shippingPlannedDate) as any,
-                deliveryPlannedDate: parseDate(input.deliveryPlannedDate) as any,
-                comment: input.comment,
-                claimComment: input.claimComment,
-                photosJson: input.photosJson,
-                oemComment: input.oemComment,
-            });
+            try {
+                // ENUM値の正規化（空文字列や無効な値はundefinedにしてフィールドを除外）
+                const normalizeEnum = (value?: string, validValues?: string[]): string | undefined => {
+                    if (!value || value === "" || value === "undefined" || value === undefined) return undefined;
+                    if (validValues && !validValues.includes(value)) return undefined;
+                    return value;
+                };
 
-            return { success: true };
+                // 文字列値の正規化（空文字列はundefinedにしてフィールドを除外）
+                const normalizeString = (value?: string): string | undefined => {
+                    if (!value || value === "" || value === "undefined" || value === undefined) return undefined;
+                    return value;
+                };
+
+                console.log("[deliverySchedules.create] Raw input:", JSON.stringify(input, null, 2));
+
+                const insertData: any = {
+                    vehicleName: input.vehicleName,
+                    vehicleType: normalizeString(input.vehicleType),
+                    customerName: normalizeString(input.customerName),
+                    optionName: normalizeString(input.optionName),
+                    optionCategory: normalizeString(input.optionCategory),
+                    prefecture: normalizeString(input.prefecture),
+                    baseCarReady: normalizeEnum(input.baseCarReady, ["yes", "no"]),
+                    furnitureReady: normalizeEnum(input.furnitureReady, ["yes", "no"]),
+                    inCharge: normalizeString(input.inCharge),
+                    dueDate: parseDate(input.dueDate),
+                    desiredIncomingPlannedDate: parseDate(input.desiredIncomingPlannedDate),
+                    incomingPlannedDate: parseDate(input.incomingPlannedDate),
+                    shippingPlannedDate: parseDate(input.shippingPlannedDate),
+                    deliveryPlannedDate: parseDate(input.deliveryPlannedDate),
+                    comment: normalizeString(input.comment),
+                    claimComment: normalizeString(input.claimComment),
+                    photosJson: normalizeString(input.photosJson),
+                    oemComment: normalizeString(input.oemComment),
+                    // status と pickupConfirmed はスキーマのデフォルト値を使用（明示的に設定しない）
+                };
+
+                console.log("[deliverySchedules.create] Insert data:", JSON.stringify(insertData, null, 2));
+
+                // 生のSQLクエリを使用して、値があるフィールドのみを挿入
+                const fields: string[] = ["vehicleName"];
+                const values: any[] = [insertData.vehicleName];
+                const placeholders: string[] = ["?"];
+
+                if (insertData.vehicleType !== undefined) {
+                    fields.push("vehicleType");
+                    values.push(insertData.vehicleType);
+                    placeholders.push("?");
+                }
+                if (insertData.customerName !== undefined) {
+                    fields.push("customerName");
+                    values.push(insertData.customerName);
+                    placeholders.push("?");
+                }
+                if (insertData.optionName !== undefined) {
+                    fields.push("optionName");
+                    values.push(insertData.optionName);
+                    placeholders.push("?");
+                }
+                if (insertData.optionCategory !== undefined) {
+                    fields.push("optionCategory");
+                    values.push(insertData.optionCategory);
+                    placeholders.push("?");
+                }
+                if (insertData.prefecture !== undefined) {
+                    fields.push("prefecture");
+                    values.push(insertData.prefecture);
+                    placeholders.push("?");
+                }
+                if (insertData.baseCarReady !== undefined) {
+                    fields.push("baseCarReady");
+                    values.push(insertData.baseCarReady);
+                    placeholders.push("?");
+                }
+                if (insertData.furnitureReady !== undefined) {
+                    fields.push("furnitureReady");
+                    values.push(insertData.furnitureReady);
+                    placeholders.push("?");
+                }
+                if (insertData.inCharge !== undefined) {
+                    fields.push("inCharge");
+                    values.push(insertData.inCharge);
+                    placeholders.push("?");
+                }
+                if (insertData.dueDate !== undefined) {
+                    fields.push("dueDate");
+                    values.push(insertData.dueDate);
+                    placeholders.push("?");
+                }
+                if (insertData.desiredIncomingPlannedDate !== undefined) {
+                    fields.push("desiredIncomingPlannedDate");
+                    values.push(insertData.desiredIncomingPlannedDate);
+                    placeholders.push("?");
+                }
+                if (insertData.incomingPlannedDate !== undefined) {
+                    fields.push("incomingPlannedDate");
+                    values.push(insertData.incomingPlannedDate);
+                    placeholders.push("?");
+                }
+                if (insertData.shippingPlannedDate !== undefined) {
+                    fields.push("shippingPlannedDate");
+                    values.push(insertData.shippingPlannedDate);
+                    placeholders.push("?");
+                }
+                if (insertData.deliveryPlannedDate !== undefined) {
+                    fields.push("deliveryPlannedDate");
+                    values.push(insertData.deliveryPlannedDate);
+                    placeholders.push("?");
+                }
+                if (insertData.comment !== undefined) {
+                    fields.push("comment");
+                    values.push(insertData.comment);
+                    placeholders.push("?");
+                }
+                if (insertData.claimComment !== undefined) {
+                    fields.push("claimComment");
+                    values.push(insertData.claimComment);
+                    placeholders.push("?");
+                }
+                if (insertData.photosJson !== undefined) {
+                    fields.push("photosJson");
+                    values.push(insertData.photosJson);
+                    placeholders.push("?");
+                }
+                if (insertData.oemComment !== undefined) {
+                    fields.push("oemComment");
+                    values.push(insertData.oemComment);
+                    placeholders.push("?");
+                }
+
+                // status と pickupConfirmed はデフォルト値を使用（フィールドリストに含めない）
+
+                const sql = `INSERT INTO \`deliverySchedules\` (\`${fields.join("`, `")}\`) VALUES (${placeholders.join(", ")})`;
+                console.log("[deliverySchedules.create] SQL:", sql);
+                console.log("[deliverySchedules.create] Values:", values);
+
+                // 生のSQLクエリを実行
+                const pool = getPool();
+                if (!pool) {
+                    throw new TRPCError({
+                        code: "INTERNAL_SERVER_ERROR",
+                        message: "データベースプールが利用できません",
+                    });
+                }
+                await pool.execute(sql, values);
+
+                return { success: true };
+            } catch (error: any) {
+                console.error("[deliverySchedules.create] Error:", error);
+                console.error("[deliverySchedules.create] Error stack:", error?.stack);
+                console.error("[deliverySchedules.create] Input:", JSON.stringify(input, null, 2));
+                const errorMessage = error?.message || String(error);
+                const errorCode = error?.code || "UNKNOWN";
+                throw new TRPCError({
+                    code: "INTERNAL_SERVER_ERROR",
+                    message: `登録に失敗しました: ${errorMessage} (コード: ${errorCode})`,
+                });
+            }
         }),
 
     // 更新（準管理者以上）
@@ -261,6 +610,7 @@ export const deliverySchedulesRouter = createTRPCRouter({
                 furnitureReady: z.enum(["yes", "no"]).optional(),
                 inCharge: z.string().optional(),
                 dueDate: z.string().optional(),
+                desiredIncomingPlannedDate: z.string().optional(), // yyyy-MM-dd（希望ワングラム完成予定日・katomo入力）
                 incomingPlannedDate: z.string().optional(),
                 shippingPlannedDate: z.string().optional(),
                 deliveryPlannedDate: z.string().optional(),
@@ -268,6 +618,12 @@ export const deliverySchedulesRouter = createTRPCRouter({
                 claimComment: z.string().optional(),
                 photosJson: z.string().optional(),
                 oemComment: z.string().optional(),
+                status: z
+                    .enum(["katomo_stock", "wg_storage", "wg_production", "wg_wait_pickup", "katomo_checked", "completed"])
+                    .optional(),
+                completionStatus: z
+                    .enum(["ok", "checked", "revision_requested"])
+                    .optional(),
             })
         )
         .mutation(async ({ input }) => {
@@ -283,8 +639,17 @@ export const deliverySchedulesRouter = createTRPCRouter({
 
             const parseDate = (value?: string) => {
                 if (!value) return undefined;
+                // YYYY-MM-DD形式の文字列をそのまま返す
+                if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+                    return value;
+                }
+                // それ以外の場合はDateオブジェクトに変換してからYYYY-MM-DD形式に
                 const d = new Date(value);
-                return isNaN(d.getTime()) ? undefined : (d as any);
+                if (isNaN(d.getTime())) return undefined;
+                const year = d.getFullYear();
+                const month = String(d.getMonth() + 1).padStart(2, "0");
+                const day = String(d.getDate()).padStart(2, "0");
+                return `${year}-${month}-${day}`;
             };
 
             const updateData: any = {};
@@ -300,6 +665,9 @@ export const deliverySchedulesRouter = createTRPCRouter({
 
             const due = parseDate(input.dueDate);
             if (input.dueDate !== undefined) updateData.dueDate = due ?? null;
+            const desiredIncoming = parseDate(input.desiredIncomingPlannedDate);
+            if (input.desiredIncomingPlannedDate !== undefined)
+                updateData.desiredIncomingPlannedDate = desiredIncoming ?? null;
             const incoming = parseDate(input.incomingPlannedDate);
             if (input.incomingPlannedDate !== undefined)
                 updateData.incomingPlannedDate = incoming ?? null;
@@ -314,13 +682,61 @@ export const deliverySchedulesRouter = createTRPCRouter({
             if (input.claimComment !== undefined) updateData.claimComment = input.claimComment;
             if (input.photosJson !== undefined) updateData.photosJson = input.photosJson;
             if (input.oemComment !== undefined) updateData.oemComment = input.oemComment;
+            if (input.status !== undefined) updateData.status = input.status;
+            if (input.completionStatus !== undefined) updateData.completionStatus = input.completionStatus;
 
-            await db
-                .update(schema.deliverySchedules)
-                .set(updateData)
-                .where(eq(schema.deliverySchedules.id, input.id));
+            console.log("[deliverySchedules.update] Update data:", JSON.stringify(updateData, null, 2));
+            console.log("[deliverySchedules.update] Updating record ID:", input.id);
 
-            return { success: true };
+            try {
+                // statusフィールドがある場合は、生SQLクエリを使用して確実に更新
+                if (input.status !== undefined) {
+                    const pool = getPool();
+                    if (pool) {
+                        await pool.execute(
+                            "UPDATE deliverySchedules SET status = ? WHERE id = ?",
+                            [input.status, input.id]
+                        );
+                        console.log("[deliverySchedules.update] ✅ Status updated using raw SQL");
+
+                        // status以外にも更新するフィールドがある場合は、それらも更新
+                        if (Object.keys(updateData).length > 1) {
+                            const otherUpdates = { ...updateData };
+                            delete otherUpdates.status;
+                            if (Object.keys(otherUpdates).length > 0) {
+                                await db
+                                    .update(schema.deliverySchedules)
+                                    .set(otherUpdates)
+                                    .where(eq(schema.deliverySchedules.id, input.id));
+                                console.log("[deliverySchedules.update] ✅ Other fields updated");
+                            }
+                        }
+                    } else {
+                        // poolが取得できない場合は通常のDrizzleクエリを使用
+                        await db
+                            .update(schema.deliverySchedules)
+                            .set(updateData as any)
+                            .where(eq(schema.deliverySchedules.id, input.id));
+                    }
+                } else {
+                    // statusフィールドがない場合は通常のDrizzleクエリを使用
+                    await db
+                        .update(schema.deliverySchedules)
+                        .set(updateData)
+                        .where(eq(schema.deliverySchedules.id, input.id));
+                }
+
+                console.log("[deliverySchedules.update] ✅ Update successful");
+                return { success: true };
+            } catch (updateError: any) {
+                console.error("[deliverySchedules.update] ❌ Update error:", updateError);
+                console.error("[deliverySchedules.update] ❌ Error message:", updateError?.message);
+                console.error("[deliverySchedules.update] ❌ Error stack:", updateError?.stack);
+                throw new TRPCError({
+                    code: "INTERNAL_SERVER_ERROR",
+                    message: `更新に失敗しました: ${updateError?.message || String(updateError)}`,
+                });
+            }
         }),
 
     // 削除（準管理者以上）
@@ -409,6 +825,81 @@ export const deliverySchedulesRouter = createTRPCRouter({
             return { success: true };
         }),
 
+    // ワングラム完成予定日を確定（準管理者以上）
+    confirmIncoming: subAdminProcedure
+        .input(z.object({ id: z.number(), confirmed: z.boolean() }))
+        .mutation(async ({ input }) => {
+            const db = await getDb();
+            if (!db) {
+                throw new TRPCError({
+                    code: "INTERNAL_SERVER_ERROR",
+                    message: "データベースに接続できません",
+                });
+            }
+
+            await ensureDeliverySchedulesTable(db);
+
+            const pool = getPool();
+            if (pool) {
+                await pool.execute(
+                    "UPDATE deliverySchedules SET incomingPlannedDateConfirmed = ? WHERE id = ?",
+                    [input.confirmed ? "true" : "false", input.id]
+                );
+            } else {
+                await db
+                    .update(schema.deliverySchedules)
+                    .set({ incomingPlannedDateConfirmed: input.confirmed ? "true" : "false" } as any)
+                    .where(eq(schema.deliverySchedules.id, input.id));
+            }
+
+            if (input.confirmed) {
+                // 通知対象: 管理者・準管理者全員 + 名前に「鈴木」を含むユーザー
+                const admins = await db
+                    .select()
+                    .from(schema.users)
+                    .where(
+                        or(
+                            eq(schema.users.role, "admin" as any),
+                            eq(schema.users.role, "sub_admin" as any)
+                        )
+                    );
+
+                const { like } = await import("drizzle-orm");
+                const suzukiUsers = await db
+                    .select()
+                    .from(schema.users)
+                    .where(like(schema.users.name, "%鈴木%"))
+                    .limit(5);
+
+                const targets = [...admins, ...suzukiUsers];
+                const uniqueUserIds = Array.from(new Set(targets.map((u) => u.id)));
+
+                // 対象の納車スケジュール情報を取得
+                const [schedule] = await db
+                    .select()
+                    .from(schema.deliverySchedules)
+                    .where(eq(schema.deliverySchedules.id, input.id))
+                    .limit(1);
+
+                const title = "ワングラム完成予定日が確定しました";
+                const baseName = schedule?.vehicleName || "納車スケジュール";
+                const message = `${baseName} のワングラム完成予定日が確定しました。`;
+
+                if (uniqueUserIds.length > 0) {
+                    await db.insert(schema.notifications).values(
+                        uniqueUserIds.map((userId) => ({
+                            userId,
+                            title,
+                            message,
+                            type: "info" as any,
+                        }))
+                    );
+                }
+            }
+
+            return { success: true };
+        }),
+
     // 製造注意仕様書をアップロード（準管理者以上）
     uploadSpecSheet: subAdminProcedure
         .input(
@@ -452,6 +943,303 @@ export const deliverySchedulesRouter = createTRPCRouter({
                 .where(eq(schema.deliverySchedules.id, input.id));
 
             return { success: true, fileUrl };
+        }),
+
+    // チャット一覧取得（全員が閲覧可能）
+    getChats: protectedProcedure
+        .input(
+            z.object({
+                deliveryScheduleId: z.number().optional(), // 指定されない場合は全体チャット
+            })
+        )
+        .query(async ({ input, ctx }) => {
+            const db = await getDb();
+            if (!db) {
+                throw new TRPCError({
+                    code: "INTERNAL_SERVER_ERROR",
+                    message: "データベースに接続できません",
+                });
+            }
+
+            // チャットテーブルが存在することを確認
+            try {
+                await db.execute(
+                    `
+                    CREATE TABLE IF NOT EXISTS \`deliveryScheduleChats\` (
+                      \`id\` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+                      \`deliveryScheduleId\` INT,
+                      \`userId\` INT NOT NULL,
+                      \`message\` TEXT NOT NULL,
+                      \`parentId\` INT,
+                      \`imageUrl\` TEXT,
+                      \`createdAt\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+                    )
+                    `
+                );
+                // parentIdカラムが存在しない場合は追加
+                try {
+                    await db.execute(
+                        `ALTER TABLE \`deliveryScheduleChats\` ADD COLUMN \`parentId\` INT`
+                    );
+                } catch (e: any) {
+                    // カラムが既に存在する場合は無視
+                    if (!e?.message?.includes("Duplicate column") && !e?.message?.includes("already exists")) {
+                        console.error("[deliverySchedules] add parentId column failed:", e);
+                    }
+                }
+                // imageUrlカラムが存在しない場合は追加
+                try {
+                    await db.execute(
+                        `ALTER TABLE \`deliveryScheduleChats\` ADD COLUMN \`imageUrl\` TEXT`
+                    );
+                } catch (e: any) {
+                    // カラムが既に存在する場合は無視
+                    if (!e?.message?.includes("Duplicate column") && !e?.message?.includes("already exists")) {
+                        console.error("[deliverySchedules] add imageUrl column failed:", e);
+                    }
+                }
+                // 既読管理テーブルを作成
+                await db.execute(
+                    `
+                    CREATE TABLE IF NOT EXISTS \`deliveryScheduleChatReads\` (
+                      \`id\` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+                      \`chatId\` INT NOT NULL,
+                      \`userId\` INT NOT NULL,
+                      \`readAt\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                      \`createdAt\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                      UNIQUE KEY \`unique_read\` (\`chatId\`, \`userId\`)
+                    )
+                    `
+                );
+            } catch (e) {
+                console.error("[deliverySchedules] ensureChatTable failed:", e);
+            }
+
+            // チャット一覧を取得（返信先情報も含める）
+            const chats = await db
+                .select({
+                    id: schema.deliveryScheduleChats.id,
+                    deliveryScheduleId: schema.deliveryScheduleChats.deliveryScheduleId,
+                    userId: schema.deliveryScheduleChats.userId,
+                    message: schema.deliveryScheduleChats.message,
+                    parentId: schema.deliveryScheduleChats.parentId,
+                    imageUrl: schema.deliveryScheduleChats.imageUrl,
+                    createdAt: schema.deliveryScheduleChats.createdAt,
+                    userName: schema.users.name,
+                })
+                .from(schema.deliveryScheduleChats)
+                .leftJoin(schema.users, eq(schema.deliveryScheduleChats.userId, schema.users.id))
+                .where(
+                    input.deliveryScheduleId !== undefined
+                        ? eq(schema.deliveryScheduleChats.deliveryScheduleId, input.deliveryScheduleId)
+                        : isNull(schema.deliveryScheduleChats.deliveryScheduleId)
+                )
+                .orderBy(desc(schema.deliveryScheduleChats.createdAt)) as any;
+
+            // 未読情報を取得（ログインユーザーがいる場合のみ）
+            let unreadChatIds: number[] = [];
+            if (ctx.user?.id) {
+                const readChats = await db
+                    .select({ chatId: schema.deliveryScheduleChatReads.chatId })
+                    .from(schema.deliveryScheduleChatReads)
+                    .where(eq(schema.deliveryScheduleChatReads.userId, ctx.user.id));
+                const readChatIdSet = new Set(readChats.map((r: any) => r.chatId));
+                unreadChatIds = chats
+                    .filter((c: any) => !readChatIdSet.has(c.id) && c.userId !== ctx.user.id)
+                    .map((c: any) => c.id);
+            }
+
+            // 返信先のユーザー名を取得（parentIdがあるコメントのみ）
+            const parentIds = chats.filter((c: any) => c.parentId).map((c: any) => Number(c.parentId)).filter((id: any) => !isNaN(id));
+            let parentChatsMap: Record<number, { userName: string | null; message: string }> = {};
+
+            if (parentIds.length > 0) {
+                const uniqueParentIds = Array.from(new Set(parentIds)) as number[];
+                const parentChats = await db
+                    .select({
+                        id: schema.deliveryScheduleChats.id,
+                        message: schema.deliveryScheduleChats.message,
+                        userName: schema.users.name,
+                    })
+                    .from(schema.deliveryScheduleChats)
+                    .leftJoin(schema.users, eq(schema.deliveryScheduleChats.userId, schema.users.id))
+                    .where(inArray(schema.deliveryScheduleChats.id, uniqueParentIds)) as any[];
+
+                parentChats.forEach((pc: any) => {
+                    parentChatsMap[pc.id] = {
+                        userName: pc.userName || null,
+                        message: pc.message || "",
+                    };
+                });
+            }
+
+            // 返信先情報を追加
+            const chatsWithReplies = chats.map((chat: any) => {
+                const result: any = {
+                    ...chat,
+                    isUnread: unreadChatIds.includes(chat.id),
+                };
+                if (chat.parentId && parentChatsMap[chat.parentId]) {
+                    result.parentUserName = parentChatsMap[chat.parentId].userName;
+                    result.parentMessage = parentChatsMap[chat.parentId].message;
+                }
+                // imageUrlがJSON文字列の場合はパース
+                if (chat.imageUrl) {
+                    try {
+                        result.imageUrls = JSON.parse(chat.imageUrl);
+                    } catch {
+                        result.imageUrls = [chat.imageUrl];
+                    }
+                } else {
+                    result.imageUrls = [];
+                }
+                return result;
+            });
+
+            return chatsWithReplies;
+        }),
+
+    // チャット投稿（全員が投稿可能）
+    createChat: protectedProcedure
+        .input(
+            z.object({
+                deliveryScheduleId: z.number().optional(),
+                message: z.string().min(1),
+                parentId: z.number().optional(), // 返信先のコメントID
+                imageUrls: z.array(z.string()).optional(), // 画像URL配列
+            })
+        )
+        .mutation(async ({ input, ctx }) => {
+            const db = await getDb();
+            if (!db) {
+                throw new TRPCError({
+                    code: "INTERNAL_SERVER_ERROR",
+                    message: "データベースに接続できません",
+                });
+            }
+
+            if (!ctx.user?.id) {
+                throw new TRPCError({
+                    code: "UNAUTHORIZED",
+                    message: "ログインが必要です",
+                });
+            }
+
+            const imageUrlJson = input.imageUrls && input.imageUrls.length > 0
+                ? JSON.stringify(input.imageUrls)
+                : null;
+
+            await db.insert(schema.deliveryScheduleChats).values({
+                deliveryScheduleId: input.deliveryScheduleId || null,
+                userId: ctx.user.id,
+                message: input.message,
+                parentId: input.parentId || null,
+                imageUrl: imageUrlJson,
+            } as any);
+
+            return { success: true };
+        }),
+
+    // チャット画像アップロード（全員が投稿可能）
+    uploadChatImage: protectedProcedure
+        .input(
+            z.object({
+                fileData: z.string(), // base64
+                fileType: z.enum(["image/jpeg", "image/jpg", "image/png"]),
+            })
+        )
+        .mutation(async ({ input }) => {
+            // ディレクトリ作成
+            const uploadDir = path.resolve(process.cwd(), "uploads", "delivery-chats");
+            if (!fs.existsSync(uploadDir)) {
+                fs.mkdirSync(uploadDir, { recursive: true });
+            }
+
+            const extension = input.fileType === "image/png" ? "png" : "jpg";
+            const fileName = `${nanoid()}.${extension}`;
+            const filePath = path.join(uploadDir, fileName);
+
+            const base64Data = input.fileData.replace(/^data:.*,/, "");
+            const buffer = Buffer.from(base64Data, "base64");
+            fs.writeFileSync(filePath, buffer);
+
+            const fileUrl = `/uploads/delivery-chats/${fileName}`;
+
+            return { success: true, fileUrl };
+        }),
+
+    // チャット既読マーク（全員が利用可能）
+    markChatAsRead: protectedProcedure
+        .input(
+            z.object({
+                chatId: z.number(),
+            })
+        )
+        .mutation(async ({ input, ctx }) => {
+            const db = await getDb();
+            if (!db) {
+                throw new TRPCError({
+                    code: "INTERNAL_SERVER_ERROR",
+                    message: "データベースに接続できません",
+                });
+            }
+
+            if (!ctx.user?.id) {
+                throw new TRPCError({
+                    code: "UNAUTHORIZED",
+                    message: "ログインが必要です",
+                });
+            }
+
+            // 既読テーブルが存在することを確認
+            try {
+                await db.execute(
+                    `
+                    CREATE TABLE IF NOT EXISTS \`deliveryScheduleChatReads\` (
+                      \`id\` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+                      \`chatId\` INT NOT NULL,
+                      \`userId\` INT NOT NULL,
+                      \`readAt\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                      \`createdAt\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                      UNIQUE KEY \`unique_read\` (\`chatId\`, \`userId\`)
+                    )
+                    `
+                );
+            } catch (e) {
+                console.error("[deliverySchedules] ensureChatReadsTable failed:", e);
+            }
+
+            // 既読レコードを挿入（重複の場合は無視）
+            try {
+                await db.insert(schema.deliveryScheduleChatReads).values({
+                    chatId: input.chatId,
+                    userId: ctx.user.id,
+                } as any);
+            } catch (e: any) {
+                // 既に既読の場合は無視
+                if (!e?.message?.includes("Duplicate entry")) {
+                    console.error("[deliverySchedules] markChatAsRead failed:", e);
+                }
+            }
+
+            return { success: true };
+        }),
+
+    // チャット削除（管理者・準管理者のみ）
+    deleteChat: subAdminProcedure
+        .input(z.object({ id: z.number() }))
+        .mutation(async ({ input }) => {
+            const db = await getDb();
+            if (!db) {
+                throw new TRPCError({
+                    code: "INTERNAL_SERVER_ERROR",
+                    message: "データベースに接続できません",
+                });
+            }
+
+            await db.delete(schema.deliveryScheduleChats).where(eq(schema.deliveryScheduleChats.id, input.id));
+
+            return { success: true };
         }),
 });
 

@@ -77,6 +77,13 @@ export async function getDb(): Promise<DbType | null> {
 }
 
 /**
+ * データベース接続プールを取得（生のSQLクエリを実行する場合に使用）
+ */
+export function getPool(): Pool | null {
+    return _pool;
+}
+
+/**
  * ユーザー情報を安全に取得する（nameやcategoryカラムが存在しない場合に対応）
  */
 export async function selectUsersSafely(db: Awaited<ReturnType<typeof getDb>>, where?: any) {

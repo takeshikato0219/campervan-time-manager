@@ -24,6 +24,11 @@ export async function setupVite(app: Express, server: Server) {
     app.use("*", async (req, res, next) => {
         const url = req.originalUrl;
 
+        // APIルートはスキップ
+        if (url.startsWith("/api/")) {
+            return next();
+        }
+
         try {
             const clientTemplate = path.resolve(
                 import.meta.dirname,
@@ -41,6 +46,7 @@ export async function setupVite(app: Express, server: Server) {
             const page = await vite.transformIndexHtml(url, template);
             res.status(200).set({ "Content-Type": "text/html" }).end(page);
         } catch (e) {
+            console.error("[vite] Error serving page:", e);
             vite.ssrFixStacktrace(e as Error);
             next(e);
         }

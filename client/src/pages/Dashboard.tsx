@@ -40,6 +40,7 @@ export default function Dashboard() {
     const { data: bulletinMessages, refetch: refetchBulletin } = trpc.bulletin.list.useQuery();
     const { data: vehicleTypes } = trpc.vehicleTypes.list.useQuery();
     const { data: recentLowWorkUsers } = trpc.analytics.getRecentLowWorkUsers.useQuery();
+    const { data: excessiveWorkUsers } = trpc.analytics.getExcessiveWorkUsers.useQuery();
     const { data: myNotifications, refetch: refetchNotifications } = trpc.notifications.getMyUnread.useQuery();
     const [selectedVehicleTypeFilter, setSelectedVehicleTypeFilter] = useState<number | "all">("all");
 
@@ -256,12 +257,37 @@ export default function Dashboard() {
                 </Card>
             )}
 
-            {/* 過去3日以内で「勤務時間-1時間」より作業記録が少ない現場スタッフの注意喚起 */}
+            {/* 作業報告が出勤時間を超えている可能性がある現場スタッフの注意喚起 */}
+            {excessiveWorkUsers && excessiveWorkUsers.length > 0 && (
+                <Card className="border-red-300 bg-red-50">
+                    <CardContent className="p-4 sm:p-6 space-y-1">
+                        <p className="font-semibold text-red-900 text-sm sm:text-base">
+                            作業報告が間違えている可能性があります（過去3日）
+                        </p>
+                        <ul className="list-disc pl-5 space-y-0.5 text-xs sm:text-sm text-red-900">
+                            {excessiveWorkUsers.flatMap((u) =>
+                                u.dates.map((d: string) => (
+                                    <li key={`${u.userId}-${d}`}>
+                                        <span className="font-semibold">{u.userName}</span>
+                                        <span>
+                                            さんが
+                                            {format(new Date(d), "MM/dd")}
+                                            日の作業報告が、出勤時間を超えています
+                                        </span>
+                                    </li>
+                                ))
+                            )}
+                        </ul>
+                    </CardContent>
+                </Card>
+            )}
+
+            {/* 過去3営業日以内で「勤務時間-1時間」より作業記録が少ない現場スタッフの注意喚起 */}
             {recentLowWorkUsers && recentLowWorkUsers.length > 0 && (
                 <Card className="border-yellow-300 bg-yellow-50">
                     <CardContent className="p-4 sm:p-6 space-y-1">
                         <p className="font-semibold text-yellow-900 text-sm sm:text-base">
-                            作業報告が不足している可能性があります（過去3日間）
+                            作業報告が不足している可能性があります（過去3日）
                         </p>
                         <ul className="list-disc pl-5 space-y-0.5 text-xs sm:text-sm text-yellow-900">
                             {recentLowWorkUsers.flatMap((u) =>

@@ -1,6 +1,7 @@
 import { createTRPCRouter, protectedProcedure } from "../_core/trpc";
 import { getDb, schema } from "../db";
-import { eq, sql } from "drizzle-orm";
+import { eq, sql, inArray } from "drizzle-orm";
+import { z } from "zod";
 
 export const analyticsRouter = createTRPCRouter({
     getVehicleTypeStats: protectedProcedure.query(async () => {
@@ -125,8 +126,33 @@ export const analyticsRouter = createTRPCRouter({
     }),
 
     /**
+     * 営業日を計算するヘルパー関数（土日を除く）
+     * 今日から過去に遡って、指定された営業日数分の日付を返す
+     */
+    getBusinessDaysAgo: protectedProcedure
+        .input(z.object({ days: z.number() }))
+        .query(async ({ input }) => {
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const dates: Date[] = [];
+            let currentDate = new Date(today);
+            currentDate.setDate(currentDate.getDate() - 1); // 昨日から開始
+
+            while (dates.length < input.days) {
+                const dayOfWeek = currentDate.getDay();
+                // 0=日曜, 6=土曜をスキップ
+                if (dayOfWeek !== 0 && dayOfWeek !== 6) {
+                    dates.push(new Date(currentDate));
+                }
+                currentDate.setDate(currentDate.getDate() - 1);
+            }
+
+            return dates.map((d) => d.toISOString().slice(0, 10));
+        }),
+
+    /**
      * 現場スタッフ（field_worker）で、
-     * - 過去3日間のいずれかの日に出勤していて
+     * - 過去3営業日のいずれかの日に出勤していて
      * - 「出勤記録の勤務時間 - 1時間(休憩) - 30分」の作業記録が入っていない日があるユーザーを取得
      *
      * 勤務時間は以下の優先順位で算出する:
@@ -146,60 +172,79 @@ export const analyticsRouter = createTRPCRouter({
             return [];
         }
 
-        // attendanceRecords と workRecords を結合して、「過去3日間の出勤日 × ユーザー」の作業時間を集計
-        const [rows]: any = await db.execute(
-            sql`
-                SELECT
-                    ar.userId AS userId,
-                    COALESCE(u.name, u.username) AS userName,
-                    ar.workDate AS workDate,
+        // 過去3営業日を計算（土日を除く）
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const businessDates: string[] = [];
+        let currentDate = new Date(today);
+        currentDate.setDate(currentDate.getDate() - 1); // 昨日から開始
+
+        while (businessDates.length < 3) {
+            const dayOfWeek = currentDate.getDay();
+            // 0=日曜, 6=土曜をスキップ
+            if (dayOfWeek !== 0 && dayOfWeek !== 6) {
+                businessDates.push(currentDate.toISOString().slice(0, 10));
+            }
+            currentDate.setDate(currentDate.getDate() - 1);
+        }
+
+        if (businessDates.length === 0) {
+            return [];
+        }
+
+        // attendanceRecords と workRecords を結合して、「過去3営業日の出勤日 × ユーザー」の作業時間を集計
+        const datePlaceholders = businessDates.map(() => "?").join(",");
+        const query = `
+            SELECT
+                ar.userId AS userId,
+                COALESCE(u.name, u.username) AS userName,
+                ar.workDate AS workDate,
+                COALESCE(
+                    SUM(
+                        CASE
+                            WHEN wr.id IS NOT NULL
+                            THEN TIMESTAMPDIFF(
+                                MINUTE,
+                                wr.startTime,
+                                COALESCE(wr.endTime, NOW())
+                            )
+                            ELSE 0
+                        END
+                    ),
+                    0
+                ) AS workMinutes,
+                GREATEST(
                     COALESCE(
-                        SUM(
-                            CASE
-                                WHEN wr.id IS NOT NULL
-                                THEN TIMESTAMPDIFF(
-                                    MINUTE,
-                                    wr.startTime,
-                                    COALESCE(wr.endTime, NOW())
-                                )
-                                ELSE 0
-                            END
+                        ar.workMinutes,
+                        TIMESTAMPDIFF(
+                            MINUTE,
+                            STR_TO_DATE(CONCAT(ar.workDate, ' ', ar.clockInTime), '%Y-%m-%d %H:%i'),
+                            STR_TO_DATE(CONCAT(ar.workDate, ' ', ar.clockOutTime), '%Y-%m-%d %H:%i')
                         ),
                         0
-                    ) AS workMinutes,
-                    -- 勤務分数: workMinutes があればそれを使い、なければ clockIn/clockOut から計算
-                    GREATEST(
-                        COALESCE(
-                            ar.workMinutes,
-                            TIMESTAMPDIFF(
-                                MINUTE,
-                                STR_TO_DATE(CONCAT(ar.workDate, ' ', ar.clockInTime), '%Y-%m-%d %H:%i'),
-                                STR_TO_DATE(CONCAT(ar.workDate, ' ', ar.clockOutTime), '%Y-%m-%d %H:%i')
-                            ),
-                            0
-                        ) - 90,
-                        0
-                    ) AS expectedWorkMinutes
-                FROM \`attendanceRecords\` ar
-                INNER JOIN \`users\` u ON u.id = ar.userId
-                LEFT JOIN \`workRecords\` wr
-                    ON wr.userId = ar.userId
-                    AND DATE(wr.startTime) = ar.workDate
-                WHERE
-                    ar.workDate BETWEEN (CURDATE() - INTERVAL 3 DAY) AND (CURDATE() - INTERVAL 1 DAY)
-                    AND ar.clockInTime IS NOT NULL
-                    AND u.role = 'field_worker'
-                GROUP BY
-                    ar.userId,
-                    u.name,
-                    u.username,
-                    ar.workDate,
-                    expectedWorkMinutes
-                HAVING
-                    expectedWorkMinutes > 0
-                    AND workMinutes < expectedWorkMinutes
-            `
-        );
+                    ) - 90,
+                    0
+                ) AS expectedWorkMinutes
+            FROM \`attendanceRecords\` ar
+            INNER JOIN \`users\` u ON u.id = ar.userId
+            LEFT JOIN \`workRecords\` wr
+                ON wr.userId = ar.userId
+                AND DATE(wr.startTime) = ar.workDate
+            WHERE
+                ar.workDate IN (${datePlaceholders})
+                AND ar.clockInTime IS NOT NULL
+                AND u.role = 'field_worker'
+            GROUP BY
+                ar.userId,
+                u.name,
+                u.username,
+                ar.workDate,
+                expectedWorkMinutes
+            HAVING
+                expectedWorkMinutes > 0
+                AND workMinutes < expectedWorkMinutes
+        `;
+        const [rows]: any = await db.execute(sql.raw(query), businessDates);
 
         type Row = {
             userId: number;
@@ -207,6 +252,130 @@ export const analyticsRouter = createTRPCRouter({
             workDate: string | Date;
             workMinutes: number;
             expectedWorkMinutes: number;
+        };
+
+        const map = new Map<
+            number,
+            {
+                userId: number;
+                userName: string;
+                dates: string[];
+            }
+        >();
+
+        for (const r of rows as Row[]) {
+            const userId = Number((r as any).userId);
+            const userName = (r as any).userName as string;
+            const workDate =
+                typeof r.workDate === "string"
+                    ? r.workDate
+                    : (r.workDate as Date).toISOString().slice(0, 10);
+
+            if (!map.has(userId)) {
+                map.set(userId, { userId, userName, dates: [] });
+            }
+            const entry = map.get(userId)!;
+            if (!entry.dates.includes(workDate)) {
+                entry.dates.push(workDate);
+            }
+        }
+
+        // 日付は新しい順に並べる
+        const result = Array.from(map.values()).map((v) => ({
+            ...v,
+            dates: v.dates.sort((a, b) => (a < b ? 1 : a > b ? -1 : 0)),
+        }));
+
+        return result;
+    }),
+
+    /**
+     * 作業報告が出勤時間を超えている可能性があるユーザーを取得
+     * - 過去3営業日のいずれかの日に出勤していて
+     * - その日の作業記録の合計が、出勤記録の勤務時間を超えているユーザーを取得
+     */
+    getExcessiveWorkUsers: protectedProcedure.query(async () => {
+        const db = await getDb();
+        if (!db) {
+            return [];
+        }
+
+        // 過去3営業日を計算（土日を除く）
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const businessDates: string[] = [];
+        let currentDate = new Date(today);
+        currentDate.setDate(currentDate.getDate() - 1); // 昨日から開始
+
+        while (businessDates.length < 3) {
+            const dayOfWeek = currentDate.getDay();
+            // 0=日曜, 6=土曜をスキップ
+            if (dayOfWeek !== 0 && dayOfWeek !== 6) {
+                businessDates.push(currentDate.toISOString().slice(0, 10));
+            }
+            currentDate.setDate(currentDate.getDate() - 1);
+        }
+
+        if (businessDates.length === 0) {
+            return [];
+        }
+
+        const datePlaceholders = businessDates.map(() => "?").join(",");
+        const query = `
+            SELECT
+                ar.userId AS userId,
+                COALESCE(u.name, u.username) AS userName,
+                ar.workDate AS workDate,
+                COALESCE(
+                    SUM(
+                        CASE
+                            WHEN wr.id IS NOT NULL
+                            THEN TIMESTAMPDIFF(
+                                MINUTE,
+                                wr.startTime,
+                                COALESCE(wr.endTime, NOW())
+                            )
+                            ELSE 0
+                        END
+                    ),
+                    0
+                ) AS workMinutes,
+                COALESCE(
+                    ar.workMinutes,
+                    TIMESTAMPDIFF(
+                        MINUTE,
+                        STR_TO_DATE(CONCAT(ar.workDate, ' ', ar.clockInTime), '%Y-%m-%d %H:%i'),
+                        STR_TO_DATE(CONCAT(ar.workDate, ' ', ar.clockOutTime), '%Y-%m-%d %H:%i')
+                    ),
+                    0
+                ) AS attendanceMinutes
+            FROM \`attendanceRecords\` ar
+            INNER JOIN \`users\` u ON u.id = ar.userId
+            LEFT JOIN \`workRecords\` wr
+                ON wr.userId = ar.userId
+                AND DATE(wr.startTime) = ar.workDate
+            WHERE
+                ar.workDate IN (${datePlaceholders})
+                AND ar.clockInTime IS NOT NULL
+                AND u.role = 'field_worker'
+            GROUP BY
+                ar.userId,
+                u.name,
+                u.username,
+                ar.workDate,
+                attendanceMinutes
+            HAVING
+                attendanceMinutes > 0
+                AND workMinutes > attendanceMinutes
+        `;
+        const [rows]: any = await db.execute(sql.raw(query), businessDates);
+
+        type Row = {
+            userId: number;
+            userName: string;
+            workDate: string | Date;
+            workMinutes: number;
+            attendanceMinutes: number;
         };
 
         const map = new Map<

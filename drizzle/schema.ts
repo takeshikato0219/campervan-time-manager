@@ -107,6 +107,7 @@ export const deliverySchedules = mysqlTable("deliverySchedules", {
     inCharge: varchar("inCharge", { length: 100 }), // 担当
     // 日付系
     dueDate: date("dueDate"), // ワングラム入庫予定（遅れ日数計算の基準日）
+    desiredIncomingPlannedDate: date("desiredIncomingPlannedDate"), // 希望ワングラム完成予定日（katomo入力）
     incomingPlannedDate: date("incomingPlannedDate"), // ワングラム完成予定
     shippingPlannedDate: date("shippingPlannedDate"), // 引き取り予定日
     deliveryPlannedDate: date("deliveryPlannedDate"), // 納車予定
@@ -115,7 +116,11 @@ export const deliverySchedules = mysqlTable("deliverySchedules", {
     claimComment: text("claimComment"), // 納車チェック後のクレーム・傷など
     photosJson: text("photosJson"), // 写真URLのJSON配列文字列
     oemComment: text("oemComment"), // ワングラム側メモ（任意）
+    status: mysqlEnum("status", ["katomo_stock", "wg_storage", "wg_production", "wg_wait_pickup", "katomo_checked", "completed"])
+        .default("katomo_stock"), // 車両状態
+    completionStatus: mysqlEnum("completionStatus", ["ok", "checked", "revision_requested"]), // 完成後の状態（OK、チェック済み、修正依頼）
     pickupConfirmed: mysqlEnum("pickupConfirmed", ["true", "false"]).default("false"), // 引き取り予定日の確定フラグ
+    incomingPlannedDateConfirmed: mysqlEnum("incomingPlannedDateConfirmed", ["true", "false"]).default("false"), // ワングラム完成予定日の確定フラグ
     specSheetUrl: text("specSheetUrl"), // 製造注意仕様書（PDF/JPG）のURL
     createdAt: timestamp("createdAt").defaultNow().notNull(),
     updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
@@ -343,6 +348,26 @@ export const staffScheduleEditLogs = mysqlTable("staffScheduleEditLogs", {
     fieldName: varchar("fieldName", { length: 50 }).notNull(), // 変更されたフィールド名（例: "displayOrder"）
     oldValue: text("oldValue"), // 変更前の値
     newValue: text("newValue"), // 変更後の値
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+// 24. deliveryScheduleChats: ワングラム製造スケジュール用チャット（全員がコメント可能）
+export const deliveryScheduleChats = mysqlTable("deliveryScheduleChats", {
+    id: int("id").autoincrement().primaryKey(),
+    deliveryScheduleId: int("deliveryScheduleId").notNull(), // 納車スケジュールID（nullの場合は全体チャット）
+    userId: int("userId").notNull(), // コメントしたユーザーID
+    message: text("message").notNull(), // コメント内容
+    parentId: int("parentId"), // 返信先のコメントID（nullの場合は通常のコメント）
+    imageUrl: text("imageUrl"), // 画像URL（JSON配列で複数画像を保存可能）
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+// 25. deliveryScheduleChatReads: チャットの既読管理
+export const deliveryScheduleChatReads = mysqlTable("deliveryScheduleChatReads", {
+    id: int("id").autoincrement().primaryKey(),
+    chatId: int("chatId").notNull(), // チャットID
+    userId: int("userId").notNull(), // 読んだユーザーID
+    readAt: timestamp("readAt").defaultNow().notNull(),
     createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 
