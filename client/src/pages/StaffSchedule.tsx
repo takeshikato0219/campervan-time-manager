@@ -265,7 +265,6 @@ export default function StaffSchedule() {
                         </tr>
                     </tfoot>
                 </table>
-                </div>
             </div>
         </div>
     );
