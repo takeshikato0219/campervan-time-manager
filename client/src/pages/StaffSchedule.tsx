@@ -201,9 +201,9 @@ export default function StaffSchedule() {
                             ))}
                         </tr>
                     </thead>
-                        <tbody>
-                            {filteredScheduleData.map((day) => (
-                                <tr key={day.date}>
+                    <tbody>
+                        {filteredScheduleData.map((day) => (
+                            <tr key={day.date}>
                                     <td
                                         className={`border border-[hsl(var(--border))] p-1 sm:p-2 text-[10px] sm:text-xs sticky left-0 z-10 ${day.isWeekend ? "bg-pink-100" : "bg-white"
                                             }`}
@@ -238,13 +238,13 @@ export default function StaffSchedule() {
                                             )}
                                         </td>
                                     ))}
-                                </tr>
-                            ))}
-                        </tbody>
-                        {/* 集計行 */}
-                        <tfoot>
-                            <tr className="bg-yellow-50">
-                                <td className="border border-[hsl(var(--border))] p-1 sm:p-2 text-[10px] sm:text-xs font-medium sticky left-0 z-10">
+                            </tr>
+                        ))}
+                    </tbody>
+                    {/* 集計行 */}
+                    <tfoot>
+                        <tr className="bg-yellow-50">
+                            <td className="border border-[hsl(var(--border))] p-1 sm:p-2 text-[10px] sm:text-xs font-medium sticky left-0 z-10">
                                     休みの数
                                 </td>
                                 {filteredSummary.map((s) => (
@@ -252,19 +252,19 @@ export default function StaffSchedule() {
                                         {s.restDays || 0}
                                     </td>
                                 ))}
-                            </tr>
-                            <tr className="bg-gray-50">
-                                <td className="border border-[hsl(var(--border))] p-1 sm:p-2 text-[10px] sm:text-xs font-medium sticky left-0 z-10">
-                                    合計
+                        </tr>
+                        <tr className="bg-gray-50">
+                            <td className="border border-[hsl(var(--border))] p-1 sm:p-2 text-[10px] sm:text-xs font-medium sticky left-0 z-10">
+                                合計
+                            </td>
+                            {filteredSummary.map((s) => (
+                                <td key={s.userId} className="border border-[hsl(var(--border))] p-1 sm:p-2 text-[10px] sm:text-xs text-center">
+                                    {s.totalRest}
                                 </td>
-                                {filteredSummary.map((s) => (
-                                    <td key={s.userId} className="border border-[hsl(var(--border))] p-1 sm:p-2 text-[10px] sm:text-xs text-center">
-                                        {s.totalRest}
-                                    </td>
-                                ))}
-                            </tr>
-                        </tfoot>
-                    </table>
+                            ))}
+                        </tr>
+                    </tfoot>
+                </table>
                 </div>
             </div>
         </div>
