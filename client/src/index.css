@@ -35,6 +35,50 @@
         color: hsl(var(--foreground));
         font-family: system-ui, -apple-system, sans-serif;
     }
+
+    /* スタッフスケジュール表のstickyヘッダー対応 */
+    .staff-schedule-table-wrapper {
+        overflow-x: auto;
+        overflow-y: visible !important;
+        -webkit-overflow-scrolling: touch;
+        position: relative;
+    }
+
+    /* テーブルヘッダーのstickyを確実に動作させる */
+    .staff-schedule-table-wrapper table thead {
+        position: sticky;
+        top: 0;
+        z-index: 50;
+    }
+
+    .staff-schedule-table-wrapper table thead th {
+        position: sticky !important;
+        top: 0 !important;
+        background-color: hsl(var(--muted)) !important;
+    }
+
+    .staff-schedule-table-wrapper table thead th:first-child {
+        left: 0 !important;
+        z-index: 60 !important;
+    }
+
+    .staff-schedule-table-wrapper table thead th:not(:first-child) {
+        z-index: 50 !important;
+    }
+
+    /* スマホでのsticky表示を確実にする */
+    @media (max-width: 768px) {
+        .staff-schedule-table-wrapper {
+            position: relative;
+        }
+
+        .staff-schedule-table-wrapper table thead th {
+            position: sticky !important;
+            top: 0 !important;
+            background-color: hsl(var(--muted)) !important;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+    }
 }
 
 /* 印刷スタイル（A4サイズ） */

@@ -169,24 +169,38 @@ export default function StaffSchedule() {
             </div>
 
             {/* スケジュール表 */}
-            <div className="overflow-x-auto">
-                <div className="w-full max-w-full">
-                    <table className="w-full border-collapse border border-[hsl(var(--border))] text-xs">
-                        <thead>
-                            <tr>
-                                <th className="border border-[hsl(var(--border))] p-1 sm:p-2 bg-[hsl(var(--muted))] sticky left-0 top-0 z-40 min-w-[70px]">
-                                    日付
+            <div className="staff-schedule-table-wrapper" style={{ overflowY: 'visible' }}>
+                <table className="w-full border-collapse border border-[hsl(var(--border))] text-xs">
+                    <thead>
+                        <tr>
+                            <th 
+                                className="border border-[hsl(var(--border))] p-1 sm:p-2 min-w-[70px] bg-[hsl(var(--muted))]"
+                                style={{ 
+                                    position: 'sticky', 
+                                    left: 0, 
+                                    top: 0, 
+                                    zIndex: 60,
+                                    backgroundColor: 'hsl(var(--muted))'
+                                }}
+                            >
+                                日付
+                            </th>
+                            {filteredUsers.map((u) => (
+                                <th
+                                    key={u.id}
+                                    className="border border-[hsl(var(--border))] p-1 sm:p-2 min-w-[60px] sm:min-w-[80px] bg-[hsl(var(--muted))]"
+                                    style={{ 
+                                        position: 'sticky', 
+                                        top: 0, 
+                                        zIndex: 50,
+                                        backgroundColor: 'hsl(var(--muted))'
+                                    }}
+                                >
+                                    <span className="text-[10px] sm:text-xs font-semibold">{u.name}</span>
                                 </th>
-                                {filteredUsers.map((u) => (
-                                    <th
-                                        key={u.id}
-                                        className="border border-[hsl(var(--border))] p-1 sm:p-2 bg-[hsl(var(--muted))] sticky top-0 z-30 min-w-[60px] sm:min-w-[80px]"
-                                    >
-                                        <span className="text-[10px] sm:text-xs">{u.name}</span>
-                                    </th>
-                                ))}
-                            </tr>
-                        </thead>
+                            ))}
+                        </tr>
+                    </thead>
                         <tbody>
                             {filteredScheduleData.map((day) => (
                                 <tr key={day.date}>
