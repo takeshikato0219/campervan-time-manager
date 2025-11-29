@@ -115,48 +115,48 @@ export const attendanceRouter = createTRPCRouter({
             })
         )
         .query(async ({ ctx, input }) => {
-            const db = await getDb();
-            if (!db) {
-                throw new TRPCError({
-                    code: "INTERNAL_SERVER_ERROR",
-                    message: "データベースに接続できません",
-                });
-            }
+        const db = await getDb();
+        if (!db) {
+            throw new TRPCError({
+                code: "INTERNAL_SERVER_ERROR",
+                message: "データベースに接続できません",
+            });
+        }
 
             const workDateStr = input.workDate;
 
-            // そのユーザーの今日の出勤記録を1件取得（基本1件想定）
-            const { desc } = await import("drizzle-orm");
-            const [record] = await db
-                .select()
-                .from(schema.attendanceRecords)
-                .where(
-                    and(
-                        eq(schema.attendanceRecords.userId, ctx.user!.id),
+        // そのユーザーの今日の出勤記録を1件取得（基本1件想定）
+        const { desc } = await import("drizzle-orm");
+        const [record] = await db
+            .select()
+            .from(schema.attendanceRecords)
+            .where(
+                and(
+                    eq(schema.attendanceRecords.userId, ctx.user!.id),
                         // workDate は "YYYY-MM-DD" の文字列として扱う
                         eq(schema.attendanceRecords.workDate, workDateStr as any)
-                    )
                 )
-                .orderBy(desc(schema.attendanceRecords.id))
-                .limit(1);
+            )
+            .orderBy(desc(schema.attendanceRecords.id))
+            .limit(1);
 
-            if (!record) {
-                return null;
-            }
+        if (!record) {
+            return null;
+        }
 
-            const workMinutes =
-                record.clockInTime && record.clockOutTime
-                    ? await calculateWorkMinutes(record.clockInTime, record.clockOutTime, db)
-                    : record.workMinutes ?? null;
+        const workMinutes =
+            record.clockInTime && record.clockOutTime
+                ? await calculateWorkMinutes(record.clockInTime, record.clockOutTime, db)
+                : record.workMinutes ?? null;
 
-            return {
-                id: record.id,
-                workDate: record.workDate,
-                clockInTime: record.clockInTime,
-                clockOutTime: record.clockOutTime,
-                workMinutes,
-            };
-        }),
+        return {
+            id: record.id,
+            workDate: record.workDate,
+            clockInTime: record.clockInTime,
+            clockOutTime: record.clockOutTime,
+            workMinutes,
+        };
+    }),
 
     // 出勤打刻（ログインユーザー本人用）
     // 一般スタッフも自分自身で出勤できるようにするため、protectedProcedure に変更
@@ -241,64 +241,64 @@ export const attendanceRouter = createTRPCRouter({
     clockOut: protectedProcedure
         .input(z.object({ workDate: z.string().optional() }).optional())
         .mutation(async ({ ctx, input }) => {
-            const db = await getDb();
-            if (!db) {
-                throw new TRPCError({
-                    code: "INTERNAL_SERVER_ERROR",
-                    message: "データベースに接続できません",
-                });
-            }
+        const db = await getDb();
+        if (!db) {
+            throw new TRPCError({
+                code: "INTERNAL_SERVER_ERROR",
+                message: "データベースに接続できません",
+            });
+        }
 
-            const now = new Date();
-            const y = now.getFullYear();
-            const m = String(now.getMonth() + 1).padStart(2, "0");
-            const d = String(now.getDate()).padStart(2, "0");
+        const now = new Date();
+        const y = now.getFullYear();
+        const m = String(now.getMonth() + 1).padStart(2, "0");
+        const d = String(now.getDate()).padStart(2, "0");
             const todayStr = input?.workDate ?? `${y}-${m}-${d}`;
-            const hh = String(now.getHours()).padStart(2, "0");
-            const mm = String(now.getMinutes()).padStart(2, "0");
-            const timeStr = `${hh}:${mm}`;
+        const hh = String(now.getHours()).padStart(2, "0");
+        const mm = String(now.getMinutes()).padStart(2, "0");
+        const timeStr = `${hh}:${mm}`;
 
-            // 今日の未退勤記録を取得
-            const [record] = await db
-                .select()
-                .from(schema.attendanceRecords)
-                .where(
-                    and(
-                        eq(schema.attendanceRecords.userId, ctx.user!.id),
+        // 今日の未退勤記録を取得
+        const [record] = await db
+            .select()
+            .from(schema.attendanceRecords)
+            .where(
+                and(
+                    eq(schema.attendanceRecords.userId, ctx.user!.id),
                         eq(schema.attendanceRecords.workDate, todayStr as any)
-                    )
                 )
-                .limit(1);
+            )
+            .limit(1);
 
-            if (!record) {
-                throw new TRPCError({
-                    code: "BAD_REQUEST",
-                    message: "出勤記録が見つかりません",
-                });
-            }
+        if (!record) {
+            throw new TRPCError({
+                code: "BAD_REQUEST",
+                message: "出勤記録が見つかりません",
+            });
+        }
 
-            const norm = normalizeWorkTimes(record.clockInTime, timeStr);
-            const workMinutes = await calculateWorkMinutes(norm.clockInTime, norm.clockOutTime, db);
+        const norm = normalizeWorkTimes(record.clockInTime, timeStr);
+        const workMinutes = await calculateWorkMinutes(norm.clockInTime, norm.clockOutTime, db);
 
-            await db
-                .update(schema.attendanceRecords)
-                .set({
+        await db
+            .update(schema.attendanceRecords)
+            .set({
                     workDate: todayStr as any,
-                    clockInTime: norm.clockInTime,
-                    clockOutTime: norm.clockOutTime,
-                    workMinutes,
-                    clockOutDevice: "pc",
-                })
-                .where(eq(schema.attendanceRecords.id, record.id));
-
-            return {
-                id: record.id,
-                workDate: todayStr,
                 clockInTime: norm.clockInTime,
                 clockOutTime: norm.clockOutTime,
                 workMinutes,
-            };
-        }),
+                clockOutDevice: "pc",
+            })
+            .where(eq(schema.attendanceRecords.id, record.id));
+
+        return {
+            id: record.id,
+            workDate: todayStr,
+            clockInTime: norm.clockInTime,
+            clockOutTime: norm.clockOutTime,
+            workMinutes,
+        };
+    }),
 
     // 全スタッフの「今日」の出退勤状況を取得（準管理者以上・workDate ベース）
     // ※現在は管理画面からは使用せず、getAllStaffByDate で日付指定する運用

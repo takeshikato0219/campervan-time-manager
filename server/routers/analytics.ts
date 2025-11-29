@@ -501,6 +501,8 @@ export const analyticsRouter = createTRPCRouter({
             const workRecordsQuery = `
                 SELECT
                     wr.id,
+                    wr.vehicleId,
+                    wr.processId,
                     wr.startTime,
                     wr.endTime,
                     TIMESTAMPDIFF(
@@ -527,6 +529,8 @@ export const analyticsRouter = createTRPCRouter({
 
             const workRecords = (workRecordsRows || []).map((row: any) => ({
                 id: row.id,
+                vehicleId: Number(row.vehicleId) || 0,
+                processId: Number(row.processId) || 0,
                 startTime: row.startTime,
                 endTime: row.endTime,
                 durationMinutes: Number(row.durationMinutes) || 0,

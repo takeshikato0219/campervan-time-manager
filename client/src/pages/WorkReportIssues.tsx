@@ -1,19 +1,27 @@
+import { useState } from "react";
 import { useLocation, Link } from "wouter";
 import { trpc } from "../lib/trpc";
+import { useAuth } from "../hooks/useAuth";
 import { Button } from "../components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
-import { ArrowLeft, Clock, AlertCircle } from "lucide-react";
+import { Input } from "../components/ui/input";
+import { ArrowLeft, Clock, AlertCircle, Plus, Edit2, Trash2 } from "lucide-react";
 import { format } from "date-fns";
 import { ja } from "date-fns/locale";
+import { toast } from "sonner";
 
 export default function WorkReportIssues() {
+    const { user } = useAuth();
     const [location, setLocation] = useLocation();
     const params = new URLSearchParams(location.split("?")[1] || "");
     const userId = params.get("userId") ? parseInt(params.get("userId")!) : null;
     const workDate = params.get("workDate") || "";
     const issueType = params.get("type") || ""; // "excessive" or "low"
 
-    const { data: detail, isLoading, error } = trpc.analytics.getWorkReportDetail.useQuery(
+    const utils = trpc.useUtils();
+    const canEdit = user?.role === "admin" || user?.role === "sub_admin";
+
+    const { data: detail, isLoading, error, refetch } = trpc.analytics.getWorkReportDetail.useQuery(
         {
             userId: userId!,
             workDate,
@@ -22,6 +30,19 @@ export default function WorkReportIssues() {
             enabled: !!userId && !!workDate,
         }
     );
+
+    const { data: vehicles } = trpc.vehicles.list.useQuery({});
+    const { data: processes } = trpc.processes.list.useQuery();
+
+    // 編集ダイアログの状態
+    const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+    const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+    const [editingRecord, setEditingRecord] = useState<any>(null);
+    const [selectedVehicleId, setSelectedVehicleId] = useState("");
+    const [selectedProcessId, setSelectedProcessId] = useState("");
+    const [editStartTime, setEditStartTime] = useState("");
+    const [editEndTime, setEditEndTime] = useState("");
+    const [editWorkDescription, setEditWorkDescription] = useState("");
 
     const formatDuration = (minutes: number) => {
         const hours = Math.floor(minutes / 60);
@@ -32,6 +53,123 @@ export default function WorkReportIssues() {
     const formatTime = (time: string | null | undefined) => {
         if (!time) return "--:--";
         return time;
+    };
+
+    // Mutations
+    const createWorkRecordMutation = trpc.workRecords.create.useMutation({
+        onSuccess: () => {
+            toast.success("作業記録を追加しました");
+            setIsAddDialogOpen(false);
+            setSelectedVehicleId("");
+            setSelectedProcessId("");
+            setEditStartTime("");
+            setEditEndTime("");
+            refetch();
+            utils.analytics.getWorkReportDetail.invalidate();
+        },
+        onError: (error) => {
+            toast.error(error.message || "作業記録の追加に失敗しました");
+        },
+    });
+
+    const updateWorkRecordMutation = trpc.workRecords.update.useMutation({
+        onSuccess: () => {
+            toast.success("作業記録を更新しました");
+            setIsEditDialogOpen(false);
+            setEditingRecord(null);
+            refetch();
+            utils.analytics.getWorkReportDetail.invalidate();
+        },
+        onError: (error) => {
+            toast.error(error.message || "作業記録の更新に失敗しました");
+        },
+    });
+
+    const deleteWorkRecordMutation = trpc.workRecords.delete.useMutation({
+        onSuccess: () => {
+            toast.success("作業記録を削除しました");
+            refetch();
+            utils.analytics.getWorkReportDetail.invalidate();
+        },
+        onError: (error) => {
+            toast.error(error.message || "作業記録の削除に失敗しました");
+        },
+    });
+
+    const updateAttendanceMutation = trpc.attendance.updateAttendance.useMutation({
+        onSuccess: () => {
+            toast.success("出勤記録を更新しました");
+            refetch();
+            utils.analytics.getWorkReportDetail.invalidate();
+        },
+        onError: (error) => {
+            toast.error(error.message || "出勤記録の更新に失敗しました");
+        },
+    });
+
+    // Handlers
+    const handleEditRecord = (record: any) => {
+        setEditingRecord(record);
+        setSelectedVehicleId(record.vehicleId.toString());
+        setSelectedProcessId(record.processId.toString());
+        const startTime = typeof record.startTime === "string" ? new Date(record.startTime) : record.startTime;
+        const endTime = record.endTime ? (typeof record.endTime === "string" ? new Date(record.endTime) : record.endTime) : null;
+        setEditStartTime(format(startTime, "HH:mm"));
+        setEditEndTime(endTime ? format(endTime, "HH:mm") : "");
+        setEditWorkDescription(record.workDescription || "");
+        setIsEditDialogOpen(true);
+    };
+
+    const handleDeleteRecord = (recordId: number) => {
+        if (!window.confirm("この作業記録を削除しますか？")) return;
+        deleteWorkRecordMutation.mutate({ id: recordId });
+    };
+
+    const handleSaveEdit = () => {
+        if (!editingRecord || !selectedVehicleId || !selectedProcessId || !editStartTime) {
+            toast.error("車両、工程、開始時刻を入力してください");
+            return;
+        }
+
+        const startDateTime = `${workDate}T${editStartTime}:00+09:00`;
+        const endDateTime = editEndTime ? `${workDate}T${editEndTime}:00+09:00` : undefined;
+
+        updateWorkRecordMutation.mutate({
+            id: editingRecord.id,
+            vehicleId: parseInt(selectedVehicleId),
+            processId: parseInt(selectedProcessId),
+            startTime: startDateTime,
+            endTime: endDateTime,
+            workDescription: editWorkDescription || undefined,
+        });
+    };
+
+    const handleAddWork = () => {
+        if (!selectedVehicleId || !selectedProcessId || !editStartTime) {
+            toast.error("車両、工程、開始時刻を入力してください");
+            return;
+        }
+
+        const startDateTime = `${workDate}T${editStartTime}:00+09:00`;
+        const endDateTime = editEndTime ? `${workDate}T${editEndTime}:00+09:00` : undefined;
+
+        createWorkRecordMutation.mutate({
+            userId: userId!,
+            vehicleId: parseInt(selectedVehicleId),
+            processId: parseInt(selectedProcessId),
+            startTime: startDateTime,
+            endTime: endDateTime,
+            workDescription: editWorkDescription || undefined,
+        });
+    };
+
+    const handleOpenAddDialog = () => {
+        setSelectedVehicleId("");
+        setSelectedProcessId("");
+        setEditStartTime("");
+        setEditEndTime("");
+        setEditWorkDescription("");
+        setIsAddDialogOpen(true);
     };
 
     if (!userId || !workDate) {
@@ -198,7 +336,19 @@ export default function WorkReportIssues() {
             {/* 作業記録 */}
             <Card>
                 <CardHeader className="p-4 sm:p-6">
-                    <CardTitle className="text-lg sm:text-xl">作業記録</CardTitle>
+                    <div className="flex items-center justify-between">
+                        <CardTitle className="text-lg sm:text-xl">作業記録</CardTitle>
+                        {canEdit && (
+                            <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={handleOpenAddDialog}
+                            >
+                                <Plus className="h-4 w-4 mr-2" />
+                                追加
+                            </Button>
+                        )}
+                    </div>
                 </CardHeader>
                 <CardContent className="p-4 sm:p-6">
                     {detail.workRecords && detail.workRecords.length > 0 ? (
@@ -219,7 +369,10 @@ export default function WorkReportIssues() {
                                         className="p-3 sm:p-4 border border-[hsl(var(--border))] rounded-lg bg-gray-50"
                                     >
                                         <div className="flex items-start justify-between gap-2 mb-2">
-                                            <div className="flex-1 min-w-0">
+                                            <div 
+                                                className={`flex-1 min-w-0 ${canEdit ? "cursor-pointer hover:opacity-80" : ""}`}
+                                                onClick={() => canEdit && handleEditRecord(record)}
+                                            >
                                                 <p className="font-semibold text-sm sm:text-base">
                                                     {record.vehicleNumber}
                                                     {record.customerName && (
@@ -232,10 +385,32 @@ export default function WorkReportIssues() {
                                                     {record.processName}
                                                 </p>
                                             </div>
-                                            <div className="text-right flex-shrink-0">
-                                                <p className="font-semibold text-sm sm:text-base">
-                                                    {formatDuration(record.durationMinutes)}
-                                                </p>
+                                            <div className="flex items-center gap-2 flex-shrink-0">
+                                                <div className="text-right">
+                                                    <p className="font-semibold text-sm sm:text-base">
+                                                        {formatDuration(record.durationMinutes)}
+                                                    </p>
+                                                </div>
+                                                {canEdit && (
+                                                    <div className="flex gap-1">
+                                                        <Button
+                                                            size="sm"
+                                                            variant="outline"
+                                                            className="h-8 w-8 p-0"
+                                                            onClick={() => handleEditRecord(record)}
+                                                        >
+                                                            <Edit2 className="h-4 w-4" />
+                                                        </Button>
+                                                        <Button
+                                                            size="sm"
+                                                            variant="outline"
+                                                            className="h-8 w-8 p-0 text-red-600 hover:text-red-700"
+                                                            onClick={() => handleDeleteRecord(record.id)}
+                                                        >
+                                                            <Trash2 className="h-4 w-4" />
+                                                        </Button>
+                                                    </div>
+                                                )}
                                             </div>
                                         </div>
                                         <div className="text-xs text-[hsl(var(--muted-foreground))]">
@@ -308,6 +483,185 @@ export default function WorkReportIssues() {
                     </div>
                 </CardContent>
             </Card>
+
+            {/* 編集ダイアログ */}
+            {isEditDialogOpen && editingRecord && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-2 sm:p-4 overflow-y-auto">
+                    <Card className="w-full max-w-md min-w-0 my-auto">
+                        <CardHeader className="p-3 sm:p-4 md:p-6">
+                            <CardTitle className="text-base sm:text-lg md:text-xl">作業記録を編集</CardTitle>
+                        </CardHeader>
+                        <CardContent className="p-3 sm:p-4 md:p-6 space-y-3 sm:space-y-4">
+                            <div className="min-w-0">
+                                <label className="text-sm font-medium block mb-1">車両</label>
+                                <select
+                                    className="flex h-10 w-full min-w-0 rounded-md border border-[hsl(var(--input))] bg-[hsl(var(--background))] px-2 sm:px-3 py-2 text-sm"
+                                    value={selectedVehicleId}
+                                    onChange={(e) => setSelectedVehicleId(e.target.value)}
+                                >
+                                    <option value="">選択してください</option>
+                                    {vehicles?.map((v) => (
+                                        <option key={v.id} value={v.id}>
+                                            {v.vehicleNumber}{v.customerName ? ` - ${v.customerName}` : ''}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div className="min-w-0">
+                                <label className="text-sm font-medium block mb-1">工程</label>
+                                <select
+                                    className="flex h-10 w-full min-w-0 rounded-md border border-[hsl(var(--input))] bg-[hsl(var(--background))] px-2 sm:px-3 py-2 text-sm"
+                                    value={selectedProcessId}
+                                    onChange={(e) => setSelectedProcessId(e.target.value)}
+                                >
+                                    <option value="">選択してください</option>
+                                    {processes?.map((p) => (
+                                        <option key={p.id} value={p.id}>
+                                            {p.name}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div className="min-w-0">
+                                <label className="text-sm font-medium block mb-1">開始時刻</label>
+                                <Input
+                                    type="time"
+                                    value={editStartTime}
+                                    onChange={(e) => setEditStartTime(e.target.value)}
+                                    required
+                                    className="w-full min-w-0"
+                                />
+                            </div>
+                            <div className="min-w-0">
+                                <label className="text-sm font-medium block mb-1">終了時刻</label>
+                                <Input
+                                    type="time"
+                                    value={editEndTime}
+                                    onChange={(e) => setEditEndTime(e.target.value)}
+                                    className="w-full min-w-0"
+                                />
+                            </div>
+                            <div className="min-w-0">
+                                <label className="text-sm font-medium block mb-1">作業内容（任意）</label>
+                                <Input
+                                    type="text"
+                                    value={editWorkDescription}
+                                    onChange={(e) => setEditWorkDescription(e.target.value)}
+                                    placeholder="作業内容を入力"
+                                    className="w-full min-w-0"
+                                />
+                            </div>
+                            <div className="flex flex-col sm:flex-row gap-2 pt-2">
+                                <Button
+                                    className="flex-1 w-full sm:w-auto"
+                                    onClick={handleSaveEdit}
+                                    disabled={updateWorkRecordMutation.isPending}
+                                >
+                                    保存
+                                </Button>
+                                <Button
+                                    variant="outline"
+                                    className="flex-1 w-full sm:w-auto"
+                                    onClick={() => {
+                                        setIsEditDialogOpen(false);
+                                        setEditingRecord(null);
+                                    }}
+                                >
+                                    キャンセル
+                                </Button>
+                            </div>
+                        </CardContent>
+                    </Card>
+                </div>
+            )}
+
+            {/* 追加ダイアログ */}
+            {isAddDialogOpen && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-2 sm:p-4 overflow-y-auto">
+                    <Card className="w-full max-w-md min-w-0 my-auto">
+                        <CardHeader className="p-3 sm:p-4 md:p-6">
+                            <CardTitle className="text-base sm:text-lg md:text-xl">作業記録を追加</CardTitle>
+                        </CardHeader>
+                        <CardContent className="p-3 sm:p-4 md:p-6 space-y-3 sm:space-y-4">
+                            <div className="min-w-0">
+                                <label className="text-sm font-medium block mb-1">車両</label>
+                                <select
+                                    className="flex h-10 w-full min-w-0 rounded-md border border-[hsl(var(--input))] bg-[hsl(var(--background))] px-2 sm:px-3 py-2 text-sm"
+                                    value={selectedVehicleId}
+                                    onChange={(e) => setSelectedVehicleId(e.target.value)}
+                                >
+                                    <option value="">選択してください</option>
+                                    {vehicles?.map((v) => (
+                                        <option key={v.id} value={v.id}>
+                                            {v.vehicleNumber}{v.customerName ? ` - ${v.customerName}` : ''}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div className="min-w-0">
+                                <label className="text-sm font-medium block mb-1">工程</label>
+                                <select
+                                    className="flex h-10 w-full min-w-0 rounded-md border border-[hsl(var(--input))] bg-[hsl(var(--background))] px-2 sm:px-3 py-2 text-sm"
+                                    value={selectedProcessId}
+                                    onChange={(e) => setSelectedProcessId(e.target.value)}
+                                >
+                                    <option value="">選択してください</option>
+                                    {processes?.map((p) => (
+                                        <option key={p.id} value={p.id}>
+                                            {p.name}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div className="min-w-0">
+                                <label className="text-sm font-medium block mb-1">開始時刻</label>
+                                <Input
+                                    type="time"
+                                    value={editStartTime}
+                                    onChange={(e) => setEditStartTime(e.target.value)}
+                                    required
+                                    className="w-full min-w-0"
+                                />
+                            </div>
+                            <div className="min-w-0">
+                                <label className="text-sm font-medium block mb-1">終了時刻</label>
+                                <Input
+                                    type="time"
+                                    value={editEndTime}
+                                    onChange={(e) => setEditEndTime(e.target.value)}
+                                    className="w-full min-w-0"
+                                />
+                            </div>
+                            <div className="min-w-0">
+                                <label className="text-sm font-medium block mb-1">作業内容（任意）</label>
+                                <Input
+                                    type="text"
+                                    value={editWorkDescription}
+                                    onChange={(e) => setEditWorkDescription(e.target.value)}
+                                    placeholder="作業内容を入力"
+                                    className="w-full min-w-0"
+                                />
+                            </div>
+                            <div className="flex flex-col sm:flex-row gap-2 pt-2">
+                                <Button
+                                    className="flex-1 w-full sm:w-auto"
+                                    onClick={handleAddWork}
+                                    disabled={createWorkRecordMutation.isPending}
+                                >
+                                    追加
+                                </Button>
+                                <Button
+                                    variant="outline"
+                                    className="flex-1 w-full sm:w-auto"
+                                    onClick={() => setIsAddDialogOpen(false)}
+                                >
+                                    キャンセル
+                                </Button>
+                            </div>
+                        </CardContent>
+                    </Card>
+                </div>
+            )}
         </div>
     );
 }
