@@ -6,7 +6,7 @@ export const users = mysqlTable("users", {
     username: varchar("username", { length: 64 }).notNull().unique(),
     password: text("password").notNull(),
     name: text("name"),
-    role: mysqlEnum("role", ["field_worker", "sales_office", "sub_admin", "admin"]).default("field_worker").notNull(),
+    role: mysqlEnum("role", ["field_worker", "sales_office", "sub_admin", "admin", "external"]).default("field_worker").notNull(),
     category: mysqlEnum("category", ["elephant", "squirrel"]), // 分類: ゾウ、リス
     createdAt: timestamp("createdAt").defaultNow().notNull(),
     updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),

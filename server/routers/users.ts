@@ -6,8 +6,8 @@ import { getDb, schema } from "../db";
 import { eq } from "drizzle-orm";
 
 export const usersRouter = createTRPCRouter({
-    // 全ユーザー一覧を取得（準管理者以上）
-    list: subAdminProcedure.query(async () => {
+    // 全ユーザー一覧を取得（管理者専用）
+    list: adminProcedure.query(async () => {
         const db = await getDb();
         if (!db) {
             return [];
@@ -37,8 +37,17 @@ export const usersRouter = createTRPCRouter({
                 username: z.string(),
                 password: z.string(),
                 name: z.string().optional(), // 表示名（社員名）
-                role: z.enum(["field_worker", "sales_office", "sub_admin", "admin"]).default("field_worker"),
-                category: z.enum(["elephant", "squirrel"]).optional(),
+                role: z.enum(["field_worker", "sales_office", "sub_admin", "admin", "external"]).default("field_worker"),
+                category: z.preprocess(
+                    (val) => {
+                        // 空文字列、undefined、または無効な値の場合はnull
+                        if (!val || val === "" || (val !== "elephant" && val !== "squirrel")) {
+                            return null;
+                        }
+                        return val;
+                    },
+                    z.enum(["elephant", "squirrel"]).nullable().optional()
+                ),
             })
         )
         .mutation(async ({ input }) => {
@@ -66,12 +75,21 @@ export const usersRouter = createTRPCRouter({
 
             const hashedPassword = await bcrypt.hash(input.password, 10);
 
+            // categoryが空文字列、undefined、または無効な値の場合はnullにする
+            let categoryValue: "elephant" | "squirrel" | null = null;
+            const category = input.category;
+            if (category === "elephant" || category === "squirrel") {
+                categoryValue = category;
+            } else if (category === "" || category === null || category === undefined) {
+                categoryValue = null;
+            }
+
             await db.insert(schema.users).values({
                 username: input.username,
                 password: hashedPassword,
                 name: input.name || null,
                 role: input.role,
-                category: input.category || null,
+                category: categoryValue,
             });
 
             return { success: true };
@@ -85,8 +103,17 @@ export const usersRouter = createTRPCRouter({
                 username: z.string().optional(),
                 password: z.string().optional(),
                 name: z.string().optional(), // 表示名（社員名）
-                role: z.enum(["field_worker", "sales_office", "sub_admin", "admin"]).optional(),
-                category: z.enum(["elephant", "squirrel"]).optional().nullable(),
+                role: z.enum(["field_worker", "sales_office", "sub_admin", "admin", "external"]).optional(),
+                category: z.preprocess(
+                    (val) => {
+                        // 空文字列、undefined、または無効な値の場合はnull
+                        if (!val || val === "" || (val !== "elephant" && val !== "squirrel")) {
+                            return null;
+                        }
+                        return val;
+                    },
+                    z.enum(["elephant", "squirrel"]).nullable().optional()
+                ),
             })
         )
         .mutation(async ({ input }) => {

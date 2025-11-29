@@ -39,16 +39,23 @@ export default function AppLayout({ children }: AppLayoutProps) {
         },
     });
 
-    const menuItems = [
-        { icon: LayoutDashboard, label: "マイダッシュボード", path: "/", admin: false },
-        { icon: Calendar, label: "出退勤記録", path: "/my-attendance", admin: false },
-        { icon: Clock, label: "作業記録管理", path: "/work-records", admin: false },
-        { icon: Car, label: "車両管理", path: "/vehicles", admin: false },
-        { icon: ClipboardCheck, label: "車両チェック", path: "/vehicle-checks", admin: false },
-        { icon: CalendarDays, label: "スタッフ休み予定一覧", path: "/staff-schedule", admin: false },
-        { icon: Timer, label: "車両制作時間確認", path: "/vehicle-production", admin: false },
-        { icon: Truck, label: "ワングラム製造スケジュール", path: "/delivery-schedules", admin: false },
-        { icon: BarChart3, label: "統計・分析", path: "/analytics", admin: false },
+    // 一般メニュー（externalユーザーは除外）
+    const menuItems: Array<{
+        icon: any;
+        label: string;
+        path: string;
+        admin: boolean;
+        excludeExternal?: boolean;
+    }> = [
+        { icon: LayoutDashboard, label: "マイダッシュボード", path: "/", admin: false, excludeExternal: true },
+        { icon: Calendar, label: "出退勤記録", path: "/my-attendance", admin: false, excludeExternal: true },
+        { icon: Clock, label: "作業記録管理", path: "/work-records", admin: false, excludeExternal: true },
+        { icon: Car, label: "車両管理", path: "/vehicles", admin: false, excludeExternal: true },
+        { icon: ClipboardCheck, label: "車両チェック", path: "/vehicle-checks", admin: false, excludeExternal: true },
+        { icon: CalendarDays, label: "スタッフ休み予定一覧", path: "/staff-schedule", admin: false, excludeExternal: true },
+        { icon: Timer, label: "車両制作時間確認", path: "/vehicle-production", admin: false, excludeExternal: true },
+        { icon: Truck, label: "ワングラム製造スケジュール", path: "/delivery-schedules", admin: false, excludeExternal: false },
+        { icon: BarChart3, label: "統計・分析", path: "/analytics", admin: false, excludeExternal: true },
     ];
 
     const adminMenuItems = [
@@ -58,10 +65,14 @@ export default function AppLayout({ children }: AppLayoutProps) {
         { icon: Settings, label: "工程管理", path: "/admin/processes", admin: true },
         { icon: Car, label: "車種管理", path: "/admin/vehicle-types", admin: true },
         { icon: CheckSquare, label: "チェック項目管理", path: "/admin/check-items", admin: true },
-        { icon: Coffee, label: "休憩時間管理", path: "/admin/break-times", admin: true },
         { icon: CalendarDays, label: "スタッフ休み予定一覧（管理）", path: "/admin/staff-schedule", admin: true },
-        { icon: Users, label: "ユーザー管理", path: "/admin/users", admin: true },
         { icon: Database, label: "バックアップ管理", path: "/admin/backup", admin: true },
+    ];
+
+    // 管理者専用メニュー（準管理者には表示しない）
+    const superAdminMenuItems = [
+        { icon: Coffee, label: "休憩時間管理", path: "/admin/break-times", admin: true },
+        { icon: Users, label: "ユーザー管理", path: "/admin/users", admin: true },
     ];
 
     const handleLogout = () => {
@@ -84,7 +95,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
                         </Button>
                         <Link href="/" className="min-w-0 flex-1">
                             <h1 className="text-base sm:text-xl font-bold truncate cursor-pointer hover:opacity-80 transition-opacity">
-                                キャンピングカー架装時間管理
+                                katomo時間管理アプリ
                             </h1>
                         </Link>
                     </div>
@@ -107,28 +118,36 @@ export default function AppLayout({ children }: AppLayoutProps) {
                         }`}
                 >
                     <nav className="p-4 space-y-2">
-                        {menuItems.map((item) => {
-                            const Icon = item.icon;
-                            const isActive = location === item.path;
-                            return (
-                                <Link key={item.path} href={item.path}>
-                                    <div
-                                        className={`flex items-center gap-3 px-3 py-2 rounded-lg transition-colors cursor-pointer ${isActive
-                                            ? "bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]"
-                                            : "text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))] hover:text-[hsl(var(--foreground))]"
-                                            }`}
-                                        onClick={() => setIsMobileMenuOpen(false)}
-                                    >
-                                        <Icon className="h-6 w-6" />
-                                        <span className="text-base sm:text-lg font-semibold">
-                                            {item.label}
-                                        </span>
-                                    </div>
-                                </Link>
-                            );
-                        })}
+                        {menuItems
+                            .filter((item) => {
+                                // externalユーザーの場合は、excludeExternalがfalseのもののみ表示
+                                if (user?.role === "external") {
+                                    return !item.excludeExternal;
+                                }
+                                return true;
+                            })
+                            .map((item) => {
+                                const Icon = item.icon;
+                                const isActive = location === item.path;
+                                return (
+                                    <Link key={item.path} href={item.path}>
+                                        <div
+                                            className={`flex items-center gap-3 px-3 py-2 rounded-lg transition-colors cursor-pointer ${isActive
+                                                ? "bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]"
+                                                : "text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))] hover:text-[hsl(var(--foreground))]"
+                                                }`}
+                                            onClick={() => setIsMobileMenuOpen(false)}
+                                        >
+                                            <Icon className="h-6 w-6" />
+                                            <span className="text-base sm:text-lg font-semibold">
+                                                {item.label}
+                                            </span>
+                                        </div>
+                                    </Link>
+                                );
+                            })}
 
-                        {user?.role === "admin" && (
+                        {(user?.role === "admin" || user?.role === "sub_admin") && (
                             <>
                                 <div className="pt-4 mt-4 border-t border-[hsl(var(--border))]">
                                     <p className="px-3 text-xs sm:text-sm font-semibold text-[hsl(var(--muted-foreground))] uppercase">
@@ -136,6 +155,35 @@ export default function AppLayout({ children }: AppLayoutProps) {
                                     </p>
                                 </div>
                                 {adminMenuItems.map((item) => {
+                                    const Icon = item.icon;
+                                    const isActive = location === item.path;
+                                    return (
+                                        <Link key={item.path} href={item.path}>
+                                            <div
+                                                className={`flex items-center gap-3 px-3 py-2 rounded-lg transition-colors cursor-pointer ${isActive
+                                                    ? "bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]"
+                                                    : "text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))] hover:text-[hsl(var(--foreground))]"
+                                                    }`}
+                                                onClick={() => setIsMobileMenuOpen(false)}
+                                            >
+                                                <Icon className="h-6 w-6" />
+                                                <span className="text-base sm:text-lg font-semibold">
+                                                    {item.label}
+                                                </span>
+                                            </div>
+                                        </Link>
+                                    );
+                                })}
+                            </>
+                        )}
+                        {user?.role === "admin" && (
+                            <>
+                                <div className="pt-4 mt-4 border-t border-[hsl(var(--border))]">
+                                    <p className="px-3 text-xs sm:text-sm font-semibold text-[hsl(var(--muted-foreground))] uppercase">
+                                        管理者専用メニュー
+                                    </p>
+                                </div>
+                                {superAdminMenuItems.map((item) => {
                                     const Icon = item.icon;
                                     const isActive = location === item.path;
                                     return (

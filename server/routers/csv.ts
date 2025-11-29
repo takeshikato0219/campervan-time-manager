@@ -4,8 +4,8 @@ import { eq, gte, lte, and } from "drizzle-orm";
 import { startOfDay, endOfDay, format, addDays, eachDayOfInterval } from "date-fns";
 import { z } from "zod";
 
-// 20日始まりの1ヶ月期間を計算する関数
-function getMonthPeriod20th(date: Date): { start: Date; end: Date } {
+// 21日始まりの1ヶ月期間を計算する関数
+function getMonthPeriod21st(date: Date): { start: Date; end: Date } {
     const year = date.getFullYear();
     const month = date.getMonth();
     const day = date.getDate();
@@ -13,14 +13,14 @@ function getMonthPeriod20th(date: Date): { start: Date; end: Date } {
     let startDate: Date;
     let endDate: Date;
 
-    if (day >= 20) {
-        // 20日以降の場合、今月20日から来月19日まで
-        startDate = new Date(year, month, 20);
-        endDate = new Date(year, month + 1, 19);
+    if (day >= 21) {
+        // 21日以降の場合、今月21日から来月20日まで
+        startDate = new Date(year, month, 21);
+        endDate = new Date(year, month + 1, 20);
     } else {
-        // 20日未満の場合、先月20日から今月19日まで
-        startDate = new Date(year, month - 1, 20);
-        endDate = new Date(year, month, 19);
+        // 21日未満の場合、先月21日から今月20日まで
+        startDate = new Date(year, month - 1, 21);
+        endDate = new Date(year, month, 20);
     }
 
     return {
@@ -42,9 +42,9 @@ export const csvRouter = createTRPCRouter({
                 throw new Error("データベースに接続できません");
             }
 
-            // 基準日から20日始まりの1ヶ月期間を計算
+            // 基準日から21日始まりの1ヶ月期間を計算
             const baseDate = input.date ? new Date(input.date) : new Date();
-            const { start, end } = getMonthPeriod20th(baseDate);
+            const { start, end } = getMonthPeriod21st(baseDate);
 
             // 期間内の全ユーザーを取得（nameやcategoryカラムが存在しない場合に対応）
             const { selectUsersSafely } = await import("../db");

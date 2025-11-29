@@ -5,14 +5,15 @@ import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/ca
 import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../components/ui/select";
-import { Edit, Save, X, User, Globe, ChevronLeft, ChevronRight } from "lucide-react";
+import { Edit, Save, X, User, Globe, ChevronLeft, ChevronRight, Palette, Printer } from "lucide-react";
 import { toast } from "sonner";
 import { format, parse } from "date-fns";
 import { ja } from "date-fns/locale";
 
-type ScheduleStatus = "work" | "rest" | "request" | "exhibition" | "other" | "morning" | "afternoon";
+type ScheduleStatus = "work" | "rest" | "request" | "exhibition" | "other" | "morning" | "afternoon" | "business_trip" | "exhibition_duty" | "paid_leave" | "delivery" | "payment_date";
 
-const STATUS_COLORS: Record<ScheduleStatus, string> = {
+// デフォルトの色設定（データベースから取得できない場合のフォールバック）
+const DEFAULT_STATUS_COLORS: Record<ScheduleStatus, string> = {
     work: "bg-blue-100", // 水色 = 出勤
     rest: "bg-pink-200", // ピンク = 休み
     request: "bg-pink-300", // ピンク = 希望休
@@ -20,7 +21,43 @@ const STATUS_COLORS: Record<ScheduleStatus, string> = {
     other: "bg-green-50", // 薄緑 = その他業務
     morning: "bg-yellow-100", // 黄色 = 午前出
     afternoon: "bg-orange-100", // オレンジ = 午後出
+    business_trip: "bg-purple-100", // 紫 = 出張
+    exhibition_duty: "bg-cyan-100", // シアン = 展示場当番
+    paid_leave: "bg-red-100", // 赤 = 有給
+    delivery: "bg-indigo-100", // インディゴ = 納車
+    payment_date: "bg-amber-100", // アンバー = 支払日
 };
+
+// 利用可能な色のオプション
+const AVAILABLE_COLORS = [
+    { value: "bg-blue-100", label: "青（薄）", preview: "bg-blue-100" },
+    { value: "bg-blue-200", label: "青（中）", preview: "bg-blue-200" },
+    { value: "bg-blue-300", label: "青（濃）", preview: "bg-blue-300" },
+    { value: "bg-pink-100", label: "ピンク（薄）", preview: "bg-pink-100" },
+    { value: "bg-pink-200", label: "ピンク（中）", preview: "bg-pink-200" },
+    { value: "bg-pink-300", label: "ピンク（濃）", preview: "bg-pink-300" },
+    { value: "bg-green-100", label: "緑（薄）", preview: "bg-green-100" },
+    { value: "bg-green-200", label: "緑（中）", preview: "bg-green-200" },
+    { value: "bg-green-300", label: "緑（濃）", preview: "bg-green-300" },
+    { value: "bg-yellow-100", label: "黄色（薄）", preview: "bg-yellow-100" },
+    { value: "bg-yellow-200", label: "黄色（中）", preview: "bg-yellow-200" },
+    { value: "bg-orange-100", label: "オレンジ（薄）", preview: "bg-orange-100" },
+    { value: "bg-orange-200", label: "オレンジ（中）", preview: "bg-orange-200" },
+    { value: "bg-purple-100", label: "紫（薄）", preview: "bg-purple-100" },
+    { value: "bg-purple-200", label: "紫（中）", preview: "bg-purple-200" },
+    { value: "bg-cyan-100", label: "シアン（薄）", preview: "bg-cyan-100" },
+    { value: "bg-cyan-200", label: "シアン（中）", preview: "bg-cyan-200" },
+    { value: "bg-red-100", label: "赤（薄）", preview: "bg-red-100" },
+    { value: "bg-red-200", label: "赤（中）", preview: "bg-red-200" },
+    { value: "bg-indigo-100", label: "インディゴ（薄）", preview: "bg-indigo-100" },
+    { value: "bg-indigo-200", label: "インディゴ（中）", preview: "bg-indigo-200" },
+    { value: "bg-amber-100", label: "アンバー（薄）", preview: "bg-amber-100" },
+    { value: "bg-amber-200", label: "アンバー（中）", preview: "bg-amber-200" },
+    { value: "bg-gray-100", label: "グレー（薄）", preview: "bg-gray-100" },
+    { value: "bg-gray-200", label: "グレー（中）", preview: "bg-gray-200" },
+    { value: "bg-slate-100", label: "スレート（薄）", preview: "bg-slate-100" },
+    { value: "bg-slate-200", label: "スレート（中）", preview: "bg-slate-200" },
+];
 
 const STATUS_LABELS: Record<ScheduleStatus, string> = {
     work: "出勤",
@@ -30,6 +67,11 @@ const STATUS_LABELS: Record<ScheduleStatus, string> = {
     other: "その他",
     morning: "午前出",
     afternoon: "午後出",
+    business_trip: "出張",
+    exhibition_duty: "展示場当番",
+    paid_leave: "有給",
+    delivery: "納車",
+    payment_date: "支払日",
 };
 
 export default function StaffScheduleManagement() {
@@ -57,6 +99,9 @@ export default function StaffScheduleManagement() {
     const [editingName, setEditingName] = useState("");
     const [baseMenuUserId, setBaseMenuUserId] = useState<number | null>(null);
     const [isResetDialogOpen, setIsResetDialogOpen] = useState(false);
+    // 編集モード用のローカル変更管理
+    const [isEditMode, setIsEditMode] = useState(false);
+    const [localChanges, setLocalChanges] = useState<Map<string, { status: ScheduleStatus; comment: string | null }>>(new Map());
     // フィルタは一旦「全員表示」のみ（スタッフは独立管理のため）
 
     // 月移動用の関数
@@ -126,6 +171,24 @@ export default function StaffScheduleManagement() {
         },
     });
 
+    // 色設定の取得と更新
+    const { data: statusColors, refetch: refetchColors } = trpc.staffSchedule.getStatusColors.useQuery();
+    const updateStatusColorMutation = trpc.staffSchedule.updateStatusColor.useMutation({
+        onSuccess: () => {
+            toast.success("色を更新しました");
+            refetchColors();
+        },
+        onError: (error) => {
+            toast.error(error.message || "色の更新に失敗しました");
+        },
+    });
+
+    // 実際に使用する色設定（データベースから取得、なければデフォルト）
+    const STATUS_COLORS = useMemo(() => {
+        if (!statusColors) return DEFAULT_STATUS_COLORS;
+        return { ...DEFAULT_STATUS_COLORS, ...statusColors } as Record<ScheduleStatus, string>;
+    }, [statusColors]);
+
     const updateMutation = trpc.staffSchedule.updateSchedule.useMutation({
         onSuccess: () => {
             // 成功時は静かに更新（toastは表示しない）
@@ -151,17 +214,40 @@ export default function StaffScheduleManagement() {
         },
     });
 
-    const handleStatusChange = (userId: number, date: string, status: ScheduleStatus) => {
-        const entry = filteredScheduleData
-            .find((d) => d.date === date)
-            ?.userEntries.find((e) => e.userId === userId);
-
-        updateMutation.mutate({
-            userId,
-            date,
-            status,
-            comment: entry?.comment || null,
-        });
+    const handleStatusChange = (userId: number, date: string, status: ScheduleStatus, comment?: string | null) => {
+        if (isEditMode) {
+            // 編集モードの場合はローカルに保存（高速化のため、元のデータではなく現在の値を優先）
+            const cellKey = `${userId}_${date}`;
+            setLocalChanges((prev) => {
+                const newChanges = new Map(prev);
+                // 既存の変更があれば、そのコメントを使用、なければ元のデータから取得
+                const existingChange = prev.get(cellKey);
+                const originalEntry = scheduleData?.scheduleData
+                    .find((d) => d.date === date)
+                    ?.userEntries.find((e) => e.userId === userId);
+                
+                newChanges.set(cellKey, {
+                    status,
+                    comment: comment !== undefined 
+                        ? comment 
+                        : (existingChange?.comment !== undefined 
+                            ? existingChange.comment 
+                            : (originalEntry?.comment || null)),
+                });
+                return newChanges;
+            });
+        } else {
+            // 通常モードの場合は即座にサーバーに送信
+            const entry = filteredScheduleData
+                .find((d) => d.date === date)
+                ?.userEntries.find((e) => e.userId === userId);
+            updateMutation.mutate({
+                userId,
+                date,
+                status,
+                comment: comment !== undefined ? comment : (entry?.comment || null),
+            });
+        }
     };
 
     const handleCellClick = (userId: number, date: string) => {
@@ -215,19 +301,24 @@ export default function StaffScheduleManagement() {
     };
 
     const handleCellDoubleClick = (userId: number, date: string) => {
-        // ダブルクリックでコメント編集ダイアログを開く（今後実装）
-        const entry = scheduleData?.scheduleData
+        // ダブルクリックでコメント編集ダイアログを開く
+        // 編集モードの場合はローカル変更を考慮、通常モードの場合は現在のデータを参照
+        const entry = filteredScheduleData
             .find((d) => d.date === date)
             ?.userEntries.find((e) => e.userId === userId);
         if (entry) {
-            const comment = prompt("コメントを入力してください（支払日、買い付け、外出など）:", entry.comment || "");
+            const currentStatus = entry.status as ScheduleStatus;
+            let promptText = "コメントを入力してください:";
+            if (currentStatus === "business_trip") {
+                promptText = "出張先の県名を入力してください:";
+            } else if (currentStatus === "payment_date") {
+                promptText = "支払日に関するコメントを入力してください:";
+            } else {
+                promptText = "コメントを入力してください（支払日、買い付け、外出など）:";
+            }
+            const comment = prompt(promptText, entry.comment || "");
             if (comment !== null) {
-                updateMutation.mutate({
-                    userId,
-                    date,
-                    status: entry.status as ScheduleStatus,
-                    comment: comment || null,
-                });
+                handleStatusChange(userId, date, currentStatus, comment || null);
             }
         }
     };
@@ -239,17 +330,32 @@ export default function StaffScheduleManagement() {
     );
 
     // フィルタリングされたスケジュールデータ（useMemoで再計算を最小限に）
+    // 編集モードの場合はローカル変更を反映
     const filteredScheduleData = useMemo(
-        () =>
-            scheduleData
-                ? scheduleData.scheduleData.map((day) => ({
-                    ...day,
-                    userEntries: day.userEntries.filter((entry) =>
-                        filteredUsers.some((u) => u.id === entry.userId)
-                    ),
-                }))
-                : [],
-        [scheduleData, filteredUsers]
+        () => {
+            if (!scheduleData) return [];
+            
+            const userIdSet = new Set(filteredUsers.map(u => u.id));
+            
+            return scheduleData.scheduleData.map((day) => ({
+                ...day,
+                userEntries: day.userEntries
+                    .filter((entry) => userIdSet.has(entry.userId))
+                    .map((entry) => {
+                        const cellKey = `${entry.userId}_${day.date}`;
+                        const localChange = localChanges.get(cellKey);
+                        if (localChange) {
+                            return {
+                                ...entry,
+                                status: localChange.status,
+                                comment: localChange.comment,
+                            };
+                        }
+                        return entry;
+                    }),
+            }));
+        },
+        [scheduleData, filteredUsers, localChanges]
     );
 
     // フィルタリングされた集計データ（useMemoで再計算を最小限に）
@@ -383,6 +489,60 @@ export default function StaffScheduleManagement() {
                         <ChevronRight className="h-4 w-4 ml-1" />
                     </Button>
                     <Button
+                        variant={isEditMode ? "default" : "outline"}
+                        onClick={() => {
+                            if (isEditMode && localChanges.size > 0) {
+                                if (confirm("編集中の変更が失われます。編集モードを終了しますか？")) {
+                                    setIsEditMode(false);
+                                    setLocalChanges(new Map());
+                                }
+                            } else {
+                                setIsEditMode(!isEditMode);
+                            }
+                        }}
+                    >
+                        {isEditMode ? "編集モード終了" : "編集モード"}
+                    </Button>
+                    {isEditMode && localChanges.size > 0 && (
+                        <>
+                            <Button
+                                onClick={() => {
+                                    const updates = Array.from(localChanges.entries()).map(([cellKey, change]) => {
+                                        const [userIdStr, date] = cellKey.split("_");
+                                        return {
+                                            userId: parseInt(userIdStr),
+                                            date,
+                                            status: change.status,
+                                            comment: change.comment,
+                                        };
+                                    });
+                                    bulkUpdateMutation.mutate({ updates }, {
+                                        onSuccess: () => {
+                                            setLocalChanges(new Map());
+                                            setIsEditMode(false);
+                                        },
+                                    });
+                                }}
+                                disabled={bulkUpdateMutation.isPending}
+                            >
+                                <Save className="h-4 w-4 mr-2" />
+                                保存（{localChanges.size}件）
+                            </Button>
+                            <Button
+                                variant="outline"
+                                onClick={() => {
+                                    if (confirm("編集中の変更を破棄しますか？")) {
+                                        setLocalChanges(new Map());
+                                        setIsEditMode(false);
+                                    }
+                                }}
+                            >
+                                <X className="h-4 w-4 mr-2" />
+                                キャンセル
+                            </Button>
+                        </>
+                    )}
+                    <Button
                         variant={isBulkEditMode ? "default" : "outline"}
                         onClick={() => {
                             setIsBulkEditMode(!isBulkEditMode);
@@ -410,6 +570,16 @@ export default function StaffScheduleManagement() {
                     >
                         <User className="h-4 w-4 mr-2" />
                         {isEditNameMode ? "名前編集モード" : "名前編集"}
+                    </Button>
+                    <Button
+                        variant={isColorEditMode ? "default" : "outline"}
+                        onClick={() => {
+                            setIsColorEditMode(!isColorEditMode);
+                            setEditingColorStatus(null);
+                        }}
+                    >
+                        <Palette className="h-4 w-4 mr-2" />
+                        {isColorEditMode ? "色設定モード終了" : "色設定"}
                     </Button>
                     <Button
                         variant="default"
@@ -451,12 +621,23 @@ export default function StaffScheduleManagement() {
                     >
                         初期に戻す
                     </Button>
+                    <Button
+                        variant="outline"
+                        onClick={() => {
+                            window.print();
+                        }}
+                    >
+                        <Printer className="h-4 w-4 mr-2" />
+                        印刷
+                    </Button>
                 </div>
             </div>
 
+            {/* 印刷用コンテナ */}
+            <div className="print-container">
             {/* 一括編集パネル */}
             {isBulkEditMode && (
-                <Card>
+                <Card className="no-print">
                     <CardHeader>
                         <CardTitle>一括編集</CardTitle>
                     </CardHeader>
@@ -509,7 +690,7 @@ export default function StaffScheduleManagement() {
             )}
 
             {/* 凡例 */}
-            <Card>
+            <Card className="no-print">
                 <CardContent className="pt-6">
                     <div className="flex flex-wrap gap-4 text-sm">
                         <div className="flex items-center gap-2">
@@ -540,12 +721,87 @@ export default function StaffScheduleManagement() {
                             <div className={`w-6 h-6 rounded ${STATUS_COLORS.afternoon}`}></div>
                             <span>午後出</span>
                         </div>
+                        <div className="flex items-center gap-2">
+                            <div className={`w-6 h-6 rounded ${STATUS_COLORS.business_trip}`}></div>
+                            <span>出張</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <div className={`w-6 h-6 rounded ${STATUS_COLORS.exhibition_duty}`}></div>
+                            <span>展示場当番</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <div className={`w-6 h-6 rounded ${STATUS_COLORS.paid_leave}`}></div>
+                            <span>有給</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <div className={`w-6 h-6 rounded ${STATUS_COLORS.delivery}`}></div>
+                            <span>納車</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <div className={`w-6 h-6 rounded ${STATUS_COLORS.payment_date}`}></div>
+                            <span>支払日</span>
+                        </div>
                     </div>
                     <p className="text-xs text-[hsl(var(--muted-foreground))] mt-2">
                         ※ セルをクリックで状態変更、ダブルクリックでコメント編集
                     </p>
                 </CardContent>
             </Card>
+
+            {/* 色設定パネル */}
+            {isColorEditMode && (
+                <Card className="no-print">
+                    <CardHeader>
+                        <CardTitle>ステータス色設定</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            {(Object.keys(STATUS_LABELS) as ScheduleStatus[]).map((status) => (
+                                <div key={status} className="flex items-center gap-3 p-3 border rounded-lg">
+                                    <div className={`w-10 h-10 rounded ${STATUS_COLORS[status]}`}></div>
+                                    <div className="flex-1">
+                                        <label className="text-sm font-medium">{STATUS_LABELS[status]}</label>
+                                        <Select
+                                            value={STATUS_COLORS[status]}
+                                            onValueChange={(value) => {
+                                                updateStatusColorMutation.mutate({
+                                                    status,
+                                                    colorClass: value,
+                                                });
+                                            }}
+                                        >
+                                            <SelectTrigger className="w-full mt-1">
+                                                <SelectValue />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                {AVAILABLE_COLORS.map((color) => (
+                                                    <SelectItem key={color.value} value={color.value}>
+                                                        <div className="flex items-center gap-2">
+                                                            <div className={`w-4 h-4 rounded ${color.preview}`}></div>
+                                                            <span>{color.label}</span>
+                                                        </div>
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                        <div className="flex justify-end">
+                            <Button
+                                variant="outline"
+                                onClick={() => {
+                                    setIsColorEditMode(false);
+                                    setEditingColorStatus(null);
+                                }}
+                            >
+                                閉じる
+                            </Button>
+                        </div>
+                    </CardContent>
+                </Card>
+            )}
 
             {/* スケジュール表 */}
             <div className="overflow-x-auto w-full">
@@ -727,54 +983,114 @@ export default function StaffScheduleManagement() {
                                             <SelectItem value="other">その他</SelectItem>
                                             <SelectItem value="morning">午前出</SelectItem>
                                             <SelectItem value="afternoon">午後出</SelectItem>
+                                            <SelectItem value="business_trip">出張</SelectItem>
+                                            <SelectItem value="exhibition_duty">展示場当番</SelectItem>
+                                            <SelectItem value="paid_leave">有給</SelectItem>
+                                            <SelectItem value="delivery">納車</SelectItem>
+                                            <SelectItem value="payment_date">支払日</SelectItem>
                                         </SelectContent>
                                     </Select>
                                 </td>
                                 {day.userEntries.map((entry) => {
                                     const cellKey = `${entry.userId}_${day.date}`;
                                     const isSelected = selectedCells.has(cellKey);
+                                    const hasLocalChange = localChanges.has(cellKey);
                                     return (
                                         <td
                                             key={entry.userId}
                                             className={`border border-[hsl(var(--border))] p-1 text-center relative w-[50px] ${STATUS_COLORS[entry.status as ScheduleStatus]
-                                                } ${isSelected ? "ring-2 ring-blue-500" : ""} ${isBulkEditMode ? "cursor-pointer" : ""}`}
-                                            onClick={isBulkEditMode ? () => handleCellClick(entry.userId, day.date) : undefined}
-                                            onDoubleClick={() => handleCellDoubleClick(entry.userId, day.date)}
+                                                } ${isSelected ? "ring-2 ring-blue-500" : ""} ${hasLocalChange ? "ring-2 ring-green-500" : ""} ${isBulkEditMode ? "cursor-pointer" : ""}`}
+                                            onClick={isBulkEditMode ? (e) => {
+                                                e.stopPropagation();
+                                                handleCellClick(entry.userId, day.date);
+                                            } : undefined}
+                                            onDoubleClick={(e) => {
+                                                e.stopPropagation();
+                                                e.preventDefault();
+                                                handleCellDoubleClick(entry.userId, day.date);
+                                            }}
+                                            title={hasLocalChange ? "変更あり（保存が必要）" : entry.status === "business_trip" ? "ダブルクリックで県名を編集" : undefined}
                                         >
-                                            {!isBulkEditMode ? (
-                                                <Select
-                                                    value={entry.status}
-                                                    onValueChange={(value) => {
-                                                        handleStatusChange(entry.userId, day.date, value as ScheduleStatus);
+                                            {entry.status === "business_trip" && entry.comment ? (
+                                                // 出張で県名がある場合は表示し、「出張」ラベルは非表示
+                                                <div 
+                                                    className="text-[14px] font-medium text-center cursor-pointer hover:opacity-80"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        handleCellDoubleClick(entry.userId, day.date);
                                                     }}
-                                                    disabled={updateMutation.isPending}
+                                                    title="クリックで県名を編集"
                                                 >
-                                                    <SelectTrigger className="h-6 text-[14px] p-0.5 border-0 bg-transparent hover:bg-transparent focus:ring-0 shadow-none w-full">
-                                                        <SelectValue>
-                                                            <span className="text-[14px] font-medium">
-                                                                {STATUS_LABELS[entry.status as ScheduleStatus]}
-                                                            </span>
-                                                        </SelectValue>
-                                                    </SelectTrigger>
-                                                    <SelectContent>
-                                                        <SelectItem value="work">出勤</SelectItem>
-                                                        <SelectItem value="rest">休</SelectItem>
-                                                        <SelectItem value="request">希望</SelectItem>
-                                                        <SelectItem value="exhibition">展</SelectItem>
-                                                        <SelectItem value="other">その他</SelectItem>
-                                                        <SelectItem value="morning">午前出</SelectItem>
-                                                        <SelectItem value="afternoon">午後出</SelectItem>
-                                                    </SelectContent>
-                                                </Select>
-                                            ) : (
-                                                <div className="text-[14px] font-medium">
-                                                    {STATUS_LABELS[entry.status as ScheduleStatus]}
-                                                </div>
-                                            )}
-                                            {entry.comment && (
-                                                <div className="text-[8px] text-[hsl(var(--muted-foreground))] mt-0.5 truncate">
                                                     {entry.comment}
                                                 </div>
+                                            ) : (
+                                                <>
+                                                    {!isBulkEditMode ? (
+                                                        <div 
+                                                            onClick={(e) => e.stopPropagation()}
+                                                        >
+                                                            <Select
+                                                                value={entry.status}
+                                                                onValueChange={(value) => {
+                                                                    handleStatusChange(entry.userId, day.date, value as ScheduleStatus);
+                                                                }}
+                                                                disabled={updateMutation.isPending && !isEditMode}
+                                                            >
+                                                                <SelectTrigger 
+                                                                    className="h-6 text-[14px] p-0.5 border-0 bg-transparent hover:bg-transparent focus:ring-0 shadow-none w-full"
+                                                                >
+                                                                    <SelectValue>
+                                                                        <span className="text-[14px] font-medium">
+                                                                            {STATUS_LABELS[entry.status as ScheduleStatus]}
+                                                                        </span>
+                                                                    </SelectValue>
+                                                                </SelectTrigger>
+                                                                <SelectContent>
+                                                                    <SelectItem value="work">出勤</SelectItem>
+                                                                    <SelectItem value="rest">休</SelectItem>
+                                                                    <SelectItem value="request">希望</SelectItem>
+                                                                    <SelectItem value="exhibition">展</SelectItem>
+                                                                    <SelectItem value="other">その他</SelectItem>
+                                                                    <SelectItem value="morning">午前出</SelectItem>
+                                                                    <SelectItem value="afternoon">午後出</SelectItem>
+                                                                    <SelectItem value="business_trip">出張</SelectItem>
+                                                                    <SelectItem value="exhibition_duty">展示場当番</SelectItem>
+                                                                    <SelectItem value="paid_leave">有給</SelectItem>
+                                                                    <SelectItem value="delivery">納車</SelectItem>
+                                                                    <SelectItem value="payment_date">支払日</SelectItem>
+                                                                </SelectContent>
+                                                            </Select>
+                                                        </div>
+                                                    ) : (
+                                                        <div className="text-[14px] font-medium">
+                                                            {STATUS_LABELS[entry.status as ScheduleStatus]}
+                                                        </div>
+                                                    )}
+                                                    {entry.comment && (
+                                                        <div 
+                                                            className="text-[8px] text-[hsl(var(--muted-foreground))] mt-0.5 truncate cursor-pointer hover:underline"
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                handleCellDoubleClick(entry.userId, day.date);
+                                                            }}
+                                                            title="クリックでコメント編集"
+                                                        >
+                                                            {entry.comment}
+                                                        </div>
+                                                    )}
+                                                    {!entry.comment && (entry.status === "business_trip" || entry.status === "payment_date") && (
+                                                        <div 
+                                                            className="text-[8px] text-gray-400 mt-0.5 truncate cursor-pointer hover:text-gray-600"
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                handleCellDoubleClick(entry.userId, day.date);
+                                                            }}
+                                                            title="クリックでコメント追加"
+                                                        >
+                                                            {entry.status === "business_trip" ? "県名を入力" : "コメント追加"}
+                                                        </div>
+                                                    )}
+                                                </>
                                             )}
                                         </td>
                                     );
@@ -822,6 +1138,8 @@ export default function StaffScheduleManagement() {
                     </tfoot>
                 </table>
             </div>
+            </div>
+            {/* 印刷用コンテナ終了 */}
 
             {/* 初期化確認ダイアログ */}
             {isResetDialogOpen && scheduleData && (
@@ -867,9 +1185,9 @@ export default function StaffScheduleManagement() {
                 </div>
             )}
 
-            {/* 編集履歴 */}
+            {/* 編集履歴（印刷時は非表示） */}
             {editLogs && editLogs.length > 0 && (
-                <Card>
+                <Card className="no-print">
                     <CardHeader>
                         <CardTitle>編集履歴</CardTitle>
                     </CardHeader>

@@ -39,9 +39,21 @@ export default function UserManagement() {
         username: string;
         password: string;
         name: string;
-        role: "field_worker" | "sales_office" | "sub_admin" | "admin";
+        role: "field_worker" | "sales_office" | "sub_admin" | "admin" | "external";
         category: "elephant" | "squirrel" | null;
     } | null>(null);
+
+    // ワングラムアカウント用の状態
+    const [wangramAccount1, setWangramAccount1] = useState({
+        username: "",
+        password: "",
+        name: "",
+    });
+    const [wangramAccount2, setWangramAccount2] = useState({
+        username: "",
+        password: "",
+        name: "",
+    });
 
     const createMutation = trpc.users.create.useMutation({
         onSuccess: () => {
@@ -54,6 +66,31 @@ export default function UserManagement() {
             toast.error(error.message || "ユーザーの登録に失敗しました");
         },
     });
+
+    // ワングラムアカウント作成用のハンドラー
+    const handleCreateWangramAccount = (account: { username: string; password: string; name: string }, accountNumber: number) => {
+        if (!account.username || !account.password) {
+            toast.error("ユーザー名とパスワードを入力してください");
+            return;
+        }
+
+        createMutation.mutate({
+            username: account.username,
+            password: account.password,
+            name: account.name || undefined,
+            role: "external",
+        }, {
+            onSuccess: () => {
+                toast.success(`ワングラムアカウント${accountNumber}を登録しました`);
+                if (accountNumber === 1) {
+                    setWangramAccount1({ username: "", password: "", name: "" });
+                } else {
+                    setWangramAccount2({ username: "", password: "", name: "" });
+                }
+                refetch();
+            },
+        });
+    };
 
     const updateMutation = trpc.users.update.useMutation({
         onSuccess: () => {
@@ -185,8 +222,10 @@ export default function UserManagement() {
                                                         ? "bg-blue-100 text-blue-800"
                                                         : userData.role === "sales_office"
                                                             ? "bg-green-100 text-green-800"
-                                                            : "bg-gray-100 text-gray-800"
-                                                    }`}
+                                                            : userData.role === "external"
+                                                                ? "bg-orange-100 text-orange-800"
+                                                                : "bg-gray-100 text-gray-800"
+                                                }`}
                                             >
                                                 {userData.role === "admin"
                                                     ? "管理人"
@@ -194,7 +233,9 @@ export default function UserManagement() {
                                                         ? "準管理人"
                                                         : userData.role === "sales_office"
                                                             ? "営業事務"
-                                                            : "現場staff"}
+                                                            : userData.role === "external"
+                                                                ? "社外（ワングラム）"
+                                                                : "現場staff"}
                                             </span>
                                         </TableCell>
                                         <TableCell>
@@ -224,6 +265,84 @@ export default function UserManagement() {
                             ユーザーがありません
                         </p>
                     )}
+                </CardContent>
+            </Card>
+
+            {/* ワングラムアカウント追加セクション */}
+            <Card className="mt-6 border-orange-200 bg-orange-50/50">
+                <CardHeader>
+                    <CardTitle className="text-lg">ワングラムアカウント追加</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {/* ワングラムアカウント1 */}
+                        <div className="space-y-2 p-4 border border-orange-200 rounded-lg bg-white">
+                            <h3 className="font-semibold text-sm">ワングラムアカウント 1</h3>
+                            <Input
+                                placeholder="ユーザー名"
+                                value={wangramAccount1.username}
+                                onChange={(e) =>
+                                    setWangramAccount1({ ...wangramAccount1, username: e.target.value })
+                                }
+                            />
+                            <Input
+                                type="password"
+                                placeholder="パスワード"
+                                value={wangramAccount1.password}
+                                onChange={(e) =>
+                                    setWangramAccount1({ ...wangramAccount1, password: e.target.value })
+                                }
+                            />
+                            <Input
+                                placeholder="表示名（任意）"
+                                value={wangramAccount1.name}
+                                onChange={(e) =>
+                                    setWangramAccount1({ ...wangramAccount1, name: e.target.value })
+                                }
+                            />
+                            <Button
+                                className="w-full"
+                                onClick={() => handleCreateWangramAccount(wangramAccount1, 1)}
+                                disabled={createMutation.isPending || !wangramAccount1.username || !wangramAccount1.password}
+                            >
+                                追加
+                            </Button>
+                        </div>
+
+                        {/* ワングラムアカウント2 */}
+                        <div className="space-y-2 p-4 border border-orange-200 rounded-lg bg-white">
+                            <h3 className="font-semibold text-sm">ワングラムアカウント 2</h3>
+                            <Input
+                                placeholder="ユーザー名"
+                                value={wangramAccount2.username}
+                                onChange={(e) =>
+                                    setWangramAccount2({ ...wangramAccount2, username: e.target.value })
+                                }
+                            />
+                            <Input
+                                type="password"
+                                placeholder="パスワード"
+                                value={wangramAccount2.password}
+                                onChange={(e) =>
+                                    setWangramAccount2({ ...wangramAccount2, password: e.target.value })
+                                }
+                            />
+                            <Input
+                                placeholder="表示名（任意）"
+                                value={wangramAccount2.name}
+                                onChange={(e) =>
+                                    setWangramAccount2({ ...wangramAccount2, name: e.target.value })
+                                }
+                            />
+                            <Button
+                                className="w-full"
+                                onClick={() => handleCreateWangramAccount(wangramAccount2, 2)}
+                                disabled={createMutation.isPending || !wangramAccount2.username || !wangramAccount2.password}
+                            >
+                                追加
+                            </Button>
+                        </div>
+                    </div>
                 </CardContent>
             </Card>
 
@@ -284,6 +403,7 @@ export default function UserManagement() {
                                     <option value="sales_office">営業事務</option>
                                     <option value="sub_admin">準管理人</option>
                                     <option value="admin">管理人</option>
+                                    <option value="external">社外アカウント（ワングラム）</option>
                                 </select>
                             </div>
                             <div className="flex gap-2">

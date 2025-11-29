@@ -176,19 +176,27 @@ function VehicleCheckCard({
                             )}
                         </div>
                     </div>
-                    <div className="flex flex-wrap gap-2">
+                    <div className="flex flex-wrap gap-2 w-full sm:w-auto">
                         {uncheckedItemIds.length > 0 && (
                             <Button
                                 size="sm"
                                 variant="outline"
                                 onClick={() => onCheckAll(vehicle.id, uncheckedItemIds)}
+                                className="w-full sm:w-auto text-sm h-9 touch-manipulation"
+                                style={{ touchAction: 'manipulation' }}
                             >
                                 車両にチェック
                             </Button>
                         )}
                         {isAdmin && (
                             <>
-                                <Button size="sm" variant="outline" onClick={() => onRequestCheck(vehicle.id)}>
+                                <Button 
+                                    size="sm" 
+                                    variant="outline" 
+                                    onClick={() => onRequestCheck(vehicle.id)}
+                                    className="w-full sm:w-auto text-sm h-9 touch-manipulation"
+                                    style={{ touchAction: 'manipulation' }}
+                                >
                                     <UserPlus className="h-4 w-4 mr-2" />
                                     依頼
                                 </Button>
@@ -254,15 +262,15 @@ function VehicleCheckCard({
                             return (
                                 <div
                                     key={status.checkItem.id}
-                                    className={`p-2 sm:p-3 border rounded-lg ${getStatusColor(status.status)}`}
+                                    className={`p-3 sm:p-4 border rounded-lg ${getStatusColor(status.status)}`}
                                 >
-                                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                                    <div className="flex flex-col gap-3">
                                         <div className="flex items-start gap-2 flex-1 min-w-0">
                                             {getStatusIcon(status.status)}
                                             <div className="flex-1 min-w-0">
                                                 <div className="flex items-center gap-2 flex-wrap">
-                                                    <p className="font-semibold text-sm sm:text-base">{status.checkItem.name}</p>
-                                                    <span className={`text-xs px-2 py-0.5 rounded ${status.status === "checked" ? "bg-green-100 text-green-800" :
+                                                    <p className="font-semibold text-base sm:text-lg">{status.checkItem.name}</p>
+                                                    <span className={`text-xs sm:text-sm px-2 py-1 rounded ${status.status === "checked" ? "bg-green-100 text-green-800" :
                                                         status.status === "needs_recheck" ? "bg-orange-100 text-orange-800" :
                                                             "bg-gray-100 text-gray-800"
                                                         }`}>
@@ -323,45 +331,51 @@ function VehicleCheckCard({
                                                 )}
                                             </div>
                                         </div>
-                                        <div className="flex flex-col sm:flex-row gap-1.5 sm:gap-2 flex-shrink-0 w-full sm:w-auto">
-                                            <Button
-                                                size="sm"
-                                                onClick={() => onCheck(vehicle.id, status.checkItem.id, "checked")}
-                                                className="w-full sm:w-auto text-[10px] sm:text-xs h-7 sm:h-8"
-                                                variant={status.status === "checked" ? "default" : "outline"}
-                                            >
-                                                チェック
-                                            </Button>
-                                            <Button
-                                                size="sm"
-                                                variant="outline"
-                                                onClick={() => onCheck(vehicle.id, status.checkItem.id, "needs_recheck")}
-                                                className={`w-full sm:w-auto text-[10px] sm:text-xs h-7 sm:h-8 ${status.status === "needs_recheck"
-                                                    ? "bg-orange-600 hover:bg-orange-700 text-white border-orange-600"
-                                                    : ""
-                                                    }`}
-                                            >
-                                                要再チェック
-                                            </Button>
-                                            <Button
-                                                size="sm"
-                                                variant="outline"
-                                                onClick={() => onCheck(vehicle.id, status.checkItem.id, "unchecked")}
-                                                className={`w-full sm:w-auto text-[10px] sm:text-xs h-7 sm:h-8 ${status.status === "unchecked"
-                                                    ? "bg-gray-600 hover:bg-gray-700 text-white border-gray-600"
-                                                    : ""
-                                                    }`}
-                                            >
-                                                未チェック
-                                            </Button>
-                                            <Button
-                                                size="sm"
-                                                variant="outline"
-                                                onClick={() => onRequestCheck(vehicle.id, status.checkItem.id)}
-                                                className="w-full sm:w-auto text-[10px] sm:text-xs h-7 sm:h-8"
-                                            >
-                                                チェック依頼する
-                                            </Button>
+                                        <div className="border-t pt-3 mt-3 sm:border-t-0 sm:pt-0 sm:mt-0">
+                                            <div className="grid grid-cols-2 sm:flex sm:flex-row gap-2 flex-shrink-0 w-full sm:w-auto">
+                                                <Button
+                                                    size="sm"
+                                                    onClick={() => onCheck(vehicle.id, status.checkItem.id, "checked")}
+                                                    className="w-full text-xs sm:text-sm h-9 sm:h-9 touch-manipulation"
+                                                    variant={status.status === "checked" ? "default" : "outline"}
+                                                    style={{ touchAction: 'manipulation' }}
+                                                >
+                                                    チェック
+                                                </Button>
+                                                <Button
+                                                    size="sm"
+                                                    variant="outline"
+                                                    onClick={() => onCheck(vehicle.id, status.checkItem.id, "needs_recheck")}
+                                                    className={`w-full text-xs sm:text-sm h-9 sm:h-9 touch-manipulation ${status.status === "needs_recheck"
+                                                        ? "bg-orange-600 hover:bg-orange-700 text-white border-orange-600"
+                                                        : ""
+                                                        }`}
+                                                    style={{ touchAction: 'manipulation' }}
+                                                >
+                                                    要再チェック
+                                                </Button>
+                                                <Button
+                                                    size="sm"
+                                                    variant="outline"
+                                                    onClick={() => onCheck(vehicle.id, status.checkItem.id, "unchecked")}
+                                                    className={`w-full text-xs sm:text-sm h-9 sm:h-9 touch-manipulation ${status.status === "unchecked"
+                                                        ? "bg-gray-600 hover:bg-gray-700 text-white border-gray-600"
+                                                        : ""
+                                                        }`}
+                                                    style={{ touchAction: 'manipulation' }}
+                                                >
+                                                    未チェック
+                                                </Button>
+                                                <Button
+                                                    size="sm"
+                                                    variant="outline"
+                                                    onClick={() => onRequestCheck(vehicle.id, status.checkItem.id)}
+                                                    className="w-full sm:w-auto text-xs sm:text-sm h-9 sm:h-9 touch-manipulation"
+                                                    style={{ touchAction: 'manipulation' }}
+                                                >
+                                                    依頼
+                                                </Button>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -530,24 +544,25 @@ export default function VehicleChecks() {
             {/* 上段：現在製作中の車両一覧（選択するとその車のチェックだけ表示） */}
             <Card>
                 <CardHeader className="p-3 sm:p-4">
-                    <CardTitle className="text-sm sm:text-base">現在製作中の車両</CardTitle>
+                    <CardTitle className="text-base sm:text-lg">現在製作中の車両</CardTitle>
                 </CardHeader>
                 <CardContent className="p-3 sm:p-4">
                     {filteredVehicles.length > 0 ? (
-                        <div className="flex gap-2 overflow-x-auto">
+                        <div className="flex gap-2 sm:gap-3 overflow-x-auto pb-2 -mx-3 sm:-mx-4 px-3 sm:px-4">
                             {filteredVehicles.map((v) => (
                                 <button
                                     key={v.id}
                                     type="button"
                                     onClick={() => setActiveVehicleId(v.id)}
-                                    className={`px-3 py-2 rounded-lg border text-left min-w-[140px] text-xs sm:text-sm ${activeVehicleId === v.id
-                                        ? "bg-blue-600 text-white border-blue-600"
-                                        : "bg-white text-[hsl(var(--foreground))] border-[hsl(var(--border))]"
+                                    className={`px-4 py-3 rounded-lg border text-left min-w-[160px] sm:min-w-[180px] flex-shrink-0 touch-manipulation ${activeVehicleId === v.id
+                                        ? "bg-blue-600 text-white border-blue-600 shadow-md"
+                                        : "bg-white text-[hsl(var(--foreground))] border-[hsl(var(--border))] hover:bg-gray-50 active:bg-gray-100"
                                         }`}
+                                    style={{ touchAction: 'manipulation' }}
                                 >
-                                    <div className="font-semibold truncate">{v.vehicleNumber}</div>
+                                    <div className="font-semibold text-sm sm:text-base truncate">{v.vehicleNumber}</div>
                                     {v.customerName && (
-                                        <div className="text-[10px] sm:text-xs text-[hsl(var(--muted-foreground))] truncate">
+                                        <div className="text-xs sm:text-sm text-[hsl(var(--muted-foreground))] truncate mt-1">
                                             {v.customerName}
                                         </div>
                                     )}
@@ -555,7 +570,7 @@ export default function VehicleChecks() {
                             ))}
                         </div>
                     ) : (
-                        <p className="text-xs sm:text-sm text-[hsl(var(--muted-foreground))]">
+                        <p className="text-sm sm:text-base text-[hsl(var(--muted-foreground))]">
                             現在、製作中の車両はありません
                         </p>
                     )}
@@ -564,14 +579,16 @@ export default function VehicleChecks() {
 
             {/* カテゴリタブ */}
             <Tabs value={selectedCategory} onValueChange={(v) => setSelectedCategory(v as any)}>
-                <TabsList className="grid w-full grid-cols-3 sm:grid-cols-3 md:grid-cols-6 gap-1 sm:gap-2 overflow-x-auto">
-                    <TabsTrigger value="all" className="text-xs sm:text-sm px-2 sm:px-3 whitespace-nowrap">全て</TabsTrigger>
-                    {CATEGORIES.map((cat) => (
-                        <TabsTrigger key={cat} value={cat} className="text-xs sm:text-sm px-2 sm:px-3 whitespace-nowrap">
-                            {cat}
-                        </TabsTrigger>
-                    ))}
-                </TabsList>
+                <div className="overflow-x-auto -mx-4 sm:mx-0 px-4 sm:px-0">
+                    <TabsList className="inline-flex w-auto min-w-full sm:w-full sm:grid sm:grid-cols-3 md:grid-cols-6 gap-1 sm:gap-2">
+                        <TabsTrigger value="all" className="text-sm sm:text-base px-4 sm:px-3 py-2 whitespace-nowrap flex-shrink-0 touch-manipulation" style={{ touchAction: 'manipulation' }}>全て</TabsTrigger>
+                        {CATEGORIES.map((cat) => (
+                            <TabsTrigger key={cat} value={cat} className="text-sm sm:text-base px-4 sm:px-3 py-2 whitespace-nowrap flex-shrink-0 touch-manipulation" style={{ touchAction: 'manipulation' }}>
+                                {cat}
+                            </TabsTrigger>
+                        ))}
+                    </TabsList>
+                </div>
 
                 <TabsContent value={selectedCategory} className="mt-4">
                     {activeVehicle ? (

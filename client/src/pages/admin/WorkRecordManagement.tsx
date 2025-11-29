@@ -218,7 +218,7 @@ export default function WorkRecordManagement() {
                                 onChange={(e) => setSelectedUserId(e.target.value)}
                             >
                                 <option value="">全スタッフ</option>
-                                {users?.map((u) => (
+                                {users?.filter((u) => u.role !== "external").map((u) => (
                                     <option key={u.id} value={u.id}>
                                         {u.name || u.username}
                                     </option>

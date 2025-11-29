@@ -36,3 +36,91 @@
         font-family: system-ui, -apple-system, sans-serif;
     }
 }
+
+/* 印刷スタイル（A4サイズ） */
+@media print {
+    @page {
+        size: A4;
+        margin: 10mm;
+    }
+
+    body {
+        background: white;
+    }
+
+    /* 印刷時に非表示にする要素 */
+    .no-print,
+    .no-print *,
+    button:not(.print-button) {
+        display: none !important;
+    }
+
+    /* スケジュール表をA4に収める */
+    .print-container {
+        width: 100%;
+        max-width: 100%;
+        overflow: visible;
+    }
+
+    /* テーブルをA4に収める */
+    table {
+        width: 100% !important;
+        font-size: 10px !important;
+        border-collapse: collapse;
+        page-break-inside: avoid;
+    }
+
+    /* セルのサイズを調整 */
+    th, td {
+        padding: 2px 4px !important;
+        font-size: 10px !important;
+        border: 1px solid #000 !important;
+    }
+
+    /* 日付列を固定幅に */
+    th:first-child,
+    td:first-child {
+        width: 50px !important;
+        min-width: 50px !important;
+        max-width: 50px !important;
+    }
+
+    /* スタッフ名列を固定幅に */
+    th:not(:first-child),
+    td:not(:first-child) {
+        width: auto !important;
+        min-width: 60px !important;
+        max-width: 60px !important;
+    }
+
+    /* セル内のテキストを調整 */
+    td div {
+        font-size: 10px !important;
+        line-height: 1.2 !important;
+    }
+
+    /* ヘッダーとフッターを非表示 */
+    header,
+    .header,
+    footer,
+    .footer {
+        display: none !important;
+    }
+
+    /* カードの余白を削除 */
+    .card,
+    .card-content,
+    .card-header {
+        padding: 0 !important;
+        margin: 0 !important;
+        box-shadow: none !important;
+        border: none !important;
+    }
+
+    /* ボタンとコントロールを非表示 */
+    .button-container,
+    .controls,
+    .action-buttons {
+        display: none !important;
+    }
+}

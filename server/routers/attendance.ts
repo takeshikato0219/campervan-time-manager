@@ -322,9 +322,12 @@ export const attendanceRouter = createTRPCRouter({
             const { selectUsersSafely } = await import("../db");
             const allUsers = await selectUsersSafely(db);
 
+            // externalロールのユーザーを除外（社外アカウントは出勤記録に含めない）
+            const staffUsers = allUsers.filter((u: any) => u.role !== "external");
+
             // 各ユーザーの出退勤記録を取得
             const result = await Promise.all(
-                allUsers.map(async (user) => {
+                staffUsers.map(async (user) => {
                     try {
                         const attendanceRecords = await db
                             .select()
@@ -397,9 +400,12 @@ export const attendanceRouter = createTRPCRouter({
                 const { selectUsersSafely } = await import("../db");
                 const allUsers = await selectUsersSafely(db);
 
+                // externalロールのユーザーを除外（社外アカウントは出勤記録に含めない）
+                const staffUsers = allUsers.filter((u: any) => u.role !== "external");
+
                 // 各ユーザーの出退勤記録を取得（指定日の出勤記録のみ）
                 const result = await Promise.all(
-                    allUsers.map(async (user) => {
+                    staffUsers.map(async (user) => {
                         try {
                             // 指定日の出勤記録のみを取得（clockInが指定日の範囲内）
                             const [attendance] = await db

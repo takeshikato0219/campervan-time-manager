@@ -20,8 +20,8 @@ export const breakTimesRouter = createTRPCRouter({
         return breakTimes;
     }),
 
-    // 休憩時間を作成（準管理者以上）
-    create: subAdminProcedure
+    // 休憩時間を作成（管理者専用）
+    create: adminProcedure
         .input(
             z.object({
                 name: z.string().min(1),
@@ -51,8 +51,8 @@ export const breakTimesRouter = createTRPCRouter({
             return { success: true };
         }),
 
-    // 休憩時間を更新（準管理者以上）
-    update: subAdminProcedure
+    // 休憩時間を更新（管理者専用）
+    update: adminProcedure
         .input(
             z.object({
                 id: z.number(),
@@ -87,8 +87,8 @@ export const breakTimesRouter = createTRPCRouter({
             return { success: true };
         }),
 
-    // 休憩時間を削除（準管理者以上）
-    delete: subAdminProcedure
+    // 休憩時間を削除（管理者専用）
+    delete: adminProcedure
         .input(z.object({ id: z.number() }))
         .mutation(async ({ input }) => {
             const db = await getDb();

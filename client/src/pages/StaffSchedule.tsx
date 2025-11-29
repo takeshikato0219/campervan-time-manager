@@ -3,12 +3,15 @@ import { useAuth } from "../hooks/useAuth";
 import { trpc } from "../lib/trpc";
 import { Card, CardContent } from "../components/ui/card";
 import { Button } from "../components/ui/button";
+import { Link } from "wouter";
+import { ArrowLeft } from "lucide-react";
 import { format, parse, addMonths, subMonths } from "date-fns";
 import { ja } from "date-fns/locale";
 
-type ScheduleStatus = "work" | "rest" | "request" | "exhibition" | "other" | "morning" | "afternoon";
+type ScheduleStatus = "work" | "rest" | "request" | "exhibition" | "other" | "morning" | "afternoon" | "business_trip" | "exhibition_duty" | "paid_leave" | "delivery" | "payment_date";
 
-const STATUS_COLORS: Record<ScheduleStatus, string> = {
+// デフォルトの色設定（データベースから取得できない場合のフォールバック）
+const DEFAULT_STATUS_COLORS: Record<ScheduleStatus, string> = {
     work: "bg-blue-100", // 水色 = 出勤
     rest: "bg-pink-200", // ピンク = 休み
     request: "bg-pink-300", // ピンク = 希望休
@@ -16,6 +19,11 @@ const STATUS_COLORS: Record<ScheduleStatus, string> = {
     other: "bg-green-50", // 薄緑 = その他業務
     morning: "bg-yellow-100", // 黄色 = 午前出
     afternoon: "bg-orange-100", // オレンジ = 午後出
+    business_trip: "bg-purple-100", // 紫 = 出張
+    exhibition_duty: "bg-cyan-100", // シアン = 展示場当番
+    paid_leave: "bg-red-100", // 赤 = 有給
+    delivery: "bg-indigo-100", // インディゴ = 納車
+    payment_date: "bg-amber-100", // アンバー = 支払日
 };
 
 const STATUS_LABELS: Record<ScheduleStatus, string> = {
@@ -26,6 +34,11 @@ const STATUS_LABELS: Record<ScheduleStatus, string> = {
     other: "その他",
     morning: "午前出",
     afternoon: "午後出",
+    business_trip: "出張",
+    exhibition_duty: "展示場当番",
+    paid_leave: "有給",
+    delivery: "納車",
+    payment_date: "支払日",
 };
 
 export default function StaffSchedule() {
@@ -42,6 +55,15 @@ export default function StaffSchedule() {
             },
         }
     );
+
+    // 色設定を取得
+    const { data: statusColors } = trpc.staffSchedule.getStatusColors.useQuery();
+
+    // 実際に使用する色設定（データベースから取得、なければデフォルト）
+    const STATUS_COLORS = React.useMemo(() => {
+        if (!statusColors) return DEFAULT_STATUS_COLORS;
+        return { ...DEFAULT_STATUS_COLORS, ...statusColors } as Record<ScheduleStatus, string>;
+    }, [statusColors]);
 
     if (isLoading) {
         return (
@@ -117,13 +139,21 @@ export default function StaffSchedule() {
 
     return (
         <div className="space-y-6">
-            <div className="flex items-center justify-between">
-                <div>
-                    <h1 className="text-3xl font-bold">スタッフ休み予定一覧</h1>
-                    <p className="text-[hsl(var(--muted-foreground))] mt-2">
-                        期間: {format(parse(scheduleData.period.start, "yyyy-MM-dd", new Date()), "yyyy年MM月dd日")} ～{" "}
-                        {format(parse(scheduleData.period.end, "yyyy-MM-dd", new Date()), "yyyy年MM月dd日")}
-                    </p>
+            <div className="flex items-center justify-between flex-wrap gap-4">
+                <div className="flex items-center gap-4 flex-wrap">
+                    <Link href="/">
+                        <Button variant="outline" size="sm">
+                            <ArrowLeft className="h-4 w-4 mr-2" />
+                            戻る
+                        </Button>
+                    </Link>
+                    <div>
+                        <h1 className="text-2xl sm:text-3xl font-bold">スタッフ休み予定一覧</h1>
+                        <p className="text-[hsl(var(--muted-foreground))] mt-2 text-sm sm:text-base">
+                            期間: {format(parse(scheduleData.period.start, "yyyy-MM-dd", new Date()), "yyyy年MM月dd日")} ～{" "}
+                            {format(parse(scheduleData.period.end, "yyyy-MM-dd", new Date()), "yyyy年MM月dd日")}
+                        </p>
+                    </div>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
                     <Button variant="outline" size="sm" onClick={handlePrevMonth}>
@@ -144,13 +174,13 @@ export default function StaffSchedule() {
                     <table className="w-full border-collapse border border-[hsl(var(--border))] text-xs">
                         <thead>
                             <tr>
-                                <th className="border border-[hsl(var(--border))] p-1 sm:p-2 bg-[hsl(var(--muted))] sticky left-0 z-10 min-w-[70px]">
+                                <th className="border border-[hsl(var(--border))] p-1 sm:p-2 bg-[hsl(var(--muted))] sticky left-0 top-0 z-20 min-w-[70px]">
                                     日付
                                 </th>
                                 {filteredUsers.map((u) => (
                                     <th
                                         key={u.id}
-                                        className="border border-[hsl(var(--border))] p-1 sm:p-2 bg-[hsl(var(--muted))] min-w-[60px] sm:min-w-[80px]"
+                                        className="border border-[hsl(var(--border))] p-1 sm:p-2 bg-[hsl(var(--muted))] sticky top-0 z-10 min-w-[60px] sm:min-w-[80px]"
                                     >
                                         <span className="text-[10px] sm:text-xs">{u.name}</span>
                                     </th>
@@ -175,13 +205,22 @@ export default function StaffSchedule() {
                                             className={`border border-[hsl(var(--border))] p-0.5 sm:p-1 text-center ${STATUS_COLORS[entry.status as ScheduleStatus]
                                                 }`}
                                         >
-                                            <div className="text-[10px] sm:text-xs font-medium">
-                                                {STATUS_LABELS[entry.status as ScheduleStatus]}
-                                            </div>
-                                            {entry.comment && (
-                                                <div className="text-[8px] sm:text-[9px] text-[hsl(var(--muted-foreground))] mt-0.5 truncate">
+                                            {entry.status === "business_trip" && entry.comment ? (
+                                                // 出張で県名がある場合は表示し、「出張」ラベルは非表示
+                                                <div className="text-[10px] sm:text-xs font-medium text-center">
                                                     {entry.comment}
                                                 </div>
+                                            ) : (
+                                                <>
+                                                    <div className="text-[10px] sm:text-xs font-medium">
+                                                        {STATUS_LABELS[entry.status as ScheduleStatus]}
+                                                    </div>
+                                                    {entry.comment && (
+                                                        <div className="text-[8px] sm:text-[9px] text-[hsl(var(--muted-foreground))] mt-0.5 truncate">
+                                                            {entry.comment}
+                                                        </div>
+                                                    )}
+                                                </>
                                             )}
                                         </td>
                                     ))}

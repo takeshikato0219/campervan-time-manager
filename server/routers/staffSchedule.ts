@@ -1,15 +1,15 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { createTRPCRouter, protectedProcedure, subAdminProcedure } from "../_core/trpc";
-import { getDb, schema } from "../db";
+import { createTRPCRouter, protectedProcedure, subAdminProcedure, adminProcedure } from "../_core/trpc";
+import { getDb, getPool, schema } from "../db";
 import { eq, and, gte, lte, sql } from "drizzle-orm";
 import { startOfDay, endOfDay, format, eachDayOfInterval, getDay } from "date-fns";
 
 // スタッフ休み予定用のデフォルト20名（あとから名前編集で自由に変更可能）
 const FIXED_STAFF_NAMES: string[] = Array.from({ length: 20 }, (_, i) => `スタッフ${i + 1}`);
 
-// 20日始まりの19日終わりの期間を計算する関数
-function getMonthPeriod20th(date: Date): { start: Date; end: Date } {
+// 21日始まりの20日終わりの期間を計算する関数
+function getMonthPeriod21st(date: Date): { start: Date; end: Date } {
     const year = date.getFullYear();
     const month = date.getMonth();
     const day = date.getDate();
@@ -17,14 +17,14 @@ function getMonthPeriod20th(date: Date): { start: Date; end: Date } {
     let startDate: Date;
     let endDate: Date;
 
-    if (day >= 20) {
-        // 20日以降の場合、今月20日から来月19日まで
-        startDate = new Date(year, month, 20);
-        endDate = new Date(year, month + 1, 19);
+    if (day >= 21) {
+        // 21日以降の場合、今月21日から来月20日まで
+        startDate = new Date(year, month, 21);
+        endDate = new Date(year, month + 1, 20);
     } else {
-        // 20日未満の場合、先月20日から今月19日まで
-        startDate = new Date(year, month - 1, 20);
-        endDate = new Date(year, month, 19);
+        // 21日未満の場合、先月21日から今月20日まで
+        startDate = new Date(year, month - 1, 21);
+        endDate = new Date(year, month, 20);
     }
 
     return {
@@ -42,7 +42,7 @@ async function getScheduleQuery(db: any, baseDateStr?: string) {
                         \`id\` int AUTO_INCREMENT PRIMARY KEY NOT NULL,
                         \`userId\` int NOT NULL,
                         \`scheduleDate\` date NOT NULL,
-                        \`status\` enum('work','rest','request','exhibition','other','morning','afternoon') DEFAULT 'work' NOT NULL,
+                        \`status\` enum('work','rest','request','exhibition','other','morning','afternoon','business_trip','exhibition_duty','paid_leave','delivery','payment_date') DEFAULT 'work' NOT NULL,
                         \`comment\` varchar(100),
                         \`createdAt\` timestamp DEFAULT CURRENT_TIMESTAMP NOT NULL,
                         \`updatedAt\` timestamp DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP NOT NULL
@@ -82,6 +82,13 @@ async function getScheduleQuery(db: any, baseDateStr?: string) {
                         \`createdAt\` timestamp DEFAULT CURRENT_TIMESTAMP NOT NULL,
                         \`updatedAt\` timestamp DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP NOT NULL
             )`);
+            await db.execute(sql`CREATE TABLE IF NOT EXISTS \`staffScheduleStatusColors\` (
+                        \`id\` int AUTO_INCREMENT PRIMARY KEY NOT NULL,
+                        \`status\` varchar(50) NOT NULL UNIQUE,
+                        \`colorClass\` varchar(100) NOT NULL,
+                        \`createdAt\` timestamp DEFAULT CURRENT_TIMESTAMP NOT NULL,
+                        \`updatedAt\` timestamp DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP NOT NULL
+            )`);
         } catch (error: any) {
             // テーブルが既に存在する場合は無視
             if (!error?.message?.includes("already exists")) {
@@ -89,9 +96,9 @@ async function getScheduleQuery(db: any, baseDateStr?: string) {
             }
         }
 
-        // 基準日から20日始まりの1ヶ月期間を計算
+        // 基準日から21日始まりの1ヶ月期間を計算
         const baseDate = baseDateStr ? new Date(baseDateStr) : new Date();
-        const { start, end } = getMonthPeriod20th(baseDate);
+        const { start, end } = getMonthPeriod21st(baseDate);
 
         // 表示順序を取得（テーブルが存在しない場合は空配列）
         let displayOrders: any[] = [];
@@ -394,7 +401,7 @@ export const staffScheduleRouter = createTRPCRouter({
             z.object({
                 userId: z.number(),
                 date: z.string(), // YYYY-MM-DD形式
-                status: z.enum(["work", "rest", "request", "exhibition", "other", "morning", "afternoon"]),
+                status: z.enum(["work", "rest", "request", "exhibition", "other", "morning", "afternoon", "business_trip", "exhibition_duty", "paid_leave", "delivery", "payment_date"]),
                 comment: z.string().optional().nullable(),
             })
         )
@@ -553,7 +560,7 @@ export const staffScheduleRouter = createTRPCRouter({
                     z.object({
                         userId: z.number(),
                         date: z.string(),
-                        status: z.enum(["work", "rest", "request", "exhibition", "other", "morning", "afternoon"]),
+                        status: z.enum(["work", "rest", "request", "exhibition", "other", "morning", "afternoon", "business_trip", "exhibition_duty", "paid_leave", "delivery", "payment_date"]),
                         comment: z.string().optional().nullable(),
                     })
                 ),
@@ -1036,16 +1043,49 @@ export const staffScheduleRouter = createTRPCRouter({
 
             // テーブルが存在しない場合は作成
             try {
-                await db.execute(sql`CREATE TABLE IF NOT EXISTS \`staffScheduleAdjustments\` (
-                    \`id\` int AUTO_INCREMENT PRIMARY KEY NOT NULL,
-                    \`userId\` int NOT NULL,
-                    \`periodStart\` date NOT NULL,
-                    \`periodEnd\` date NOT NULL,
-                    \`adjustment\` int NOT NULL DEFAULT 0,
-                    \`createdAt\` timestamp DEFAULT CURRENT_TIMESTAMP NOT NULL,
-                    \`updatedAt\` timestamp DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP NOT NULL
-                )`);
-            } catch (error: any) {
+            await db.execute(sql`CREATE TABLE IF NOT EXISTS \`staffScheduleAdjustments\` (
+                        \`id\` int AUTO_INCREMENT PRIMARY KEY NOT NULL,
+                        \`userId\` int NOT NULL,
+                        \`periodStart\` date NOT NULL,
+                        \`periodEnd\` date NOT NULL,
+                        \`adjustment\` int NOT NULL DEFAULT 0,
+                        \`createdAt\` timestamp DEFAULT CURRENT_TIMESTAMP NOT NULL,
+                        \`updatedAt\` timestamp DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP NOT NULL
+            )`);
+            await db.execute(sql`CREATE TABLE IF NOT EXISTS \`staffScheduleStatusColors\` (
+                        \`id\` int AUTO_INCREMENT PRIMARY KEY NOT NULL,
+                        \`status\` varchar(50) NOT NULL UNIQUE,
+                        \`colorClass\` varchar(100) NOT NULL,
+                        \`createdAt\` timestamp DEFAULT CURRENT_TIMESTAMP NOT NULL,
+                        \`updatedAt\` timestamp DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP NOT NULL
+            )`);
+            
+            // デフォルトの色設定を初期化
+            const defaultColors: Record<string, string> = {
+                work: "bg-blue-100",
+                rest: "bg-pink-200",
+                request: "bg-pink-300",
+                exhibition: "bg-green-100",
+                other: "bg-green-50",
+                morning: "bg-yellow-100",
+                afternoon: "bg-orange-100",
+                business_trip: "bg-purple-100",
+                exhibition_duty: "bg-cyan-100",
+                paid_leave: "bg-red-100",
+                delivery: "bg-indigo-100",
+                payment_date: "bg-amber-100",
+            };
+            
+            for (const [status, colorClass] of Object.entries(defaultColors)) {
+                try {
+                    await db.execute(
+                        sql`INSERT IGNORE INTO \`staffScheduleStatusColors\` (\`status\`, \`colorClass\`) VALUES (${status}, ${colorClass})`
+                    );
+                } catch (error: any) {
+                    // 既に存在する場合は無視
+                }
+            }
+        } catch (error: any) {
                 if (!error?.message?.includes("already exists")) {
                     console.warn("[staffSchedule] 調整休テーブル作成エラー（無視）:", error?.message);
                 }
@@ -1127,6 +1167,111 @@ export const staffScheduleRouter = createTRPCRouter({
             }
 
             return { success: true };
+        }),
+
+    // ステータス色設定を取得
+    getStatusColors: protectedProcedure.query(async () => {
+        const db = await getDb();
+        if (!db) {
+            throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "データベースに接続できません" });
+        }
+
+        try {
+            const pool = getPool();
+            if (!pool) {
+                throw new Error("データベースプールが取得できません");
+            }
+
+            const [rows] = await pool.execute(
+                sql`SELECT \`status\`, \`colorClass\` FROM \`staffScheduleStatusColors\``
+            );
+            const colorMap: Record<string, string> = {};
+            
+            // デフォルトの色設定
+            const defaultColors: Record<string, string> = {
+                work: "bg-blue-100",
+                rest: "bg-pink-200",
+                request: "bg-pink-300",
+                exhibition: "bg-green-100",
+                other: "bg-green-50",
+                morning: "bg-yellow-100",
+                afternoon: "bg-orange-100",
+                business_trip: "bg-purple-100",
+                exhibition_duty: "bg-cyan-100",
+                paid_leave: "bg-red-100",
+                delivery: "bg-indigo-100",
+                payment_date: "bg-amber-100",
+            };
+
+            if (Array.isArray(rows) && rows.length > 0) {
+                for (const row of rows as any[]) {
+                    if (row.status && row.colorClass) {
+                        colorMap[row.status] = row.colorClass;
+                    }
+                }
+            }
+
+            // データベースにないステータスはデフォルト値を使用
+            for (const [status, colorClass] of Object.entries(defaultColors)) {
+                if (!colorMap[status]) {
+                    colorMap[status] = colorClass;
+                }
+            }
+
+            return colorMap;
+        } catch (error: any) {
+            console.warn("[staffSchedule] 色設定取得エラー（デフォルト値を使用）:", error?.message);
+            // エラーの場合はデフォルト値を返す
+            return {
+                work: "bg-blue-100",
+                rest: "bg-pink-200",
+                request: "bg-pink-300",
+                exhibition: "bg-green-100",
+                other: "bg-green-50",
+                morning: "bg-yellow-100",
+                afternoon: "bg-orange-100",
+                business_trip: "bg-purple-100",
+                exhibition_duty: "bg-cyan-100",
+                paid_leave: "bg-red-100",
+                delivery: "bg-indigo-100",
+                payment_date: "bg-amber-100",
+            };
+        }
+    }),
+
+    // ステータス色設定を更新（管理者のみ）
+    updateStatusColor: adminProcedure
+        .input(
+            z.object({
+                status: z.string(),
+                colorClass: z.string(),
+            })
+        )
+        .mutation(async ({ input }) => {
+            const db = await getDb();
+            if (!db) {
+                throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "データベースに接続できません" });
+            }
+
+            try {
+                const pool = getPool();
+                if (!pool) {
+                    throw new Error("データベースプールが取得できません");
+                }
+
+                await pool.execute(
+                    sql`INSERT INTO \`staffScheduleStatusColors\` (\`status\`, \`colorClass\`) 
+                        VALUES (${input.status}, ${input.colorClass})
+                        ON DUPLICATE KEY UPDATE \`colorClass\` = ${input.colorClass}, \`updatedAt\` = CURRENT_TIMESTAMP`
+                );
+                return { success: true };
+            } catch (error: any) {
+                console.error("[staffSchedule] 色設定更新エラー:", error?.message);
+                throw new TRPCError({
+                    code: "INTERNAL_SERVER_ERROR",
+                    message: "色設定の更新に失敗しました",
+                });
+            }
         }),
 });
 
