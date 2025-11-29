@@ -97,6 +97,9 @@ export default function StaffScheduleManagement() {
     const [isEditNameMode, setIsEditNameMode] = useState(false);
     const [editingNameUserId, setEditingNameUserId] = useState<number | null>(null);
     const [editingName, setEditingName] = useState("");
+    // 色設定管理
+    const [isColorEditMode, setIsColorEditMode] = useState(false);
+    const [editingColorStatus, setEditingColorStatus] = useState<ScheduleStatus | null>(null);
     const [baseMenuUserId, setBaseMenuUserId] = useState<number | null>(null);
     const [isResetDialogOpen, setIsResetDialogOpen] = useState(false);
     // 編集モード用のローカル変更管理
