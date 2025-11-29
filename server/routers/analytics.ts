@@ -297,7 +297,8 @@ export const analyticsRouter = createTRPCRouter({
     /**
      * 作業報告が出勤時間を超えている可能性があるユーザーを取得
      * - 過去3営業日のいずれかの日に出勤していて
-     * - その日の作業記録の合計が、出勤記録の勤務時間を超えているユーザーを取得
+     * - その日の作業記録の合計が、出勤記録の勤務時間を30分以上超えているユーザーを取得
+     * - 30分以内の超過は許容範囲として警告を出さない
      */
     getExcessiveWorkUsers: protectedProcedure.query(async () => {
         const db = await getDb();
@@ -376,7 +377,7 @@ export const analyticsRouter = createTRPCRouter({
                 attendanceMinutes
             HAVING
                 attendanceMinutes > 0
-                AND workMinutes > attendanceMinutes
+                AND workMinutes > (attendanceMinutes + 30)
         `;
         const [rows]: any = await pool.execute(query, businessDates);
 
