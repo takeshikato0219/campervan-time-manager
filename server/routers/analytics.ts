@@ -425,6 +425,143 @@ export const analyticsRouter = createTRPCRouter({
     }),
 
     /**
+     * 特定ユーザーの特定日の作業報告詳細を取得
+     * - 出勤時間と作業時間の比較
+     * - 各作業記録の詳細
+     */
+    getWorkReportDetail: protectedProcedure
+        .input(
+            z.object({
+                userId: z.number(),
+                workDate: z.string(), // "YYYY-MM-DD"
+            })
+        )
+        .query(async ({ input }) => {
+            const db = await getDb();
+            if (!db) {
+                throw new Error("データベースに接続できません");
+            }
+
+            const pool = getPool();
+            if (!pool) {
+                throw new Error("データベースプールに接続できません");
+            }
+
+            // 出勤記録を取得
+            const attendanceQuery = `
+                SELECT
+                    ar.id AS attendanceId,
+                    ar.workDate,
+                    ar.clockInTime,
+                    ar.clockOutTime,
+                    ar.workMinutes AS attendanceWorkMinutes,
+                    COALESCE(
+                        ar.workMinutes,
+                        TIMESTAMPDIFF(
+                            MINUTE,
+                            STR_TO_DATE(CONCAT(ar.workDate, ' ', ar.clockInTime), '%Y-%m-%d %H:%i'),
+                            STR_TO_DATE(CONCAT(ar.workDate, ' ', ar.clockOutTime), '%Y-%m-%d %H:%i')
+                        ),
+                        0
+                    ) AS attendanceMinutes,
+                    COALESCE(u.name, u.username) AS userName
+                FROM \`attendanceRecords\` ar
+                INNER JOIN \`users\` u ON u.id = ar.userId
+                WHERE
+                    ar.userId = ?
+                    AND ar.workDate = ?
+                    AND ar.clockInTime IS NOT NULL
+                LIMIT 1
+            `;
+            const [attendanceRows]: any = await pool.execute(attendanceQuery, [
+                input.userId,
+                input.workDate,
+            ]);
+
+            if (!attendanceRows || attendanceRows.length === 0) {
+                return {
+                    userId: input.userId,
+                    workDate: input.workDate,
+                    userName: null,
+                    attendance: null,
+                    workRecords: [],
+                    summary: {
+                        attendanceMinutes: 0,
+                        workMinutes: 0,
+                        differenceMinutes: 0,
+                    },
+                };
+            }
+
+            const attendance = attendanceRows[0];
+            const attendanceMinutes = Number(attendance.attendanceMinutes) || 0;
+            const userName = attendance.userName;
+
+            // 作業記録を取得
+            const workRecordsQuery = `
+                SELECT
+                    wr.id,
+                    wr.startTime,
+                    wr.endTime,
+                    TIMESTAMPDIFF(
+                        MINUTE,
+                        wr.startTime,
+                        COALESCE(wr.endTime, NOW())
+                    ) AS durationMinutes,
+                    v.vehicleNumber,
+                    v.customerName,
+                    p.name AS processName,
+                    wr.workDescription
+                FROM \`workRecords\` wr
+                LEFT JOIN \`vehicles\` v ON v.id = wr.vehicleId
+                LEFT JOIN \`processes\` p ON p.id = wr.processId
+                WHERE
+                    wr.userId = ?
+                    AND DATE(wr.startTime) = ?
+                ORDER BY wr.startTime ASC
+            `;
+            const [workRecordsRows]: any = await pool.execute(workRecordsQuery, [
+                input.userId,
+                input.workDate,
+            ]);
+
+            const workRecords = (workRecordsRows || []).map((row: any) => ({
+                id: row.id,
+                startTime: row.startTime,
+                endTime: row.endTime,
+                durationMinutes: Number(row.durationMinutes) || 0,
+                vehicleNumber: row.vehicleNumber || "不明",
+                customerName: row.customerName || null,
+                processName: row.processName || "不明",
+                workDescription: row.workDescription || null,
+            }));
+
+            const workMinutes = workRecords.reduce(
+                (sum: number, record: any) => sum + record.durationMinutes,
+                0
+            );
+
+            return {
+                userId: input.userId,
+                workDate: input.workDate,
+                userName,
+                attendance: {
+                    id: attendance.attendanceId,
+                    workDate: attendance.workDate,
+                    clockInTime: attendance.clockInTime,
+                    clockOutTime: attendance.clockOutTime,
+                    attendanceMinutes,
+                },
+                workRecords,
+                summary: {
+                    attendanceMinutes,
+                    workMinutes,
+                    differenceMinutes: workMinutes - attendanceMinutes,
+                },
+            };
+        }),
+
+    /**
      * 車両ごとの制作時間を集計する
      * - 1台あたりの総作業時間（全期間）
      * - 工程ごとの総作業時間

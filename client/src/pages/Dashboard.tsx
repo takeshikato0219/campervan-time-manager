@@ -268,12 +268,17 @@ export default function Dashboard() {
                             {excessiveWorkUsers.flatMap((u) =>
                                 u.dates.map((d: string) => (
                                     <li key={`${u.userId}-${d}`}>
-                                        <span className="font-semibold">{u.userName}</span>
-                                        <span>
-                                            さんが
-                                            {format(new Date(d), "MM/dd")}
-                                            日の作業報告が、出勤時間を超えています
-                                        </span>
+                                        <Link
+                                            href={`/work-report-issues?userId=${u.userId}&workDate=${d}&type=excessive`}
+                                            className="hover:underline cursor-pointer"
+                                        >
+                                            <span className="font-semibold">{u.userName}</span>
+                                            <span>
+                                                さんが
+                                                {format(new Date(d), "MM/dd")}
+                                                日の作業報告が、出勤時間を超えています
+                                            </span>
+                                        </Link>
                                     </li>
                                 ))
                             )}
@@ -293,12 +298,17 @@ export default function Dashboard() {
                             {recentLowWorkUsers.flatMap((u) =>
                                 u.dates.map((d: string) => (
                                     <li key={`${u.userId}-${d}`}>
-                                        <span className="font-semibold">{u.userName}</span>
-                                        <span>
-                                            さんが
-                                            {format(new Date(d), "MM/dd")}
-                                            日の作業報告を入れていません
-                                        </span>
+                                        <Link
+                                            href={`/work-report-issues?userId=${u.userId}&workDate=${d}&type=low`}
+                                            className="hover:underline cursor-pointer"
+                                        >
+                                            <span className="font-semibold">{u.userName}</span>
+                                            <span>
+                                                さんが
+                                                {format(new Date(d), "MM/dd")}
+                                                日の作業報告を入れていません
+                                            </span>
+                                        </Link>
                                     </li>
                                 ))
                             )}

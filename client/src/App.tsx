@@ -24,6 +24,7 @@ import BreakTimeManagement from "./pages/admin/BreakTimeManagement";
 import StaffSchedule from "./pages/StaffSchedule";
 import StaffScheduleManagement from "./pages/admin/StaffScheduleManagement";
 import BackupManagement from "./pages/admin/BackupManagement";
+import WorkReportIssues from "./pages/WorkReportIssues";
 import AppLayout from "./components/AppLayout";
 import { Button } from "./components/ui/button";
 
@@ -141,6 +142,9 @@ export default function App() {
                 </Route>
                 <Route path="/admin/backup">
                     {() => <ProtectedRoute component={BackupManagement} />}
+                </Route>
+                <Route path="/work-report-issues">
+                    {() => <ProtectedRoute component={WorkReportIssues} />}
                 </Route>
                 <Route>
                     <AppLayout>
