@@ -546,7 +546,23 @@ export const analyticsRouter = createTRPCRouter({
                 workDescription: row.workDescription || null,
             }));
 
-            // 作業記録の合計時間を計算（重複時間を考慮）
+            // 休憩時間を取得
+            const breakTimes = await db.select().from(schema.breakTimes).then((times) =>
+                times.filter((bt) => bt.isActive === "true")
+            );
+
+            // 時刻文字列（"HH:MM"）を分に変換する関数
+            const timeToMinutes = (timeStr: string | null | undefined): number | null => {
+                if (!timeStr) return null;
+                const parts = timeStr.split(":");
+                if (parts.length !== 2) return null;
+                const hours = parseInt(parts[0], 10);
+                const minutes = parseInt(parts[1], 10);
+                if (isNaN(hours) || isNaN(minutes)) return null;
+                return hours * 60 + minutes;
+            };
+
+            // 作業記録の合計時間を計算（重複時間を考慮し、休憩時間を引く）
             // 作業記録を開始時間でソート
             const sortedRecords = [...workRecords].sort((a, b) => {
                 const startA = a.startTime ? new Date(a.startTime).getTime() : 0;
@@ -556,25 +572,23 @@ export const analyticsRouter = createTRPCRouter({
 
             // 重複を排除した合計時間を計算
             let workMinutes = 0;
-            const intervals: Array<{ start: number; end: number }> = [];
+            const intervals: Array<{ start: Date; end: Date }> = [];
 
             for (const record of sortedRecords) {
                 if (!record.startTime) continue;
                 
-                const start = new Date(record.startTime).getTime();
-                const end = record.endTime 
-                    ? new Date(record.endTime).getTime() 
-                    : Date.now();
+                const start = new Date(record.startTime);
+                const end = record.endTime ? new Date(record.endTime) : new Date();
 
                 // 既存のインターバルと重複しているかチェック
                 let merged = false;
                 for (let i = 0; i < intervals.length; i++) {
                     const interval = intervals[i];
                     // 重複または隣接している場合
-                    if (!(end < interval.start || start > interval.end)) {
+                    if (!(end.getTime() < interval.start.getTime() || start.getTime() > interval.end.getTime())) {
                         // マージ
-                        interval.start = Math.min(interval.start, start);
-                        interval.end = Math.max(interval.end, end);
+                        interval.start = start.getTime() < interval.start.getTime() ? start : interval.start;
+                        interval.end = end.getTime() > interval.end.getTime() ? end : interval.end;
                         merged = true;
                         break;
                     }
@@ -585,11 +599,48 @@ export const analyticsRouter = createTRPCRouter({
                 }
             }
 
-            // マージされたインターバルの合計時間を計算
-            workMinutes = intervals.reduce((sum, interval) => {
-                const duration = Math.max(0, Math.floor((interval.end - interval.start) / 1000 / 60));
-                return sum + duration;
-            }, 0);
+            // マージされたインターバルの合計時間を計算し、休憩時間を引く
+            for (const interval of intervals) {
+                const startDate = interval.start;
+                const endDate = interval.end;
+                
+                // 作業記録の開始時刻・終了時刻をその日の0時からの経過分数に変換
+                const startMinutes = startDate.getHours() * 60 + startDate.getMinutes();
+                const endMinutes = endDate.getHours() * 60 + endDate.getMinutes();
+                
+                // 日を跨ぐ場合は24時間を加算
+                let actualEndMinutes = endMinutes;
+                if (startDate.toDateString() !== endDate.toDateString()) {
+                    // 日を跨いでいる場合は、終了時刻に24時間（1440分）を加算
+                    actualEndMinutes = endMinutes + 24 * 60;
+                }
+                
+                const baseMinutes = Math.max(0, actualEndMinutes - startMinutes);
+                
+                // 休憩時間との重複を計算
+                let breakTotal = 0;
+                for (const bt of breakTimes) {
+                    const breakStart = timeToMinutes(bt.startTime);
+                    const breakEndRaw = timeToMinutes(bt.endTime);
+                    if (breakStart === null || breakEndRaw === null) continue;
+                    
+                    let breakEnd = breakEndRaw;
+                    // 休憩が日を跨ぐ場合
+                    if (breakEnd < breakStart) {
+                        breakEnd += 24 * 60;
+                    }
+
+                    // 作業区間 [startMinutes, actualEndMinutes] と休憩区間 [breakStart, breakEnd] の重なり
+                    const overlapStart = Math.max(startMinutes, breakStart);
+                    const overlapEnd = Math.min(actualEndMinutes, breakEnd);
+                    if (overlapEnd > overlapStart) {
+                        breakTotal += overlapEnd - overlapStart;
+                    }
+                }
+
+                const duration = Math.max(0, baseMinutes - breakTotal);
+                workMinutes += duration;
+            }
 
             return {
                 userId: input.userId,
