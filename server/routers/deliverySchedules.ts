@@ -664,6 +664,27 @@ export const deliverySchedulesRouter = createTRPCRouter({
 
             await ensureDeliverySchedulesTable(db);
 
+            // productionMonthフィールドを更新する場合、カラムの存在を確認
+            const pool = getPool();
+            if (pool && input.productionMonth !== undefined) {
+                try {
+                    const [columns]: any = await pool.execute(
+                        "SHOW COLUMNS FROM `deliverySchedules` LIKE 'productionMonth'"
+                    );
+                    if (columns.length === 0) {
+                        await pool.execute(
+                            "ALTER TABLE `deliverySchedules` ADD COLUMN `productionMonth` VARCHAR(100) AFTER `inCharge`"
+                        );
+                        console.log("[deliverySchedules.update] Added productionMonth column");
+                    }
+                } catch (alterError: any) {
+                    // カラムが既に存在する場合は無視
+                    if (!alterError?.message?.includes("Duplicate column") && !alterError?.message?.includes("already exists")) {
+                        console.error("[deliverySchedules.update] Failed to ensure productionMonth column:", alterError);
+                    }
+                }
+            }
+
             const parseDate = (value?: string) => {
                 if (!value) return undefined;
                 // YYYY-MM-DD形式の文字列をそのまま返す
@@ -689,7 +710,10 @@ export const deliverySchedulesRouter = createTRPCRouter({
             if (input.baseCarReady !== undefined) updateData.baseCarReady = input.baseCarReady;
             if (input.furnitureReady !== undefined) updateData.furnitureReady = input.furnitureReady;
             if (input.inCharge !== undefined) updateData.inCharge = input.inCharge;
-            if (input.productionMonth !== undefined) updateData.productionMonth = input.productionMonth;
+            if (input.productionMonth !== undefined) {
+                // 空文字列の場合はnullに変換
+                updateData.productionMonth = input.productionMonth === "" ? null : input.productionMonth;
+            }
 
             const due = parseDate(input.dueDate);
             if (input.dueDate !== undefined) updateData.dueDate = due ?? null;
