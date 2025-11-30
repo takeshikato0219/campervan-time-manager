@@ -243,14 +243,30 @@ export default function WorkReportIssues() {
     };
 
     const handleOpenAddDialog = () => {
-        console.log("[WorkReportIssues] handleOpenAddDialog called");
+        console.log("[WorkReportIssues] ========== handleOpenAddDialog 開始 ==========");
+        console.log("[WorkReportIssues] handleOpenAddDialog called", {
+            canEdit,
+            userRole: user?.role,
+            vehiclesCount: vehicles?.length || 0,
+            processesCount: processes?.length || 0,
+        });
+        
+        if (!canEdit) {
+            console.error("[WorkReportIssues] canEdit is false, cannot open dialog");
+            toast.error("編集権限がありません");
+            return;
+        }
+        
         setSelectedVehicleId("");
         setSelectedProcessId("");
         setEditStartTime("");
         setEditEndTime("");
         setEditWorkDescription("");
         setIsAddDialogOpen(true);
-        console.log("[WorkReportIssues] 追加ダイアログを開きました");
+        console.log("[WorkReportIssues] 追加ダイアログを開きました", {
+            isAddDialogOpen: true,
+        });
+        console.log("[WorkReportIssues] ========== handleOpenAddDialog 終了 ==========");
     };
 
     if (!userId || !workDate) {
@@ -425,22 +441,31 @@ export default function WorkReportIssues() {
                 <CardHeader className="p-4 sm:p-6">
                     <div className="flex items-center justify-between">
                         <CardTitle className="text-lg sm:text-xl">作業記録</CardTitle>
-                        {canEdit && (
-                            <Button
-                                type="button"
-                                size="sm"
-                                variant="outline"
-                                onClick={(e) => {
-                                    e.preventDefault();
-                                    e.stopPropagation();
-                                    console.log("[WorkReportIssues] 追加ボタン（ヘッダー）がクリックされました");
-                                    handleOpenAddDialog();
-                                }}
-                            >
-                                <Plus className="h-4 w-4 mr-2" />
-                                追加
-                            </Button>
-                        )}
+                        <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                console.log("[WorkReportIssues] 追加ボタン（ヘッダー）がクリックされました", {
+                                    canEdit,
+                                    userRole: user?.role,
+                                    isAddDialogOpen,
+                                });
+                                if (!canEdit) {
+                                    console.warn("[WorkReportIssues] canEdit is false, but button was clicked");
+                                    toast.error("編集権限がありません");
+                                    return;
+                                }
+                                handleOpenAddDialog();
+                            }}
+                            disabled={!canEdit}
+                            style={{ pointerEvents: canEdit ? 'auto' : 'none', opacity: canEdit ? 1 : 0.5 }}
+                        >
+                            <Plus className="h-4 w-4 mr-2" />
+                            追加
+                        </Button>
                     </div>
                 </CardHeader>
                 <CardContent className="p-4 sm:p-6">
