@@ -494,8 +494,14 @@ export const analyticsRouter = createTRPCRouter({
             }
 
             const attendance = attendanceRows[0];
-            const attendanceMinutes = Number(attendance.attendanceMinutes) || 0;
             const userName = attendance.userName;
+            
+            // 出勤時間の計算:
+            // - attendanceWorkMinutes (workMinutesカラム) が存在する場合: 既に休憩時間が引かれている（calculateWorkMinutesで計算済み）
+            // - 存在しない場合: 単純な時間差なので、休憩時間（90分）を引く必要がある
+            const attendanceMinutes = attendance.attendanceWorkMinutes !== null && attendance.attendanceWorkMinutes !== undefined
+                ? Number(attendance.attendanceWorkMinutes)  // 既に休憩時間を差し引いた値
+                : Math.max(0, (Number(attendance.attendanceMinutes) || 0) - 90);  // 単純な時間差から休憩時間を引く
 
             // 作業記録を取得
             const workRecordsQuery = `
@@ -540,6 +546,7 @@ export const analyticsRouter = createTRPCRouter({
                 workDescription: row.workDescription || null,
             }));
 
+            // 作業記録の合計時間を計算（作業記録自体は休憩時間を含まない）
             const workMinutes = workRecords.reduce(
                 (sum: number, record: any) => sum + record.durationMinutes,
                 0
@@ -554,7 +561,7 @@ export const analyticsRouter = createTRPCRouter({
                     workDate: attendance.workDate,
                     clockInTime: attendance.clockInTime,
                     clockOutTime: attendance.clockOutTime,
-                    attendanceMinutes,
+                    attendanceMinutes,  // 休憩時間を差し引いた値
                 },
                 workRecords,
                 summary: {

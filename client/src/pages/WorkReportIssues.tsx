@@ -288,7 +288,7 @@ export default function WorkReportIssues() {
                 </Card>
             )}
 
-            {issueType === "low" && detail.summary.workMinutes < (detail.summary.attendanceMinutes - 90) && (
+            {issueType === "low" && detail.summary.workMinutes < detail.summary.attendanceMinutes && (
                 <Card className="border-yellow-300 bg-yellow-50">
                     <CardContent className="p-4 sm:p-6">
                         <div className="flex items-start gap-3">
@@ -298,7 +298,7 @@ export default function WorkReportIssues() {
                                     作業報告が不足しています
                                 </p>
                                 <p className="text-xs sm:text-sm text-yellow-800 mt-1">
-                                    期待される作業時間より{formatDuration((detail.summary.attendanceMinutes - 90) - detail.summary.workMinutes)}不足しています
+                                    期待される作業時間より{formatDuration(detail.summary.attendanceMinutes - detail.summary.workMinutes)}不足しています
                                 </p>
                             </div>
                         </div>
