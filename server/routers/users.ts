@@ -2,7 +2,7 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import bcrypt from "bcryptjs";
 import { createTRPCRouter, adminProcedure, subAdminProcedure } from "../_core/trpc";
-import { getDb, schema } from "../db";
+import { getDb, getPool, schema } from "../db";
 import { eq } from "drizzle-orm";
 
 export const usersRouter = createTRPCRouter({
@@ -87,17 +87,39 @@ export const usersRouter = createTRPCRouter({
             }
 
             // categoryがundefinedの場合は、データベースに送信しない
-            const insertData: any = {
-                username: input.username,
-                password: hashedPassword,
-                name: input.name || null,
-                role: input.role,
-            };
-            if (categoryValue !== undefined) {
-                insertData.category = categoryValue;
+            // externalロールの場合は生SQLを使用してcategoryを除外
+            if (input.role === "external" || categoryValue === undefined) {
+                const pool = getPool();
+                if (pool) {
+                    await pool.execute(
+                        `INSERT INTO \`users\` (\`username\`, \`password\`, \`name\`, \`role\`, \`createdAt\`, \`updatedAt\`) VALUES (?, ?, ?, ?, NOW(), NOW())`,
+                        [
+                            input.username,
+                            hashedPassword,
+                            input.name || null,
+                            input.role,
+                        ]
+                    );
+                } else {
+                    // poolが取得できない場合は通常の方法を使用（categoryをnullに）
+                    await db.insert(schema.users).values({
+                        username: input.username,
+                        password: hashedPassword,
+                        name: input.name || null,
+                        role: input.role,
+                        category: null,
+                    });
+                }
+            } else {
+                // categoryがある場合は通常の方法を使用
+                await db.insert(schema.users).values({
+                    username: input.username,
+                    password: hashedPassword,
+                    name: input.name || null,
+                    role: input.role,
+                    category: categoryValue,
+                });
             }
-
-            await db.insert(schema.users).values(insertData);
 
             return { success: true };
         }),

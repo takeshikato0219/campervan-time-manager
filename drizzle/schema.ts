@@ -7,7 +7,7 @@ export const users = mysqlTable("users", {
     password: text("password").notNull(),
     name: text("name"),
     role: mysqlEnum("role", ["field_worker", "sales_office", "sub_admin", "admin", "external"]).default("field_worker").notNull(),
-    category: mysqlEnum("category", ["elephant", "squirrel"]), // 分類: ゾウ、リス
+    category: mysqlEnum("category", ["elephant", "squirrel"]).nullable(), // 分類: ゾウ、リス
     createdAt: timestamp("createdAt").defaultNow().notNull(),
     updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
