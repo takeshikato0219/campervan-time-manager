@@ -330,8 +330,7 @@ export default function DeliverySchedules() {
             productionMonth: editing.productionMonth || undefined,
             dueDate: normalizeDate(editing.dueDate),
             desiredIncomingPlannedDate: normalizeDate(editing.desiredIncomingPlannedDate),
-            incomingPlannedDate: normalizeDate(editing.incomingPlannedDate),
-            shippingPlannedDate: normalizeDate(editing.shippingPlannedDate),
+            // incomingPlannedDate と shippingPlannedDate は編集ダイアログからは編集不可（カード表示の直接入力のみ）
             deliveryPlannedDate: normalizeDate(editing.deliveryPlannedDate),
             comment: editing.comment || undefined,
             claimComment: editing.claimComment || undefined,
@@ -1866,25 +1865,13 @@ export default function DeliverySchedules() {
                                     placeholder="例: 11月ワングラム制作分"
                                 />
                             </div>
-                            <div className="grid grid-cols-2 gap-2">
-                                <div>
-                                    <label className="text-xs font-medium block mb-1">ワングラム入庫予定</label>
-                                    <Input
-                                        type="date"
-                                        value={editing.dueDate}
-                                        onChange={(e) => setEditing({ ...editing, dueDate: e.target.value })}
-                                    />
-                                </div>
-                                <div>
-                                    <label className="text-xs font-medium block mb-1">ワングラム完成予定日（ワングラム入力）</label>
-                                    <Input
-                                        type="date"
-                                        value={editing.incomingPlannedDate}
-                                        onChange={(e) =>
-                                            setEditing({ ...editing, incomingPlannedDate: e.target.value })
-                                        }
-                                    />
-                                </div>
+                            <div>
+                                <label className="text-xs font-medium block mb-1">ワングラム入庫予定</label>
+                                <Input
+                                    type="date"
+                                    value={editing.dueDate}
+                                    onChange={(e) => setEditing({ ...editing, dueDate: e.target.value })}
+                                />
                             </div>
                             <div>
                                 <label className="text-xs font-medium block mb-1">希望ワングラム完成予定日（katomo入力）</label>
@@ -1893,16 +1880,6 @@ export default function DeliverySchedules() {
                                     value={editing.desiredIncomingPlannedDate}
                                     onChange={(e) =>
                                         setEditing({ ...editing, desiredIncomingPlannedDate: e.target.value })
-                                    }
-                                />
-                            </div>
-                            <div>
-                                <label className="text-xs font-medium block mb-1">ワングラム様に引き取りに行く日</label>
-                                <Input
-                                    type="date"
-                                    value={editing.shippingPlannedDate}
-                                    onChange={(e) =>
-                                        setEditing({ ...editing, shippingPlannedDate: e.target.value })
                                     }
                                 />
                             </div>
