@@ -61,21 +61,32 @@ async function ensureDeliverySchedulesTable(db: any) {
             `
         );
         
-        // 既存のテーブルにproductionMonthカラムが存在しない場合は追加
+        // 既存のテーブルに必要なカラムが存在しない場合は追加
         const pool = getPool();
         if (pool) {
-            try {
-                const [columns]: any = await pool.execute(
-                    "SHOW COLUMNS FROM `deliverySchedules` LIKE 'productionMonth'"
-                );
-                if (columns.length === 0) {
-                    await pool.execute(
-                        "ALTER TABLE `deliverySchedules` ADD COLUMN `productionMonth` VARCHAR(100) AFTER `inCharge`"
+            const columnsToCheck = [
+                { name: 'productionMonth', type: 'VARCHAR(100)', after: 'inCharge' },
+                { name: 'desiredIncomingPlannedDate', type: 'DATE', after: 'dueDate' },
+                { name: 'incomingPlannedDateConfirmed', type: "ENUM('true','false') NOT NULL DEFAULT 'false'", after: 'pickupConfirmed' },
+            ];
+
+            for (const col of columnsToCheck) {
+                try {
+                    const [columns]: any = await pool.execute(
+                        `SHOW COLUMNS FROM \`deliverySchedules\` LIKE '${col.name}'`
                     );
-                    console.log("[deliverySchedules] Added productionMonth column");
+                    if (columns.length === 0) {
+                        await pool.execute(
+                            `ALTER TABLE \`deliverySchedules\` ADD COLUMN \`${col.name}\` ${col.type} AFTER \`${col.after}\``
+                        );
+                        console.log(`[deliverySchedules] Added ${col.name} column`);
+                    }
+                } catch (alterError: any) {
+                    // カラムが既に存在する場合は無視
+                    if (!alterError?.message?.includes("Duplicate column") && !alterError?.message?.includes("already exists")) {
+                        console.error(`[deliverySchedules] Failed to add ${col.name} column:`, alterError);
+                    }
                 }
-            } catch (alterError) {
-                console.error("[deliverySchedules] Failed to add productionMonth column:", alterError);
             }
         }
     } catch (e) {
@@ -664,23 +675,31 @@ export const deliverySchedulesRouter = createTRPCRouter({
 
             await ensureDeliverySchedulesTable(db);
 
-            // productionMonthフィールドを更新する場合、カラムの存在を確認
+            // 必要なカラムが存在するか確認し、存在しない場合は追加
             const pool = getPool();
-            if (pool && input.productionMonth !== undefined) {
-                try {
-                    const [columns]: any = await pool.execute(
-                        "SHOW COLUMNS FROM `deliverySchedules` LIKE 'productionMonth'"
-                    );
-                    if (columns.length === 0) {
-                        await pool.execute(
-                            "ALTER TABLE `deliverySchedules` ADD COLUMN `productionMonth` VARCHAR(100) AFTER `inCharge`"
+            if (pool) {
+                const columnsToCheck = [
+                    { name: 'productionMonth', type: 'VARCHAR(100)', after: 'inCharge' },
+                    { name: 'desiredIncomingPlannedDate', type: 'DATE', after: 'dueDate' },
+                    { name: 'incomingPlannedDateConfirmed', type: "ENUM('true','false') NOT NULL DEFAULT 'false'", after: 'pickupConfirmed' },
+                ];
+
+                for (const col of columnsToCheck) {
+                    try {
+                        const [columns]: any = await pool.execute(
+                            `SHOW COLUMNS FROM \`deliverySchedules\` LIKE '${col.name}'`
                         );
-                        console.log("[deliverySchedules.update] Added productionMonth column");
-                    }
-                } catch (alterError: any) {
-                    // カラムが既に存在する場合は無視
-                    if (!alterError?.message?.includes("Duplicate column") && !alterError?.message?.includes("already exists")) {
-                        console.error("[deliverySchedules.update] Failed to ensure productionMonth column:", alterError);
+                        if (columns.length === 0) {
+                            await pool.execute(
+                                `ALTER TABLE \`deliverySchedules\` ADD COLUMN \`${col.name}\` ${col.type} AFTER \`${col.after}\``
+                            );
+                            console.log(`[deliverySchedules.update] Added ${col.name} column`);
+                        }
+                    } catch (alterError: any) {
+                        // カラムが既に存在する場合は無視
+                        if (!alterError?.message?.includes("Duplicate column") && !alterError?.message?.includes("already exists")) {
+                            console.error(`[deliverySchedules.update] Failed to ensure ${col.name} column:`, alterError);
+                        }
                     }
                 }
             }
