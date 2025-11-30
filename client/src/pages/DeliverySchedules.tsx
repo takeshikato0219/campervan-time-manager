@@ -132,6 +132,9 @@ export default function DeliverySchedules() {
     });
 
     const canEdit = user && (user.role === "admin" || user.role === "sub_admin");
+    const isExternal = user?.role === "external";
+    // ワングラムアカウントでもチャット機能は使える
+    const canUseChat = user && (canEdit || isExternal);
 
     const handlePrevMonth = () => {
         if (month === 1) {
@@ -272,7 +275,7 @@ export default function DeliverySchedules() {
         return data.filter((item: any) => {
             // 完成済みは除外
             if (item.status === "completed") return false;
-            
+
             // 引き取り待ちより前のステータスのみ（katomo_stock, wg_storage, wg_production）
             const beforePickupStatuses = ["katomo_stock", "wg_storage", "wg_production"];
             if (!beforePickupStatuses.includes(item.status)) return false;
@@ -281,9 +284,9 @@ export default function DeliverySchedules() {
             if (!item.productionMonth) return false;
             const match = item.productionMonth.match(/^(\d+)月/);
             if (!match) return false;
-            
+
             const productionMonthNum = parseInt(match[1], 10); // 1-12
-            
+
             // 制作月が現在の年月より前の場合、遅延とみなす
             // 年をまたぐ場合は考慮（例：12月制作分を1月に確認）
             let isDelayed = false;
@@ -303,7 +306,7 @@ export default function DeliverySchedules() {
             const aMonth = aMatch ? parseInt(aMatch[1], 10) : 999;
             const bMonth = bMatch ? parseInt(bMatch[1], 10) : 999;
             if (aMonth !== bMonth) return aMonth - bMonth;
-            
+
             // 同じ制作月なら、ステータスの順序でソート
             const statusOrder = ["katomo_stock", "wg_storage", "wg_production"];
             const aStatusIndex = statusOrder.indexOf(a.status);
@@ -629,7 +632,7 @@ export default function DeliverySchedules() {
                                 // 制作分の場合は制作分名を表示、それ以外は日付を表示
                                 const isProductionMonth = day.includes("月ワングラム制作分");
                                 const displayHeader = isProductionMonth ? day : (day === "未設定" ? "日付未設定" : format(new Date(day), "M月d日"));
-                                
+
                                 return (
                                     <div key={day} className="border border-[hsl(var(--border))] rounded-lg">
                                         <div className="px-2 sm:px-3 py-1.5 sm:py-2 bg-[hsl(var(--muted))] text-xs sm:text-sm font-semibold flex items-center justify-between">
@@ -726,8 +729,8 @@ export default function DeliverySchedules() {
                                                             </div>
                                                         )}
 
-                                                        {/* katomotorお客さん納期 */}
-                                                        {item.deliveryPlannedDate && (
+                                                        {/* katomotorお客さん納期 - ワングラム側では非表示 */}
+                                                        {!isExternal && item.deliveryPlannedDate && (
                                                             <div className="flex items-center gap-2">
                                                                 <span className="text-[11px] sm:text-xs font-semibold">katomotorお客さん納期:</span>
                                                                 <span className="text-[11px] sm:text-xs">
@@ -830,7 +833,7 @@ export default function DeliverySchedules() {
                                                             <div className="flex flex-wrap items-center gap-1.5 text-xs sm:text-sm">
                                                                 {item.optionName && (() => {
                                                                     // オプションを「/」で分割して、一つひとつ表示
-                                                                    const options = typeof item.optionName === "string" 
+                                                                    const options = typeof item.optionName === "string"
                                                                         ? item.optionName.split("/").map((opt: string) => opt.trim()).filter((opt: string) => opt)
                                                                         : [];
                                                                     return options.map((opt: string, index: number) => (
@@ -872,8 +875,36 @@ export default function DeliverySchedules() {
                                                         )}
 
 
-                                                        {/* ワングラム完成予定日（ワングラム入力） */}
-                                                        {canEdit && (
+                                                        {/* 希望ワングラム完成予定日（katomo入力） - ワングラム側はロック */}
+                                                        {(isExternal || canEdit) && (
+                                                            <div className="border-t pt-2">
+                                                                <label className="text-xs sm:text-sm font-semibold block mb-1">
+                                                                    希望ワングラム完成予定日（katomo入力）{isExternal && <span className="text-gray-500 font-normal">(katomo側で設定)</span>}:
+                                                                </label>
+                                                                <Input
+                                                                    type="date"
+                                                                    value={
+                                                                        item.desiredIncomingPlannedDate
+                                                                            ? format(new Date(item.desiredIncomingPlannedDate), "yyyy-MM-dd")
+                                                                            : ""
+                                                                    }
+                                                                    onChange={(e) => {
+                                                                        if (!isExternal) {
+                                                                            const value = e.target.value;
+                                                                            updateMutation.mutate({
+                                                                                id: item.id,
+                                                                                desiredIncomingPlannedDate: value === "" ? undefined : value,
+                                                                            });
+                                                                        }
+                                                                    }}
+                                                                    readOnly={isExternal}
+                                                                    className="text-sm sm:text-base px-2 py-1 border rounded flex-1"
+                                                                />
+                                                            </div>
+                                                        )}
+
+                                                        {/* ワングラム完成予定日（ワングラム入力）- ワングラム側でも編集可能 */}
+                                                        {(isExternal || canEdit) && (
                                                             <div className="border-t pt-2">
                                                                 <label className="text-xs sm:text-sm font-semibold block mb-1">
                                                                     ワングラム完成予定日（ワングラム入力）:
@@ -896,7 +927,8 @@ export default function DeliverySchedules() {
                                                                         }}
                                                                         className="text-sm sm:text-base px-2 py-1 border rounded flex-1"
                                                                     />
-                                                                    {item.incomingPlannedDate && (
+                                                                    {/* 確定ボタンは管理者・準管理者のみ */}
+                                                                    {canEdit && item.incomingPlannedDate && (
                                                                         <div className="flex items-center gap-1">
                                                                             <button
                                                                                 type="button"
@@ -949,11 +981,11 @@ export default function DeliverySchedules() {
                                                             </div>
                                                         )}
 
-                                                        {/* ワングラム様に引き取りに行く日（カレンダー入力・一番下） */}
-                                                        {canEdit && (
+                                                        {/* ワングラム様に引き取りに行く日（katomo入力）- ワングラム側はロック */}
+                                                        {(isExternal || canEdit) && (
                                                             <div className="border-t pt-2">
                                                                 <label className="text-xs sm:text-sm font-semibold block mb-1">
-                                                                    ワングラム様に引き取りに行く日:
+                                                                    ワングラム様に引き取りに行く日（katomo入力）{isExternal && <span className="text-gray-500 font-normal">(katomo側で設定)</span>}:
                                                                 </label>
                                                                 <div className="flex items-center gap-2">
                                                                     <Input
@@ -964,13 +996,16 @@ export default function DeliverySchedules() {
                                                                                 : ""
                                                                         }
                                                                         onChange={(e) => {
-                                                                            const value = e.target.value;
-                                                                            // カレンダーの消去ボタン対応: 空文字列をそのまま送信（サーバー側でnullに変換される）
-                                                                            updateMutation.mutate({
-                                                                                id: item.id,
-                                                                                shippingPlannedDate: value,
-                                                                            });
+                                                                            if (!isExternal) {
+                                                                                const value = e.target.value;
+                                                                                // カレンダーの消去ボタン対応: 空文字列をそのまま送信（サーバー側でnullに変換される）
+                                                                                updateMutation.mutate({
+                                                                                    id: item.id,
+                                                                                    shippingPlannedDate: value,
+                                                                                });
+                                                                            }
                                                                         }}
+                                                                        readOnly={isExternal}
                                                                         className="text-sm sm:text-base px-2 py-1 border rounded flex-1"
                                                                     />
                                                                     {item.shippingPlannedDate && (
@@ -1016,7 +1051,8 @@ export default function DeliverySchedules() {
                                                                 </div>
                                                             </div>
                                                         )}
-                                                        {!canEdit && item.shippingPlannedDate && (
+                                                        {/* ワングラム側以外では表示のみ */}
+                                                        {!isExternal && !canEdit && item.shippingPlannedDate && (
                                                             <div className="border-t pt-2 text-xs sm:text-sm">
                                                                 <span className="text-[hsl(var(--muted-foreground))]">ワングラム様に引き取りに行く日: </span>
                                                                 <span className="font-semibold">{format(new Date(item.shippingPlannedDate), "M月d日")}</span>
@@ -1026,16 +1062,16 @@ export default function DeliverySchedules() {
                                                             </div>
                                                         )}
 
-                                                        {/* katomotorお客さん納期 */}
-                                                        {item.deliveryPlannedDate && (
+                                                        {/* katomotorお客さん納期 - ワングラム側では非表示 */}
+                                                        {!isExternal && item.deliveryPlannedDate && (
                                                             <div className="border-t pt-2 text-xs sm:text-sm">
                                                                 <span className="text-[hsl(var(--muted-foreground))]">katomotorお客さん納期: </span>
                                                                 <span className="font-semibold">{format(new Date(item.deliveryPlannedDate), "M月d日")}</span>
                                                             </div>
                                                         )}
 
-                                                        {/* コメント機能 */}
-                                                        <VehicleChat vehicleId={item.id} canEdit={!!canEdit} />
+                                                        {/* コメント機能 - ワングラムアカウントでも使用可能 */}
+                                                        <VehicleChat vehicleId={item.id} canEdit={!!canUseChat} />
 
                                                         {/* ボタン類（準管理者以上のみ） */}
                                                         {canEdit && (
@@ -1169,10 +1205,29 @@ export default function DeliverySchedules() {
                                                     <p className="font-bold text-xl sm:text-2xl md:text-3xl break-words">
                                                         {item.vehicleName}
                                                     </p>
-                                                    {item.desiredIncomingPlannedDate && (
-                                                        <p className="text-base sm:text-lg md:text-xl font-bold text-blue-600 break-words">
-                                                            {format(new Date(item.desiredIncomingPlannedDate), "yyyy年M月d日")} 希望ワングラム完成予定日（katomo入力）
-                                                        </p>
+                                                    {/* ワングラム側はロック、それ以外は表示のみ */}
+                                                    {isExternal ? (
+                                                        <div className="border-t pt-2 mt-2">
+                                                            <label className="text-xs sm:text-sm font-semibold block mb-1">
+                                                                希望ワングラム完成予定日（katomo入力） <span className="text-gray-500 font-normal">(katomo側で設定)</span>:
+                                                            </label>
+                                                            <Input
+                                                                type="date"
+                                                                value={
+                                                                    item.desiredIncomingPlannedDate
+                                                                        ? format(new Date(item.desiredIncomingPlannedDate), "yyyy-MM-dd")
+                                                                        : ""
+                                                                }
+                                                                readOnly={true}
+                                                                className="text-sm sm:text-base px-2 py-1 border rounded flex-1"
+                                                            />
+                                                        </div>
+                                                    ) : (
+                                                        item.desiredIncomingPlannedDate && (
+                                                            <p className="text-base sm:text-lg md:text-xl font-bold text-blue-600 break-words">
+                                                                {format(new Date(item.desiredIncomingPlannedDate), "yyyy年M月d日")} 希望ワングラム完成予定日（katomo入力）
+                                                            </p>
+                                                        )
                                                     )}
                                                 </div>
                                                 <p className="text-[11px] sm:text-xs text-[hsl(var(--muted-foreground))] break-words">
@@ -1280,8 +1335,8 @@ export default function DeliverySchedules() {
                                                 {item.claimComment && <p className="font-semibold text-red-600">クレーム・傷: {item.claimComment}</p>}
                                             </div>
                                         )}
-                                        {/* ワングラム完成予定日（ワングラム入力） */}
-                                        {canEdit && (
+                                        {/* ワングラム完成予定日（ワングラム入力）- ワングラム側でも編集可能 */}
+                                        {(isExternal || canEdit) && (
                                             <div className="border-t pt-2 mt-2">
                                                 <label className="text-xs sm:text-sm font-semibold block mb-1">
                                                     ワングラム完成予定日（ワングラム入力）:
@@ -1295,14 +1350,16 @@ export default function DeliverySchedules() {
                                                                 : ""
                                                         }
                                                         onChange={(e) => {
+                                                            const value = e.target.value;
                                                             updateMutation.mutate({
                                                                 id: item.id,
-                                                                incomingPlannedDate: e.target.value || undefined,
+                                                                incomingPlannedDate: value,
                                                             });
                                                         }}
                                                         className="text-sm sm:text-base px-2 py-1 border rounded flex-1"
                                                     />
-                                                    {item.incomingPlannedDate && (
+                                                    {/* 確定ボタンは管理者・準管理者のみ */}
+                                                    {canEdit && item.incomingPlannedDate && (
                                                         <div className="flex items-center gap-1">
                                                             <button
                                                                 type="button"
@@ -1354,11 +1411,11 @@ export default function DeliverySchedules() {
                                                 )}
                                             </div>
                                         )}
-                                        {/* ワングラム様に引き取りに行く日（カレンダー入力・一番下） */}
-                                        {canEdit && (
+                                        {/* ワングラム様に引き取りに行く日（katomo入力）- ワングラム側はロック */}
+                                        {(isExternal || canEdit) && (
                                             <div className="border-t pt-2">
                                                 <label className="text-xs sm:text-sm font-semibold block mb-1">
-                                                    ワングラム様に引き取りに行く日:
+                                                    ワングラム様に引き取りに行く日（katomo入力）{isExternal && <span className="text-gray-500 font-normal">(katomo側で設定)</span>}:
                                                 </label>
                                                 <div className="flex items-center gap-2">
                                                     <Input
@@ -1369,14 +1426,18 @@ export default function DeliverySchedules() {
                                                                 : ""
                                                         }
                                                         onChange={(e) => {
-                                                            updateMutation.mutate({
-                                                                id: item.id,
-                                                                shippingPlannedDate: e.target.value || undefined,
-                                                            });
+                                                            if (!isExternal) {
+                                                                updateMutation.mutate({
+                                                                    id: item.id,
+                                                                    shippingPlannedDate: e.target.value || undefined,
+                                                                });
+                                                            }
                                                         }}
+                                                        readOnly={isExternal}
                                                         className="text-sm sm:text-base px-2 py-1 border rounded flex-1"
                                                     />
-                                                    {item.shippingPlannedDate && (
+                                                    {/* 確定ボタンは管理者・準管理者のみ */}
+                                                    {canEdit && item.shippingPlannedDate && (
                                                         <div className="flex items-center gap-1">
                                                             <button
                                                                 type="button"
@@ -1419,7 +1480,8 @@ export default function DeliverySchedules() {
                                                 </div>
                                             </div>
                                         )}
-                                        {!canEdit && item.shippingPlannedDate && (
+                                        {/* ワングラム側以外では表示のみ */}
+                                        {!isExternal && !canEdit && item.shippingPlannedDate && (
                                             <div className="border-t pt-2 text-xs sm:text-sm">
                                                 <span className="text-[hsl(var(--muted-foreground))]">ワングラム様に引き取りに行く日: </span>
                                                 <span className="font-semibold">{format(new Date(item.shippingPlannedDate), "M月d日")}</span>
@@ -1429,16 +1491,16 @@ export default function DeliverySchedules() {
                                             </div>
                                         )}
 
-                                        {/* katomotorお客さん納期 */}
-                                        {item.deliveryPlannedDate && (
+                                        {/* katomotorお客さん納期 - ワングラム側では非表示 */}
+                                        {!isExternal && item.deliveryPlannedDate && (
                                             <div className="border-t pt-2 text-xs sm:text-sm">
                                                 <span className="text-[hsl(var(--muted-foreground))]">katomotorお客さん納期: </span>
                                                 <span className="font-semibold">{format(new Date(item.deliveryPlannedDate), "M月d日")}</span>
                                             </div>
                                         )}
 
-                                        {/* コメント機能 */}
-                                        <VehicleChat vehicleId={item.id} canEdit={!!canEdit} />
+                                        {/* コメント機能 - ワングラムアカウントでも使用可能 */}
+                                        <VehicleChat vehicleId={item.id} canEdit={!!canUseChat} />
                                     </div>
                                 ))}
                             </div>
@@ -1461,10 +1523,29 @@ export default function DeliverySchedules() {
                                                     <p className="font-bold text-xl sm:text-2xl md:text-3xl break-words">
                                                         {item.vehicleName}
                                                     </p>
-                                                    {item.desiredIncomingPlannedDate && (
-                                                        <p className="text-base sm:text-lg md:text-xl font-bold text-blue-600 break-words">
-                                                            {format(new Date(item.desiredIncomingPlannedDate), "yyyy年M月d日")} 希望ワングラム完成予定日（katomo入力）
-                                                        </p>
+                                                    {/* ワングラム側はロック、それ以外は表示のみ */}
+                                                    {isExternal ? (
+                                                        <div className="border-t pt-2 mt-2">
+                                                            <label className="text-xs sm:text-sm font-semibold block mb-1">
+                                                                希望ワングラム完成予定日（katomo入力） <span className="text-gray-500 font-normal">(katomo側で設定)</span>:
+                                                            </label>
+                                                            <Input
+                                                                type="date"
+                                                                value={
+                                                                    item.desiredIncomingPlannedDate
+                                                                        ? format(new Date(item.desiredIncomingPlannedDate), "yyyy-MM-dd")
+                                                                        : ""
+                                                                }
+                                                                readOnly={true}
+                                                                className="text-sm sm:text-base px-2 py-1 border rounded flex-1"
+                                                            />
+                                                        </div>
+                                                    ) : (
+                                                        item.desiredIncomingPlannedDate && (
+                                                            <p className="text-base sm:text-lg md:text-xl font-bold text-blue-600 break-words">
+                                                                {format(new Date(item.desiredIncomingPlannedDate), "yyyy年M月d日")} 希望ワングラム完成予定日（katomo入力）
+                                                            </p>
+                                                        )
                                                     )}
                                                 </div>
                                                 <p className="text-[11px] sm:text-xs text-[hsl(var(--muted-foreground))] break-words">
@@ -1572,8 +1653,8 @@ export default function DeliverySchedules() {
                                                 {item.claimComment && <p className="font-semibold text-red-600">クレーム・傷: {item.claimComment}</p>}
                                             </div>
                                         )}
-                                        {/* ワングラム完成予定日（ワングラム入力） */}
-                                        {canEdit && (
+                                        {/* ワングラム完成予定日（ワングラム入力）- ワングラム側でも編集可能 */}
+                                        {(isExternal || canEdit) && (
                                             <div className="border-t pt-2 mt-2">
                                                 <label className="text-xs sm:text-sm font-semibold block mb-1">
                                                     ワングラム完成予定日（ワングラム入力）:
@@ -1587,14 +1668,16 @@ export default function DeliverySchedules() {
                                                                 : ""
                                                         }
                                                         onChange={(e) => {
+                                                            const value = e.target.value;
                                                             updateMutation.mutate({
                                                                 id: item.id,
-                                                                incomingPlannedDate: e.target.value || undefined,
+                                                                incomingPlannedDate: value,
                                                             });
                                                         }}
                                                         className="text-sm sm:text-base px-2 py-1 border rounded flex-1"
                                                     />
-                                                    {item.incomingPlannedDate && (
+                                                    {/* 確定ボタンは管理者・準管理者のみ */}
+                                                    {canEdit && item.incomingPlannedDate && (
                                                         <div className="flex items-center gap-1">
                                                             <button
                                                                 type="button"
@@ -1646,11 +1729,11 @@ export default function DeliverySchedules() {
                                                 )}
                                             </div>
                                         )}
-                                        {/* ワングラム様に引き取りに行く日（カレンダー入力・一番下） */}
-                                        {canEdit && (
+                                        {/* ワングラム様に引き取りに行く日（katomo入力）- ワングラム側はロック */}
+                                        {(isExternal || canEdit) && (
                                             <div className="border-t pt-2">
                                                 <label className="text-xs sm:text-sm font-semibold block mb-1">
-                                                    ワングラム様に引き取りに行く日:
+                                                    ワングラム様に引き取りに行く日（katomo入力）{isExternal && <span className="text-gray-500 font-normal">(katomo側で設定)</span>}:
                                                 </label>
                                                 <div className="flex items-center gap-2">
                                                     <Input
@@ -1661,14 +1744,18 @@ export default function DeliverySchedules() {
                                                                 : ""
                                                         }
                                                         onChange={(e) => {
-                                                            updateMutation.mutate({
-                                                                id: item.id,
-                                                                shippingPlannedDate: e.target.value || undefined,
-                                                            });
+                                                            if (!isExternal) {
+                                                                updateMutation.mutate({
+                                                                    id: item.id,
+                                                                    shippingPlannedDate: e.target.value || undefined,
+                                                                });
+                                                            }
                                                         }}
+                                                        readOnly={isExternal}
                                                         className="text-sm sm:text-base px-2 py-1 border rounded flex-1"
                                                     />
-                                                    {item.shippingPlannedDate && (
+                                                    {/* 確定ボタンは管理者・準管理者のみ */}
+                                                    {canEdit && item.shippingPlannedDate && (
                                                         <div className="flex items-center gap-1">
                                                             <button
                                                                 type="button"
@@ -1711,7 +1798,8 @@ export default function DeliverySchedules() {
                                                 </div>
                                             </div>
                                         )}
-                                        {!canEdit && item.shippingPlannedDate && (
+                                        {/* ワングラム側以外では表示のみ */}
+                                        {!isExternal && !canEdit && item.shippingPlannedDate && (
                                             <div className="border-t pt-2 text-xs sm:text-sm">
                                                 <span className="text-[hsl(var(--muted-foreground))]">ワングラム様に引き取りに行く日: </span>
                                                 <span className="font-semibold">{format(new Date(item.shippingPlannedDate), "M月d日")}</span>

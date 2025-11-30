@@ -61,7 +61,7 @@ async function ensureDeliverySchedulesTable(db: any) {
             )
             `
         );
-        
+
         // 既存のテーブルに必要なカラムが存在しない場合は追加
         const pool = getPool();
         if (pool) {
@@ -646,8 +646,8 @@ export const deliverySchedulesRouter = createTRPCRouter({
             }
         }),
 
-    // 更新（準管理者以上）
-    update: subAdminProcedure
+    // 更新（準管理者以上、またはワングラム側はincomingPlannedDateのみ）
+    update: protectedProcedure
         .input(
             z.object({
                 id: z.number(),
@@ -671,14 +671,14 @@ export const deliverySchedulesRouter = createTRPCRouter({
                 photosJson: z.string().optional(),
                 oemComment: z.string().optional(),
                 status: z
-                    .enum(["katomo_stock", "wg_storage", "wg_production", "wg_wait_pickup", "katomo_checked", "completed"])
+                    .enum(["katomo_stock", "wg_storage", "wg_production", "wg_wait_pickup", "katomo_picked_up", "katomo_checked", "completed"])
                     .optional(),
                 completionStatus: z
                     .enum(["ok", "checked", "revision_requested"])
                     .optional(),
             })
         )
-        .mutation(async ({ input }) => {
+        .mutation(async ({ input, ctx }) => {
             const db = await getDb();
             if (!db) {
                 throw new TRPCError({
@@ -688,6 +688,51 @@ export const deliverySchedulesRouter = createTRPCRouter({
             }
 
             await ensureDeliverySchedulesTable(db);
+
+            // ワングラム側（externalロール）は incomingPlannedDate のみ編集可能
+            const userRole = ctx.user?.role;
+            const isExternal = userRole === "external";
+            const isSubAdminOrAdmin = userRole === "sub_admin" || userRole === "admin";
+
+            if (isExternal) {
+                // externalロールの場合、incomingPlannedDate以外のフィールドを除外
+                const allowedFields = ["id", "incomingPlannedDate"];
+                const restrictedFields = Object.keys(input).filter(key => !allowedFields.includes(key));
+                if (restrictedFields.length > 0) {
+                    throw new TRPCError({
+                        code: "FORBIDDEN",
+                        message: `ワングラム側は「ワングラム完成予定日（ワングラム入力）」のみ編集可能です。`,
+                    });
+                }
+            } else if (!isSubAdminOrAdmin) {
+                // external以外でsub_admin/adminでない場合は拒否
+                throw new TRPCError({
+                    code: "FORBIDDEN",
+                    message: "この操作は管理者・準管理者のみが実行できます。",
+                });
+            }
+
+            // 更新前のincomingPlannedDateを取得（通知用）
+            let previousIncomingPlannedDate: string | null = null;
+            if (isExternal && input.incomingPlannedDate !== undefined) {
+                const [existing] = await db
+                    .select({ incomingPlannedDate: schema.deliverySchedules.incomingPlannedDate })
+                    .from(schema.deliverySchedules)
+                    .where(eq(schema.deliverySchedules.id, input.id))
+                    .limit(1);
+                if (existing?.incomingPlannedDate) {
+                    // DateオブジェクトをYYYY-MM-DD形式の文字列に変換
+                    const date = existing.incomingPlannedDate instanceof Date
+                        ? existing.incomingPlannedDate
+                        : new Date(existing.incomingPlannedDate);
+                    if (!isNaN(date.getTime())) {
+                        const year = date.getFullYear();
+                        const month = String(date.getMonth() + 1).padStart(2, "0");
+                        const day = String(date.getDate()).padStart(2, "0");
+                        previousIncomingPlannedDate = `${year}-${month}-${day}`;
+                    }
+                }
+            }
 
             // 必要なカラムが存在するか確認し、存在しない場合は追加
             const pool = getPool();
@@ -797,7 +842,7 @@ export const deliverySchedulesRouter = createTRPCRouter({
                         { name: 'completionStatus', type: "ENUM('ok','checked','revision_requested')", after: 'status' },
                         { name: 'incomingPlannedDateConfirmed', type: "ENUM('true','false') NOT NULL DEFAULT 'false'", after: 'pickupConfirmed' },
                     ];
-                    
+
                     for (const col of requiredColumns) {
                         try {
                             const [columns]: any = await pool.execute(
@@ -848,15 +893,15 @@ export const deliverySchedulesRouter = createTRPCRouter({
                     // updateDataの各フィールドをSET句に変換
                     const fields: string[] = [];
                     const values: any[] = [];
-                    
+
                     for (const [key, value] of Object.entries(validUpdateData)) {
                         fields.push(`\`${key}\` = ?`);
                         values.push(value);
                     }
-                    
+
                     // IDを最後に追加
                     values.push(input.id);
-                    
+
                     const updateQuery = `UPDATE \`deliverySchedules\` SET ${fields.join(", ")} WHERE \`id\` = ?`;
                     console.log("[deliverySchedules.update] Executing SQL:", updateQuery);
                     console.log("[deliverySchedules.update] Values:", values);
@@ -886,6 +931,70 @@ export const deliverySchedulesRouter = createTRPCRouter({
                 }
 
                 console.log("[deliverySchedules.update] ✅ Update successful");
+
+                // ワングラム側がincomingPlannedDateを更新した場合、準管理者以上に通知を送る
+                if (isExternal && input.incomingPlannedDate !== undefined) {
+                    const currentIncoming = parseDate(input.incomingPlannedDate);
+                    // 値が変更された場合（新規設定または更新）に通知
+                    const previousValue = previousIncomingPlannedDate || "";
+                    const currentValue = currentIncoming || "";
+                    const shouldNotify = currentValue !== "" && previousValue !== currentValue;
+
+                    if (shouldNotify) {
+                        try {
+                            // 通知対象: 管理者・準管理者全員
+                            const admins = await db
+                                .select()
+                                .from(schema.users)
+                                .where(
+                                    or(
+                                        eq(schema.users.role, "admin" as any),
+                                        eq(schema.users.role, "sub_admin" as any)
+                                    )
+                                );
+
+                            // 対象の納車スケジュール情報を取得
+                            const [schedule] = await db
+                                .select()
+                                .from(schema.deliverySchedules)
+                                .where(eq(schema.deliverySchedules.id, input.id))
+                                .limit(1);
+
+                            const title = "ワングラム完成予定日が入力されました";
+                            const baseName = schedule?.vehicleName || "納車スケジュール";
+                            let dateStr = "";
+                            if (currentIncoming) {
+                                try {
+                                    const dateObj = new Date(currentIncoming);
+                                    if (!isNaN(dateObj.getTime())) {
+                                        dateStr = dateObj.toLocaleDateString("ja-JP", { year: "numeric", month: "long", day: "numeric" });
+                                    } else {
+                                        dateStr = currentIncoming; // パースできない場合はそのまま表示
+                                    }
+                                } catch (e) {
+                                    dateStr = currentIncoming; // エラーの場合はそのまま表示
+                                }
+                            }
+                            const message = `${baseName} のワングラム完成予定日（ワングラム入力）が ${dateStr} に設定されました。`;
+
+                            if (admins.length > 0) {
+                                await db.insert(schema.notifications).values(
+                                    admins.map((admin) => ({
+                                        userId: admin.id,
+                                        title,
+                                        message,
+                                        type: "info" as any,
+                                    }))
+                                );
+                                console.log(`[deliverySchedules.update] 📧 Sent notifications to ${admins.length} admins/sub_admins`);
+                            }
+                        } catch (notificationError: any) {
+                            // 通知の送信に失敗しても、更新自体は成功とする
+                            console.error("[deliverySchedules.update] ❌ Failed to send notifications:", notificationError);
+                        }
+                    }
+                }
+
                 return { success: true };
             } catch (updateError: any) {
                 console.error("[deliverySchedules.update] ❌ Update error:", updateError);
@@ -893,7 +1002,7 @@ export const deliverySchedulesRouter = createTRPCRouter({
                 console.error("[deliverySchedules.update] ❌ Error code:", updateError?.code);
                 console.error("[deliverySchedules.update] ❌ Error stack:", updateError?.stack);
                 console.error("[deliverySchedules.update] ❌ Update data was:", JSON.stringify(updateData, null, 2));
-                
+
                 // カラムが存在しないエラーの場合、より詳細なメッセージを提供
                 const errorMessage = updateError?.message || String(updateError);
                 if (errorMessage.includes("Unknown column") || errorMessage.includes("doesn't exist")) {
@@ -902,7 +1011,7 @@ export const deliverySchedulesRouter = createTRPCRouter({
                         message: `更新に失敗しました: データベースのカラムが見つかりません。エラー: ${errorMessage}`,
                     });
                 }
-                
+
                 throw new TRPCError({
                     code: "INTERNAL_SERVER_ERROR",
                     message: `更新に失敗しました: ${errorMessage}`,
