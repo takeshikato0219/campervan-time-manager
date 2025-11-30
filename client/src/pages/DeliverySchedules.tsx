@@ -686,6 +686,9 @@ export default function DeliverySchedules() {
                                                                         担当: {item.inCharge}
                                                                     </span>
                                                                 )}
+                                                                <span className="px-2 py-0.5 rounded bg-gray-100 text-gray-700">
+                                                                    {month}月ワングラム制作分
+                                                                </span>
                                                             </div>
                                                         )}
 
