@@ -888,10 +888,10 @@ export default function DeliverySchedules() {
                                                                         }
                                                                         onChange={(e) => {
                                                                             const value = e.target.value;
-                                                                            // カレンダーの消去ボタン対応: 空文字列の場合はnullを送信（サーバー側でnullが許可されている）
+                                                                            // カレンダーの消去ボタン対応: 空文字列をそのまま送信（サーバー側でnullに変換される）
                                                                             updateMutation.mutate({
                                                                                 id: item.id,
-                                                                                incomingPlannedDate: value === "" ? null : value,
+                                                                                incomingPlannedDate: value,
                                                                             });
                                                                         }}
                                                                         className="text-sm sm:text-base px-2 py-1 border rounded flex-1"
@@ -965,10 +965,10 @@ export default function DeliverySchedules() {
                                                                         }
                                                                         onChange={(e) => {
                                                                             const value = e.target.value;
-                                                                            // カレンダーの消去ボタン対応: 空文字列の場合はnullを送信（サーバー側でnullが許可されている）
+                                                                            // カレンダーの消去ボタン対応: 空文字列をそのまま送信（サーバー側でnullに変換される）
                                                                             updateMutation.mutate({
                                                                                 id: item.id,
-                                                                                shippingPlannedDate: value === "" ? null : value,
+                                                                                shippingPlannedDate: value,
                                                                             });
                                                                         }}
                                                                         className="text-sm sm:text-base px-2 py-1 border rounded flex-1"

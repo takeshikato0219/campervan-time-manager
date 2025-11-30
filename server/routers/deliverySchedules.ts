@@ -719,8 +719,11 @@ export const deliverySchedulesRouter = createTRPCRouter({
                 }
             }
 
-            const parseDate = (value?: string) => {
-                if (!value) return undefined;
+            const parseDate = (value?: string | null) => {
+                // nullまたは空文字列の場合はnullを返す（日付をクリアするため）
+                if (value === null || value === "") return null;
+                // undefinedの場合はundefinedを返す（更新しない）
+                if (value === undefined) return undefined;
                 // YYYY-MM-DD形式の文字列をそのまま返す
                 if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
                     return value;
@@ -756,10 +759,10 @@ export const deliverySchedulesRouter = createTRPCRouter({
                 updateData.desiredIncomingPlannedDate = desiredIncoming ?? null;
             const incoming = parseDate(input.incomingPlannedDate);
             if (input.incomingPlannedDate !== undefined)
-                updateData.incomingPlannedDate = incoming ?? null;
+                updateData.incomingPlannedDate = incoming;
             const shipping = parseDate(input.shippingPlannedDate);
             if (input.shippingPlannedDate !== undefined)
-                updateData.shippingPlannedDate = shipping ?? null;
+                updateData.shippingPlannedDate = shipping;
             const delivery = parseDate(input.deliveryPlannedDate);
             if (input.deliveryPlannedDate !== undefined)
                 updateData.deliveryPlannedDate = delivery ?? null;
