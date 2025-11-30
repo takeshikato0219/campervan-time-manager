@@ -66,6 +66,7 @@ async function ensureDeliverySchedulesTable(db: any) {
         const pool = getPool();
         if (pool) {
             const columnsToCheck = [
+                { name: 'status', type: "ENUM('katomo_stock','wg_storage','wg_production','wg_wait_pickup','katomo_checked','completed') NOT NULL DEFAULT 'katomo_stock'", after: 'oemComment' },
                 { name: 'productionMonth', type: 'VARCHAR(100)', after: 'inCharge' },
                 { name: 'desiredIncomingPlannedDate', type: 'DATE', after: 'dueDate' },
                 { name: 'completionStatus', type: "ENUM('ok','checked','revision_requested')", after: 'status' },
@@ -774,6 +775,34 @@ export const deliverySchedulesRouter = createTRPCRouter({
                 // すべての更新を生SQLクエリで実行
                 const pool = getPool();
                 if (pool) {
+                    // 必要なカラムが存在するか確認し、存在しない場合は追加
+                    const requiredColumns = [
+                        { name: 'status', type: "ENUM('katomo_stock','wg_storage','wg_production','wg_wait_pickup','katomo_checked','completed') NOT NULL DEFAULT 'katomo_stock'", after: 'oemComment' },
+                        { name: 'productionMonth', type: 'VARCHAR(100)', after: 'inCharge' },
+                        { name: 'desiredIncomingPlannedDate', type: 'DATE', after: 'dueDate' },
+                        { name: 'completionStatus', type: "ENUM('ok','checked','revision_requested')", after: 'status' },
+                        { name: 'incomingPlannedDateConfirmed', type: "ENUM('true','false') NOT NULL DEFAULT 'false'", after: 'pickupConfirmed' },
+                    ];
+                    
+                    for (const col of requiredColumns) {
+                        try {
+                            const [columns]: any = await pool.execute(
+                                `SHOW COLUMNS FROM \`deliverySchedules\` LIKE '${col.name}'`
+                            );
+                            if (columns.length === 0) {
+                                await pool.execute(
+                                    `ALTER TABLE \`deliverySchedules\` ADD COLUMN \`${col.name}\` ${col.type} AFTER \`${col.after}\``
+                                );
+                                console.log(`[deliverySchedules.update] Added missing ${col.name} column`);
+                            }
+                        } catch (alterError: any) {
+                            // カラムが既に存在する場合は無視
+                            if (!alterError?.message?.includes("Duplicate column") && !alterError?.message?.includes("already exists")) {
+                                console.warn(`[deliverySchedules.update] Failed to add ${col.name} column:`, alterError?.message);
+                            }
+                        }
+                    }
+
                     // updateDataからundefinedを除外し、有効なフィールドのみを抽出
                     const validUpdateData: Record<string, any> = {};
                     for (const [key, value] of Object.entries(updateData)) {
@@ -806,8 +835,16 @@ export const deliverySchedulesRouter = createTRPCRouter({
                     const updateQuery = `UPDATE \`deliverySchedules\` SET ${fields.join(", ")} WHERE \`id\` = ?`;
                     console.log("[deliverySchedules.update] Executing SQL:", updateQuery);
                     console.log("[deliverySchedules.update] Values:", values);
-                    await pool.execute(updateQuery, values);
-                    console.log("[deliverySchedules.update] ✅ Fields updated using raw SQL");
+                    console.log("[deliverySchedules.update] Valid update data keys:", Object.keys(validUpdateData));
+                    try {
+                        await pool.execute(updateQuery, values);
+                        console.log("[deliverySchedules.update] ✅ Fields updated using raw SQL");
+                    } catch (sqlError: any) {
+                        console.error("[deliverySchedules.update] ❌ SQL execution error:", sqlError);
+                        console.error("[deliverySchedules.update] ❌ SQL query:", updateQuery);
+                        console.error("[deliverySchedules.update] ❌ SQL values:", values);
+                        throw sqlError;
+                    }
                 } else {
                     // poolが取得できない場合は通常のDrizzleクエリを使用
                     // undefinedを除外
