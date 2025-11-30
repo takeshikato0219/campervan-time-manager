@@ -4,7 +4,7 @@ import { trpc } from "../../lib/trpc";
 import { Button } from "../../components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/card";
 import { Input } from "../../components/ui/input";
-import { ChevronLeft, ChevronRight, Calendar } from "lucide-react";
+import { ChevronLeft, ChevronRight, Calendar, RefreshCw, AlertTriangle } from "lucide-react";
 import { format, addDays, subDays } from "date-fns";
 import StaffAttendanceList from "./StaffAttendanceList";
 import { useAutoRefresh } from "../../hooks/useAutoRefresh";
@@ -14,6 +14,32 @@ import { usePageVisibility } from "../../hooks/usePageVisibility";
 export default function AttendanceManagement() {
     const { user } = useAuth();
     const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+    const [isRecalculating, setIsRecalculating] = useState(false);
+    const [recalculateResult, setRecalculateResult] = useState<{
+        total: number;
+        updated: number;
+        errors: number;
+        errorDetails: Array<{ id: number; error: string }>;
+    } | null>(null);
+
+    const recalculateMutation = trpc.attendance.recalculateAllWorkMinutes.useMutation({
+        onSuccess: (result) => {
+            setIsRecalculating(false);
+            setRecalculateResult(result);
+            refreshData(); // データを更新
+            alert(
+                `再計算が完了しました。\n` +
+                `対象レコード: ${result.total}件\n` +
+                `更新: ${result.updated}件\n` +
+                `エラー: ${result.errors}件`
+            );
+        },
+        onError: (error) => {
+            setIsRecalculating(false);
+            console.error("[出退勤管理] 再計算エラー:", error);
+            alert(`再計算中にエラーが発生しました: ${error.message}`);
+        },
+    });
 
     const autoCloseMutation = trpc.attendance.autoCloseTodayAt2359.useMutation({
         onSuccess: (result: { count: number }) => {
@@ -139,6 +165,22 @@ export default function AttendanceManagement() {
         setSelectedDate(new Date());
     };
 
+    const handleRecalculateAll = () => {
+        if (
+            !window.confirm(
+                "過去のすべての出勤記録の作業時間（workMinutes）を再計算します。\n" +
+                "この処理には時間がかかる場合があります。\n" +
+                "続行しますか？"
+            )
+        ) {
+            return;
+        }
+
+        setIsRecalculating(true);
+        setRecalculateResult(null);
+        recalculateMutation.mutate();
+    };
+
     return (
         <div className="space-y-6">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -156,6 +198,59 @@ export default function AttendanceManagement() {
                     今日
                 </Button>
             </div>
+
+            {/* 過去データ再計算ボタン */}
+            <Card className="border-amber-200 bg-amber-50/50">
+                <CardHeader className="p-4 sm:p-6">
+                    <CardTitle className="text-base sm:text-lg flex items-center gap-2">
+                        <AlertTriangle className="h-4 w-4 sm:h-5 sm:w-5 text-amber-600" />
+                        過去データの再計算
+                    </CardTitle>
+                </CardHeader>
+                <CardContent className="p-4 sm:p-6 pt-0">
+                    <p className="text-sm text-[hsl(var(--muted-foreground))] mb-4">
+                        過去のすべての出勤記録の作業時間（workMinutes）を、最新の休憩時間設定に基づいて再計算します。
+                        この処理には時間がかかる場合があります。
+                    </p>
+                    <Button
+                        onClick={handleRecalculateAll}
+                        disabled={isRecalculating}
+                        className="w-full sm:w-auto bg-amber-600 hover:bg-amber-700 text-white"
+                    >
+                        {isRecalculating ? (
+                            <>
+                                <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                                再計算中...
+                            </>
+                        ) : (
+                            <>
+                                <RefreshCw className="h-4 w-4 mr-2" />
+                                すべての出勤記録を再計算
+                            </>
+                        )}
+                    </Button>
+                    {recalculateResult && (
+                        <div className="mt-4 p-3 bg-white rounded-md border text-sm">
+                            <div className="font-semibold mb-2">再計算結果:</div>
+                            <div>対象レコード: {recalculateResult.total}件</div>
+                            <div>更新: {recalculateResult.updated}件</div>
+                            {recalculateResult.errors > 0 && (
+                                <div className="text-red-600">エラー: {recalculateResult.errors}件</div>
+                            )}
+                            {recalculateResult.errorDetails.length > 0 && (
+                                <div className="mt-2 text-xs text-red-600">
+                                    <div className="font-semibold">エラー詳細（最初の10件）:</div>
+                                    {recalculateResult.errorDetails.map((err, idx) => (
+                                        <div key={idx}>
+                                            レコードID {err.id}: {err.error}
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    )}
+                </CardContent>
+            </Card>
 
             {/* 日付選択 */}
             <Card>

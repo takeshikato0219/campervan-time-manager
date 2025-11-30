@@ -2,7 +2,7 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure, subAdminProcedure, publicProcedure } from "../_core/trpc";
 import { getDb, schema } from "../db";
-import { eq, and, isNull, inArray } from "drizzle-orm";
+import { eq, and, isNull, inArray, sql } from "drizzle-orm";
 
 // ==== ここから新しい時間計算ロジック（UTC/タイムゾーンは一切使わない）====
 
@@ -798,5 +798,78 @@ export const attendanceRouter = createTRPCRouter({
                 };
             });
         }),
+
+    // 過去の出勤記録のworkMinutesを再計算（準管理者以上・バッチ処理）
+    recalculateAllWorkMinutes: subAdminProcedure.mutation(async () => {
+        const db = await getDb();
+        if (!db) {
+            throw new TRPCError({
+                code: "INTERNAL_SERVER_ERROR",
+                message: "データベースに接続できません",
+            });
+        }
+
+        // すべての出勤記録を取得（clockInTimeとclockOutTimeが存在するもの）
+        const allRecords = await db
+            .select()
+            .from(schema.attendanceRecords)
+            .where(
+                and(
+                    sql`${schema.attendanceRecords.clockInTime} IS NOT NULL`,
+                    sql`${schema.attendanceRecords.clockOutTime} IS NOT NULL`
+                )
+            );
+
+        console.log(`[recalculateAllWorkMinutes] 対象レコード数: ${allRecords.length}`);
+
+        let updatedCount = 0;
+        let errorCount = 0;
+        const errors: Array<{ id: number; error: string }> = [];
+
+        for (const record of allRecords) {
+            try {
+                if (!record.clockInTime || !record.clockOutTime) {
+                    continue;
+                }
+
+                // 正規化してから再計算
+                const norm = normalizeWorkTimes(record.clockInTime, record.clockOutTime);
+                const newWorkMinutes = await calculateWorkMinutes(norm.clockInTime, norm.clockOutTime, db);
+
+                // workMinutesが変更されている場合のみ更新
+                if (record.workMinutes !== newWorkMinutes) {
+                    await db
+                        .update(schema.attendanceRecords)
+                        .set({
+                            workMinutes: newWorkMinutes,
+                        })
+                        .where(eq(schema.attendanceRecords.id, record.id));
+
+                    updatedCount++;
+                    
+                    if (updatedCount % 100 === 0) {
+                        console.log(`[recalculateAllWorkMinutes] ${updatedCount}件更新済み...`);
+                    }
+                }
+            } catch (error) {
+                errorCount++;
+                const errorMessage = error instanceof Error ? error.message : String(error);
+                errors.push({
+                    id: record.id,
+                    error: errorMessage,
+                });
+                console.error(`[recalculateAllWorkMinutes] レコードID ${record.id} の更新に失敗:`, errorMessage);
+            }
+        }
+
+        console.log(`[recalculateAllWorkMinutes] 完了: 更新 ${updatedCount}件, エラー ${errorCount}件`);
+
+        return {
+            total: allRecords.length,
+            updated: updatedCount,
+            errors: errorCount,
+            errorDetails: errors.slice(0, 10), // 最初の10件のエラーのみ返す
+        };
+    }),
 });
 
