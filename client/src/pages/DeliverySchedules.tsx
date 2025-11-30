@@ -90,7 +90,7 @@ export default function DeliverySchedules() {
 
     const confirmPickupMutation = trpc.deliverySchedules.confirmPickup.useMutation({
         onSuccess: () => {
-            toast.success("引き取り予定日を更新しました");
+            toast.success("ワングラム様に引き取りに行く日を更新しました");
             refetch();
         },
         onError: (e) => toast.error(e.message || "更新に失敗しました"),
@@ -561,10 +561,10 @@ export default function DeliverySchedules() {
                                                         </div>
                                                     )}
 
-                                                    {/* 引き取り予定日 */}
+                                                    {/* ワングラム様に引き取りに行く日 */}
                                                     {item.shippingPlannedDate && (
                                                         <div className="flex items-center gap-2">
-                                                            <span className="text-[11px] sm:text-xs font-semibold">引き取り予定日:</span>
+                                                            <span className="text-[11px] sm:text-xs font-semibold">ワングラム様に引き取りに行く日:</span>
                                                             <span className="text-[11px] sm:text-xs">
                                                                 {format(new Date(item.shippingPlannedDate), "M月d日")}
                                                             </span>
@@ -789,11 +789,11 @@ export default function DeliverySchedules() {
                                                             </div>
                                                         )}
 
-                                                        {/* 引き取り予定日（カレンダー入力・一番下） */}
+                                                        {/* ワングラム様に引き取りに行く日（カレンダー入力・一番下） */}
                                                         {canEdit && (
                                                             <div className="border-t pt-2">
                                                                 <label className="text-xs sm:text-sm font-semibold block mb-1">
-                                                                    引き取り予定日:
+                                                                    ワングラム様に引き取りに行く日:
                                                                 </label>
                                                                 <div className="flex items-center gap-2">
                                                                     <Input
@@ -856,7 +856,7 @@ export default function DeliverySchedules() {
                                                         )}
                                                         {!canEdit && item.shippingPlannedDate && (
                                                             <div className="border-t pt-2 text-xs sm:text-sm">
-                                                                <span className="text-[hsl(var(--muted-foreground))]">引き取り予定日: </span>
+                                                                <span className="text-[hsl(var(--muted-foreground))]">ワングラム様に引き取りに行く日: </span>
                                                                 <span className="font-semibold">{format(new Date(item.shippingPlannedDate), "M月d日")}</span>
                                                                 {item.pickupConfirmed === "true" && (
                                                                     <span className="ml-1 px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700 text-[10px]">確定済み</span>
@@ -1181,11 +1181,11 @@ export default function DeliverySchedules() {
                                                 )}
                                             </div>
                                         )}
-                                        {/* 引き取り予定日（カレンダー入力・一番下） */}
+                                        {/* ワングラム様に引き取りに行く日（カレンダー入力・一番下） */}
                                         {canEdit && (
                                             <div className="border-t pt-2">
                                                 <label className="text-xs sm:text-sm font-semibold block mb-1">
-                                                    引き取り予定日:
+                                                    ワングラム様に引き取りに行く日:
                                                 </label>
                                                 <div className="flex items-center gap-2">
                                                     <Input
@@ -1248,7 +1248,7 @@ export default function DeliverySchedules() {
                                         )}
                                         {!canEdit && item.shippingPlannedDate && (
                                             <div className="border-t pt-2 text-xs sm:text-sm">
-                                                <span className="text-[hsl(var(--muted-foreground))]">引き取り予定日: </span>
+                                                <span className="text-[hsl(var(--muted-foreground))]">ワングラム様に引き取りに行く日: </span>
                                                 <span className="font-semibold">{format(new Date(item.shippingPlannedDate), "M月d日")}</span>
                                                 {item.pickupConfirmed === "true" && (
                                                     <span className="ml-1 px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700 text-[10px]">確定済み</span>
@@ -1465,11 +1465,11 @@ export default function DeliverySchedules() {
                                                 )}
                                             </div>
                                         )}
-                                        {/* 引き取り予定日（カレンダー入力・一番下） */}
+                                        {/* ワングラム様に引き取りに行く日（カレンダー入力・一番下） */}
                                         {canEdit && (
                                             <div className="border-t pt-2">
                                                 <label className="text-xs sm:text-sm font-semibold block mb-1">
-                                                    引き取り予定日:
+                                                    ワングラム様に引き取りに行く日:
                                                 </label>
                                                 <div className="flex items-center gap-2">
                                                     <Input
@@ -1532,7 +1532,7 @@ export default function DeliverySchedules() {
                                         )}
                                         {!canEdit && item.shippingPlannedDate && (
                                             <div className="border-t pt-2 text-xs sm:text-sm">
-                                                <span className="text-[hsl(var(--muted-foreground))]">引き取り予定日: </span>
+                                                <span className="text-[hsl(var(--muted-foreground))]">ワングラム様に引き取りに行く日: </span>
                                                 <span className="font-semibold">{format(new Date(item.shippingPlannedDate), "M月d日")}</span>
                                                 {item.pickupConfirmed === "true" && (
                                                     <span className="ml-1 px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700 text-[10px]">確定済み</span>
@@ -1882,7 +1882,7 @@ export default function DeliverySchedules() {
                                 />
                             </div>
                             <div>
-                                <label className="text-xs font-medium block mb-1">引き取り予定日</label>
+                                <label className="text-xs font-medium block mb-1">ワングラム様に引き取りに行く日</label>
                                 <Input
                                     type="date"
                                     value={editing.shippingPlannedDate}

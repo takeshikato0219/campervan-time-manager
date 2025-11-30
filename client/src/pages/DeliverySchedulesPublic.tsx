@@ -193,10 +193,10 @@ export default function DeliverySchedulesPublic() {
                                                             </div>
                                                         )}
 
-                                                        {/* 引き取り予定日 */}
+                                                        {/* ワングラム様に引き取りに行く日 */}
                                                         {item.shippingPlannedDate && (
                                                             <div className="flex items-center gap-2">
-                                                                <span className="text-[11px] sm:text-xs font-semibold">引き取り予定日:</span>
+                                                                <span className="text-[11px] sm:text-xs font-semibold">ワングラム様に引き取りに行く日:</span>
                                                                 <span className="text-[11px] sm:text-xs">
                                                                     {format(new Date(item.shippingPlannedDate), "M月d日")}
                                                                 </span>
@@ -267,7 +267,7 @@ export default function DeliverySchedulesPublic() {
                                                             )}
                                                             {item.shippingPlannedDate && (
                                                                 <div>
-                                                                    <span className="font-semibold">引き取り予定日: </span>
+                                                                    <span className="font-semibold">ワングラム様に引き取りに行く日: </span>
                                                                     <span>{format(new Date(item.shippingPlannedDate), "M月d日")}</span>
                                                                 </div>
                                                             )}
