@@ -657,6 +657,12 @@ export const analyticsRouter = createTRPCRouter({
                 workMinutes += duration;
             }
 
+            console.log("[getWorkReportDetail] 最終的な作業時間:", {
+                workMinutes,
+                workRecordsCount: workRecords.length,
+                mergedIntervalsCount: mergedIntervals.length
+            });
+
             return {
                 userId: input.userId,
                 workDate: input.workDate,
