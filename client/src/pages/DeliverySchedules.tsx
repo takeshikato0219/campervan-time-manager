@@ -331,6 +331,7 @@ export default function DeliverySchedules() {
             dueDate: normalizeDate(editing.dueDate),
             desiredIncomingPlannedDate: normalizeDate(editing.desiredIncomingPlannedDate),
             // incomingPlannedDate と shippingPlannedDate は編集ダイアログからは編集不可（カード表示の直接入力のみ）
+            // これらのフィールドは編集ダイアログから削除されているため、payloadには含めない
             deliveryPlannedDate: normalizeDate(editing.deliveryPlannedDate),
             comment: editing.comment || undefined,
             claimComment: editing.claimComment || undefined,
