@@ -546,11 +546,50 @@ export const analyticsRouter = createTRPCRouter({
                 workDescription: row.workDescription || null,
             }));
 
-            // 作業記録の合計時間を計算（作業記録自体は休憩時間を含まない）
-            const workMinutes = workRecords.reduce(
-                (sum: number, record: any) => sum + record.durationMinutes,
-                0
-            );
+            // 作業記録の合計時間を計算（重複時間を考慮）
+            // 作業記録を開始時間でソート
+            const sortedRecords = [...workRecords].sort((a, b) => {
+                const startA = a.startTime ? new Date(a.startTime).getTime() : 0;
+                const startB = b.startTime ? new Date(b.startTime).getTime() : 0;
+                return startA - startB;
+            });
+
+            // 重複を排除した合計時間を計算
+            let workMinutes = 0;
+            const intervals: Array<{ start: number; end: number }> = [];
+
+            for (const record of sortedRecords) {
+                if (!record.startTime) continue;
+                
+                const start = new Date(record.startTime).getTime();
+                const end = record.endTime 
+                    ? new Date(record.endTime).getTime() 
+                    : Date.now();
+
+                // 既存のインターバルと重複しているかチェック
+                let merged = false;
+                for (let i = 0; i < intervals.length; i++) {
+                    const interval = intervals[i];
+                    // 重複または隣接している場合
+                    if (!(end < interval.start || start > interval.end)) {
+                        // マージ
+                        interval.start = Math.min(interval.start, start);
+                        interval.end = Math.max(interval.end, end);
+                        merged = true;
+                        break;
+                    }
+                }
+
+                if (!merged) {
+                    intervals.push({ start, end });
+                }
+            }
+
+            // マージされたインターバルの合計時間を計算
+            workMinutes = intervals.reduce((sum, interval) => {
+                const duration = Math.max(0, Math.floor((interval.end - interval.start) / 1000 / 60));
+                return sum + duration;
+            }, 0);
 
             return {
                 userId: input.userId,
