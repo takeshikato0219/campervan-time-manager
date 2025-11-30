@@ -771,11 +771,28 @@ export const deliverySchedulesRouter = createTRPCRouter({
                 // すべての更新を生SQLクエリで実行
                 const pool = getPool();
                 if (pool) {
+                    // updateDataからundefinedを除外し、有効なフィールドのみを抽出
+                    const validUpdateData: Record<string, any> = {};
+                    for (const [key, value] of Object.entries(updateData)) {
+                        // undefinedは除外、nullは許可
+                        if (value !== undefined) {
+                            validUpdateData[key] = value;
+                        }
+                    }
+
+                    // 有効なフィールドがない場合はエラー
+                    if (Object.keys(validUpdateData).length === 0) {
+                        throw new TRPCError({
+                            code: "BAD_REQUEST",
+                            message: "更新する有効なデータがありません",
+                        });
+                    }
+
                     // updateDataの各フィールドをSET句に変換
                     const fields: string[] = [];
                     const values: any[] = [];
                     
-                    for (const [key, value] of Object.entries(updateData)) {
+                    for (const [key, value] of Object.entries(validUpdateData)) {
                         fields.push(`\`${key}\` = ?`);
                         values.push(value);
                     }
@@ -784,13 +801,22 @@ export const deliverySchedulesRouter = createTRPCRouter({
                     values.push(input.id);
                     
                     const updateQuery = `UPDATE \`deliverySchedules\` SET ${fields.join(", ")} WHERE \`id\` = ?`;
+                    console.log("[deliverySchedules.update] Executing SQL:", updateQuery);
+                    console.log("[deliverySchedules.update] Values:", values);
                     await pool.execute(updateQuery, values);
                     console.log("[deliverySchedules.update] ✅ Fields updated using raw SQL");
                 } else {
                     // poolが取得できない場合は通常のDrizzleクエリを使用
+                    // undefinedを除外
+                    const validUpdateData: any = {};
+                    for (const [key, value] of Object.entries(updateData)) {
+                        if (value !== undefined) {
+                            validUpdateData[key] = value;
+                        }
+                    }
                     await db
                         .update(schema.deliverySchedules)
-                        .set(updateData as any)
+                        .set(validUpdateData)
                         .where(eq(schema.deliverySchedules.id, input.id));
                 }
 
@@ -799,10 +825,22 @@ export const deliverySchedulesRouter = createTRPCRouter({
             } catch (updateError: any) {
                 console.error("[deliverySchedules.update] ❌ Update error:", updateError);
                 console.error("[deliverySchedules.update] ❌ Error message:", updateError?.message);
+                console.error("[deliverySchedules.update] ❌ Error code:", updateError?.code);
                 console.error("[deliverySchedules.update] ❌ Error stack:", updateError?.stack);
+                console.error("[deliverySchedules.update] ❌ Update data was:", JSON.stringify(updateData, null, 2));
+                
+                // カラムが存在しないエラーの場合、より詳細なメッセージを提供
+                const errorMessage = updateError?.message || String(updateError);
+                if (errorMessage.includes("Unknown column") || errorMessage.includes("doesn't exist")) {
+                    throw new TRPCError({
+                        code: "INTERNAL_SERVER_ERROR",
+                        message: `更新に失敗しました: データベースのカラムが見つかりません。エラー: ${errorMessage}`,
+                    });
+                }
+                
                 throw new TRPCError({
                     code: "INTERNAL_SERVER_ERROR",
-                    message: `更新に失敗しました: ${updateError?.message || String(updateError)}`,
+                    message: `更新に失敗しました: ${errorMessage}`,
                 });
             }
         }),
