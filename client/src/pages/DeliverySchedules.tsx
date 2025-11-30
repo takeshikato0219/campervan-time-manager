@@ -1864,7 +1864,11 @@ export default function DeliverySchedules() {
                                 <label className="text-xs font-medium block mb-1">ワングラム制作分（月選択）</label>
                                 <select
                                     className="flex h-9 w-full rounded-md border border-[hsl(var(--input))] bg-[hsl(var(--background))] px-2 text-xs"
-                                    value={editing.productionMonth ? editing.productionMonth.replace("月ワングラム制作分", "") : ""}
+                                    value={editing.productionMonth ? (() => {
+                                        // 「○月ワングラム制作分」から月の数字を抽出（例: "11月ワングラム制作分" → "11"）
+                                        const match = editing.productionMonth.match(/^(\d+)月/);
+                                        return match ? match[1] : "";
+                                    })() : ""}
                                     onChange={(e) => {
                                         const month = e.target.value;
                                         if (month) {
