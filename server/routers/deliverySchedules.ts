@@ -759,62 +759,39 @@ export const deliverySchedulesRouter = createTRPCRouter({
             console.log("[deliverySchedules.update] Update data:", JSON.stringify(updateData, null, 2));
             console.log("[deliverySchedules.update] Updating record ID:", input.id);
 
-            try {
-                // statusフィールドがある場合は、生SQLクエリを使用して確実に更新
-                if (input.status !== undefined) {
-                    const pool = getPool();
-                    if (pool) {
-                        await pool.execute(
-                            "UPDATE deliverySchedules SET status = ? WHERE id = ?",
-                            [input.status, input.id]
-                        );
-                        console.log("[deliverySchedules.update] ✅ Status updated using raw SQL");
+            // 更新データが空の場合はエラー
+            if (Object.keys(updateData).length === 0) {
+                throw new TRPCError({
+                    code: "BAD_REQUEST",
+                    message: "更新するデータがありません",
+                });
+            }
 
-                        // status以外にも更新するフィールドがある場合は、それらも更新
-                        if (Object.keys(updateData).length > 1) {
-                            const otherUpdates = { ...updateData };
-                            delete otherUpdates.status;
-                            if (Object.keys(otherUpdates).length > 0) {
-                                await db
-                                    .update(schema.deliverySchedules)
-                                    .set(otherUpdates)
-                                    .where(eq(schema.deliverySchedules.id, input.id));
-                                console.log("[deliverySchedules.update] ✅ Other fields updated");
-                            }
-                        }
-                    } else {
-                        // poolが取得できない場合は通常のDrizzleクエリを使用
-                        await db
-                            .update(schema.deliverySchedules)
-                            .set(updateData as any)
-                            .where(eq(schema.deliverySchedules.id, input.id));
+            try {
+                // すべての更新を生SQLクエリで実行
+                const pool = getPool();
+                if (pool) {
+                    // updateDataの各フィールドをSET句に変換
+                    const fields: string[] = [];
+                    const values: any[] = [];
+                    
+                    for (const [key, value] of Object.entries(updateData)) {
+                        fields.push(`\`${key}\` = ?`);
+                        values.push(value);
                     }
+                    
+                    // IDを最後に追加
+                    values.push(input.id);
+                    
+                    const updateQuery = `UPDATE \`deliverySchedules\` SET ${fields.join(", ")} WHERE \`id\` = ?`;
+                    await pool.execute(updateQuery, values);
+                    console.log("[deliverySchedules.update] ✅ Fields updated using raw SQL");
                 } else {
-                    // statusフィールドがない場合も生SQLクエリを使用して確実に更新
-                    const pool = getPool();
-                    if (pool) {
-                        // updateDataの各フィールドをSET句に変換
-                        const fields: string[] = [];
-                        const values: any[] = [];
-                        
-                        for (const [key, value] of Object.entries(updateData)) {
-                            fields.push(`\`${key}\` = ?`);
-                            values.push(value);
-                        }
-                        
-                        // IDを最後に追加
-                        values.push(input.id);
-                        
-                        const updateQuery = `UPDATE \`deliverySchedules\` SET ${fields.join(", ")} WHERE \`id\` = ?`;
-                        await pool.execute(updateQuery, values);
-                        console.log("[deliverySchedules.update] ✅ Fields updated using raw SQL");
-                    } else {
-                        // poolが取得できない場合は通常のDrizzleクエリを使用
-                        await db
-                            .update(schema.deliverySchedules)
-                            .set(updateData)
-                            .where(eq(schema.deliverySchedules.id, input.id));
-                    }
+                    // poolが取得できない場合は通常のDrizzleクエリを使用
+                    await db
+                        .update(schema.deliverySchedules)
+                        .set(updateData as any)
+                        .where(eq(schema.deliverySchedules.id, input.id));
                 }
 
                 console.log("[deliverySchedules.update] ✅ Update successful");
