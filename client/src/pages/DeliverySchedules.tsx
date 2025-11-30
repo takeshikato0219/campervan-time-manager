@@ -553,84 +553,85 @@ export default function DeliverySchedules() {
                                 const displayHeader = isProductionMonth ? day : (day === "未設定" ? "日付未設定" : format(new Date(day), "M月d日"));
                                 
                                 return (
-                                <div key={day} className="border border-[hsl(var(--border))] rounded-lg">
-                                    <div className="px-2 sm:px-3 py-1.5 sm:py-2 bg-[hsl(var(--muted))] text-xs sm:text-sm font-semibold flex items-center justify-between">
-                                        <span>{displayHeader}</span>
-                                        <span className="text-[10px] sm:text-xs text-[hsl(var(--muted-foreground))]">
-                                            {items.length}件
-                                        </span>
-                                    </div>
-                                    <div className="divide-y divide-[hsl(var(--border))]">
-                                        {items.map((item: any) => {
-                                            // 納期（希望納期）の計算
-                                            const desiredDate = item.desiredIncomingPlannedDate ? new Date(item.desiredIncomingPlannedDate) : null;
-                                            const today = new Date();
-                                            today.setHours(0, 0, 0, 0);
-                                            let daysDiff = 0;
-                                            let isOverdue = false;
-                                            let daysText = "";
-                                            if (desiredDate) {
-                                                desiredDate.setHours(0, 0, 0, 0);
-                                                daysDiff = Math.floor((desiredDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-                                                isOverdue = daysDiff < 0;
-                                                daysText = isOverdue ? `${Math.abs(daysDiff)}日遅れ` : `後${daysDiff}日`;
-                                            }
+                                    <div key={day} className="border border-[hsl(var(--border))] rounded-lg">
+                                        <div className="px-2 sm:px-3 py-1.5 sm:py-2 bg-[hsl(var(--muted))] text-xs sm:text-sm font-semibold flex items-center justify-between">
+                                            <span>{displayHeader}</span>
+                                            <span className="text-[10px] sm:text-xs text-[hsl(var(--muted-foreground))]">
+                                                {items.length}件
+                                            </span>
+                                        </div>
+                                        <div className="divide-y divide-[hsl(var(--border))]">
+                                            {items.map((item: any) => {
+                                                // 納期（希望納期）の計算
+                                                const desiredDate = item.desiredIncomingPlannedDate ? new Date(item.desiredIncomingPlannedDate) : null;
+                                                const today = new Date();
+                                                today.setHours(0, 0, 0, 0);
+                                                let daysDiff = 0;
+                                                let isOverdue = false;
+                                                let daysText = "";
+                                                if (desiredDate) {
+                                                    desiredDate.setHours(0, 0, 0, 0);
+                                                    daysDiff = Math.floor((desiredDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+                                                    isOverdue = daysDiff < 0;
+                                                    daysText = isOverdue ? `${Math.abs(daysDiff)}日遅れ` : `後${daysDiff}日`;
+                                                }
 
-                                            return (
-                                                <div key={item.id} className="p-2 sm:p-3 space-y-2">
-                                                    <div className="flex items-center justify-between gap-2">
-                                                        <div className="min-w-0 flex-1">
-                                                            <p className="font-semibold text-sm sm:text-base break-words">
-                                                                {item.vehicleName}
-                                                                {item.customerName && ` / ${item.customerName}様`}
-                                                                {item.productionMonth && ` / ${item.productionMonth}`}
-                                                            </p>
-                                                            <p className="text-[11px] sm:text-xs text-[hsl(var(--muted-foreground))] break-words">
-                                                                {item.vehicleType || "車種未設定"}
-                                                            </p>
+                                                return (
+                                                    <div key={item.id} className="p-2 sm:p-3 space-y-2">
+                                                        <div className="flex items-center justify-between gap-2">
+                                                            <div className="min-w-0 flex-1">
+                                                                <p className="font-semibold text-sm sm:text-base break-words">
+                                                                    {item.vehicleName}
+                                                                    {item.customerName && ` / ${item.customerName}様`}
+                                                                    {item.productionMonth && ` / ${item.productionMonth}`}
+                                                                </p>
+                                                                <p className="text-[11px] sm:text-xs text-[hsl(var(--muted-foreground))] break-words">
+                                                                    {item.vehicleType || "車種未設定"}
+                                                                </p>
+                                                            </div>
+                                                            <div className="flex flex-col items-end gap-1 flex-shrink-0">
+                                                                <span className="px-2 py-0.5 rounded-full bg-gray-100 text-gray-800 text-[10px] sm:text-xs font-semibold">
+                                                                    {statusLabel(item.status)}
+                                                                </span>
+                                                            </div>
                                                         </div>
-                                                        <div className="flex flex-col items-end gap-1 flex-shrink-0">
-                                                            <span className="px-2 py-0.5 rounded-full bg-gray-100 text-gray-800 text-[10px] sm:text-xs font-semibold">
-                                                                {statusLabel(item.status)}
-                                                            </span>
-                                                        </div>
+
+                                                        {/* 納期（希望納期） */}
+                                                        {desiredDate && (
+                                                            <div className="flex items-center gap-2">
+                                                                <span className="text-[11px] sm:text-xs font-semibold">納期:</span>
+                                                                <span className={`px-2 py-0.5 rounded-full text-[10px] sm:text-xs font-bold ${isOverdue ? "bg-red-600 text-white" : "bg-blue-600 text-white"}`}>
+                                                                    {format(desiredDate, "M月d日")} {daysText}
+                                                                </span>
+                                                            </div>
+                                                        )}
+
+                                                        {/* ワングラム完成予定日 */}
+                                                        {item.incomingPlannedDate && (
+                                                            <div className="flex items-center gap-2">
+                                                                <span className="text-[11px] sm:text-xs font-semibold">ワングラム完成予定日:</span>
+                                                                <span className="text-[11px] sm:text-xs">
+                                                                    {format(new Date(item.incomingPlannedDate), "M月d日")}
+                                                                </span>
+                                                            </div>
+                                                        )}
+
+                                                        {/* ワングラム様に引き取りに行く日 */}
+                                                        {item.shippingPlannedDate && (
+                                                            <div className="flex items-center gap-2">
+                                                                <span className="text-[11px] sm:text-xs font-semibold">ワングラム様に引き取りに行く日:</span>
+                                                                <span className="text-[11px] sm:text-xs">
+                                                                    {format(new Date(item.shippingPlannedDate), "M月d日")}
+                                                                </span>
+                                                            </div>
+                                                        )}
                                                     </div>
-
-                                                    {/* 納期（希望納期） */}
-                                                    {desiredDate && (
-                                                        <div className="flex items-center gap-2">
-                                                            <span className="text-[11px] sm:text-xs font-semibold">納期:</span>
-                                                            <span className={`px-2 py-0.5 rounded-full text-[10px] sm:text-xs font-bold ${isOverdue ? "bg-red-600 text-white" : "bg-blue-600 text-white"}`}>
-                                                                {format(desiredDate, "M月d日")} {daysText}
-                                                            </span>
-                                                        </div>
-                                                    )}
-
-                                                    {/* ワングラム完成予定日 */}
-                                                    {item.incomingPlannedDate && (
-                                                        <div className="flex items-center gap-2">
-                                                            <span className="text-[11px] sm:text-xs font-semibold">ワングラム完成予定日:</span>
-                                                            <span className="text-[11px] sm:text-xs">
-                                                                {format(new Date(item.incomingPlannedDate), "M月d日")}
-                                                            </span>
-                                                        </div>
-                                                    )}
-
-                                                    {/* ワングラム様に引き取りに行く日 */}
-                                                    {item.shippingPlannedDate && (
-                                                        <div className="flex items-center gap-2">
-                                                            <span className="text-[11px] sm:text-xs font-semibold">ワングラム様に引き取りに行く日:</span>
-                                                            <span className="text-[11px] sm:text-xs">
-                                                                {format(new Date(item.shippingPlannedDate), "M月d日")}
-                                                            </span>
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            );
-                                        })}
+                                                );
+                                            })}
+                                        </div>
                                     </div>
-                                </div>
-                            ))}
+                                );
+                            })}
                         </div>
                     ) : (
                         <div className="space-y-4">
