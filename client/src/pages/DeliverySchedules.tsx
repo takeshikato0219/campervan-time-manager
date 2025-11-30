@@ -625,6 +625,28 @@ export default function DeliverySchedules() {
                                                                 </span>
                                                             </div>
                                                         )}
+
+                                                        {/* ベース車と家具 */}
+                                                        {(item.baseCarReady || item.furnitureReady) && (
+                                                            <div className="flex items-center gap-3">
+                                                                {item.baseCarReady && (
+                                                                    <div className="flex items-center gap-1">
+                                                                        <span className="text-[11px] sm:text-xs font-semibold">ベース車:</span>
+                                                                        <span className="text-[11px] sm:text-xs">
+                                                                            {item.baseCarReady === "yes" ? "◯" : "×"}
+                                                                        </span>
+                                                                    </div>
+                                                                )}
+                                                                {item.furnitureReady && (
+                                                                    <div className="flex items-center gap-1">
+                                                                        <span className="text-[11px] sm:text-xs font-semibold">家具:</span>
+                                                                        <span className="text-[11px] sm:text-xs">
+                                                                            {item.furnitureReady === "yes" ? "◯" : "×"}
+                                                                        </span>
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        )}
                                                     </div>
                                                 );
                                             })}
