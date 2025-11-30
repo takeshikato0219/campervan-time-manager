@@ -224,8 +224,8 @@ export default function UserManagement() {
                                                             ? "bg-green-100 text-green-800"
                                                             : userData.role === "external"
                                                                 ? "bg-orange-100 text-orange-800"
-                                                                : "bg-gray-100 text-gray-800"
-                                                }`}
+                                                            : "bg-gray-100 text-gray-800"
+                                                    }`}
                                             >
                                                 {userData.role === "admin"
                                                     ? "管理人"
@@ -235,7 +235,7 @@ export default function UserManagement() {
                                                             ? "営業事務"
                                                             : userData.role === "external"
                                                                 ? "社外（ワングラム）"
-                                                                : "現場staff"}
+                                                            : "現場staff"}
                                             </span>
                                         </TableCell>
                                         <TableCell>

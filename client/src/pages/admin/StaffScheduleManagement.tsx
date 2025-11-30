@@ -226,9 +226,9 @@ export default function StaffScheduleManagement() {
                 // 既存の変更があれば、そのコメントを使用、なければ元のデータから取得
                 const existingChange = prev.get(cellKey);
                 const originalEntry = scheduleData?.scheduleData
-                    .find((d) => d.date === date)
-                    ?.userEntries.find((e) => e.userId === userId);
-                
+            .find((d) => d.date === date)
+            ?.userEntries.find((e) => e.userId === userId);
+
                 newChanges.set(cellKey, {
                     status,
                     comment: comment !== undefined 
@@ -244,12 +244,12 @@ export default function StaffScheduleManagement() {
             const entry = filteredScheduleData
                 .find((d) => d.date === date)
                 ?.userEntries.find((e) => e.userId === userId);
-            updateMutation.mutate({
-                userId,
-                date,
-                status,
+        updateMutation.mutate({
+            userId,
+            date,
+            status,
                 comment: comment !== undefined ? comment : (entry?.comment || null),
-            });
+        });
         }
     };
 
@@ -341,7 +341,7 @@ export default function StaffScheduleManagement() {
             const userIdSet = new Set(filteredUsers.map(u => u.id));
             
             return scheduleData.scheduleData.map((day) => ({
-                ...day,
+                    ...day,
                 userEntries: day.userEntries
                     .filter((entry) => userIdSet.has(entry.userId))
                     .map((entry) => {
@@ -1028,48 +1028,48 @@ export default function StaffScheduleManagement() {
                                                 </div>
                                             ) : (
                                                 <>
-                                                    {!isBulkEditMode ? (
+                                            {!isBulkEditMode ? (
                                                         <div 
                                                             onClick={(e) => e.stopPropagation()}
                                                         >
-                                                            <Select
-                                                                value={entry.status}
-                                                                onValueChange={(value) => {
-                                                                    handleStatusChange(entry.userId, day.date, value as ScheduleStatus);
-                                                                }}
+                                                <Select
+                                                    value={entry.status}
+                                                    onValueChange={(value) => {
+                                                        handleStatusChange(entry.userId, day.date, value as ScheduleStatus);
+                                                    }}
                                                                 disabled={updateMutation.isPending && !isEditMode}
-                                                            >
+                                                >
                                                                 <SelectTrigger 
                                                                     className="h-6 text-[14px] p-0.5 border-0 bg-transparent hover:bg-transparent focus:ring-0 shadow-none w-full"
                                                                 >
-                                                                    <SelectValue>
-                                                                        <span className="text-[14px] font-medium">
-                                                                            {STATUS_LABELS[entry.status as ScheduleStatus]}
-                                                                        </span>
-                                                                    </SelectValue>
-                                                                </SelectTrigger>
-                                                                <SelectContent>
-                                                                    <SelectItem value="work">出勤</SelectItem>
-                                                                    <SelectItem value="rest">休</SelectItem>
-                                                                    <SelectItem value="request">希望</SelectItem>
-                                                                    <SelectItem value="exhibition">展</SelectItem>
-                                                                    <SelectItem value="other">その他</SelectItem>
-                                                                    <SelectItem value="morning">午前出</SelectItem>
-                                                                    <SelectItem value="afternoon">午後出</SelectItem>
+                                                        <SelectValue>
+                                                            <span className="text-[14px] font-medium">
+                                                                {STATUS_LABELS[entry.status as ScheduleStatus]}
+                                                            </span>
+                                                        </SelectValue>
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                        <SelectItem value="work">出勤</SelectItem>
+                                                        <SelectItem value="rest">休</SelectItem>
+                                                        <SelectItem value="request">希望</SelectItem>
+                                                        <SelectItem value="exhibition">展</SelectItem>
+                                                        <SelectItem value="other">その他</SelectItem>
+                                                        <SelectItem value="morning">午前出</SelectItem>
+                                                        <SelectItem value="afternoon">午後出</SelectItem>
                                                                     <SelectItem value="business_trip">出張</SelectItem>
                                                                     <SelectItem value="exhibition_duty">展示場当番</SelectItem>
                                                                     <SelectItem value="paid_leave">有給</SelectItem>
                                                                     <SelectItem value="delivery">納車</SelectItem>
                                                                     <SelectItem value="payment_date">支払日</SelectItem>
-                                                                </SelectContent>
-                                                            </Select>
+                                                    </SelectContent>
+                                                </Select>
                                                         </div>
-                                                    ) : (
-                                                        <div className="text-[14px] font-medium">
-                                                            {STATUS_LABELS[entry.status as ScheduleStatus]}
-                                                        </div>
-                                                    )}
-                                                    {entry.comment && (
+                                            ) : (
+                                                <div className="text-[14px] font-medium">
+                                                    {STATUS_LABELS[entry.status as ScheduleStatus]}
+                                                </div>
+                                            )}
+                                            {entry.comment && (
                                                         <div 
                                                             className="text-[8px] text-[hsl(var(--muted-foreground))] mt-0.5 truncate cursor-pointer hover:underline"
                                                             onClick={(e) => {
@@ -1078,8 +1078,8 @@ export default function StaffScheduleManagement() {
                                                             }}
                                                             title="クリックでコメント編集"
                                                         >
-                                                            {entry.comment}
-                                                        </div>
+                                                    {entry.comment}
+                                                </div>
                                                     )}
                                                     {!entry.comment && (entry.status === "business_trip" || entry.status === "payment_date") && (
                                                         <div 

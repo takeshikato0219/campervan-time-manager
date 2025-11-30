@@ -127,25 +127,25 @@ export default function AppLayout({ children }: AppLayoutProps) {
                                 return true;
                             })
                             .map((item) => {
-                                const Icon = item.icon;
-                                const isActive = location === item.path;
-                                return (
-                                    <Link key={item.path} href={item.path}>
-                                        <div
-                                            className={`flex items-center gap-3 px-3 py-2 rounded-lg transition-colors cursor-pointer ${isActive
-                                                ? "bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]"
-                                                : "text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))] hover:text-[hsl(var(--foreground))]"
-                                                }`}
-                                            onClick={() => setIsMobileMenuOpen(false)}
-                                        >
+                            const Icon = item.icon;
+                            const isActive = location === item.path;
+                            return (
+                                <Link key={item.path} href={item.path}>
+                                    <div
+                                        className={`flex items-center gap-3 px-3 py-2 rounded-lg transition-colors cursor-pointer ${isActive
+                                            ? "bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]"
+                                            : "text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))] hover:text-[hsl(var(--foreground))]"
+                                            }`}
+                                        onClick={() => setIsMobileMenuOpen(false)}
+                                    >
                                             <Icon className="h-6 w-6" />
                                             <span className="text-base sm:text-lg font-semibold">
                                                 {item.label}
                                             </span>
-                                        </div>
-                                    </Link>
-                                );
-                            })}
+                                    </div>
+                                </Link>
+                            );
+                        })}
 
                         {(user?.role === "admin" || user?.role === "sub_admin") && (
                             <>

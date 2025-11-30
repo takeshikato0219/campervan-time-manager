@@ -333,48 +333,48 @@ function VehicleCheckCard({
                                         </div>
                                         <div className="border-t pt-3 mt-3 sm:border-t-0 sm:pt-0 sm:mt-0">
                                             <div className="grid grid-cols-2 sm:flex sm:flex-row gap-2 flex-shrink-0 w-full sm:w-auto">
-                                                <Button
-                                                    size="sm"
-                                                    onClick={() => onCheck(vehicle.id, status.checkItem.id, "checked")}
+                                            <Button
+                                                size="sm"
+                                                onClick={() => onCheck(vehicle.id, status.checkItem.id, "checked")}
                                                     className="w-full text-xs sm:text-sm h-9 sm:h-9 touch-manipulation"
-                                                    variant={status.status === "checked" ? "default" : "outline"}
+                                                variant={status.status === "checked" ? "default" : "outline"}
                                                     style={{ touchAction: 'manipulation' }}
-                                                >
-                                                    チェック
-                                                </Button>
-                                                <Button
-                                                    size="sm"
-                                                    variant="outline"
-                                                    onClick={() => onCheck(vehicle.id, status.checkItem.id, "needs_recheck")}
+                                            >
+                                                チェック
+                                            </Button>
+                                            <Button
+                                                size="sm"
+                                                variant="outline"
+                                                onClick={() => onCheck(vehicle.id, status.checkItem.id, "needs_recheck")}
                                                     className={`w-full text-xs sm:text-sm h-9 sm:h-9 touch-manipulation ${status.status === "needs_recheck"
-                                                        ? "bg-orange-600 hover:bg-orange-700 text-white border-orange-600"
-                                                        : ""
-                                                        }`}
+                                                    ? "bg-orange-600 hover:bg-orange-700 text-white border-orange-600"
+                                                    : ""
+                                                    }`}
                                                     style={{ touchAction: 'manipulation' }}
-                                                >
-                                                    要再チェック
-                                                </Button>
-                                                <Button
-                                                    size="sm"
-                                                    variant="outline"
-                                                    onClick={() => onCheck(vehicle.id, status.checkItem.id, "unchecked")}
+                                            >
+                                                要再チェック
+                                            </Button>
+                                            <Button
+                                                size="sm"
+                                                variant="outline"
+                                                onClick={() => onCheck(vehicle.id, status.checkItem.id, "unchecked")}
                                                     className={`w-full text-xs sm:text-sm h-9 sm:h-9 touch-manipulation ${status.status === "unchecked"
-                                                        ? "bg-gray-600 hover:bg-gray-700 text-white border-gray-600"
-                                                        : ""
-                                                        }`}
+                                                    ? "bg-gray-600 hover:bg-gray-700 text-white border-gray-600"
+                                                    : ""
+                                                    }`}
                                                     style={{ touchAction: 'manipulation' }}
-                                                >
-                                                    未チェック
-                                                </Button>
-                                                <Button
-                                                    size="sm"
-                                                    variant="outline"
-                                                    onClick={() => onRequestCheck(vehicle.id, status.checkItem.id)}
+                                            >
+                                                未チェック
+                                            </Button>
+                                            <Button
+                                                size="sm"
+                                                variant="outline"
+                                                onClick={() => onRequestCheck(vehicle.id, status.checkItem.id)}
                                                     className="w-full sm:w-auto text-xs sm:text-sm h-9 sm:h-9 touch-manipulation"
                                                     style={{ touchAction: 'manipulation' }}
-                                                >
+                                            >
                                                     依頼
-                                                </Button>
+                                            </Button>
                                             </div>
                                         </div>
                                     </div>
@@ -582,12 +582,12 @@ export default function VehicleChecks() {
                 <div className="overflow-x-auto -mx-4 sm:mx-0 px-4 sm:px-0">
                     <TabsList className="inline-flex w-auto min-w-full sm:w-full sm:grid sm:grid-cols-3 md:grid-cols-6 gap-1 sm:gap-2">
                         <TabsTrigger value="all" className="text-sm sm:text-base px-4 sm:px-3 py-2 whitespace-nowrap flex-shrink-0 touch-manipulation" style={{ touchAction: 'manipulation' }}>全て</TabsTrigger>
-                        {CATEGORIES.map((cat) => (
+                    {CATEGORIES.map((cat) => (
                             <TabsTrigger key={cat} value={cat} className="text-sm sm:text-base px-4 sm:px-3 py-2 whitespace-nowrap flex-shrink-0 touch-manipulation" style={{ touchAction: 'manipulation' }}>
-                                {cat}
-                            </TabsTrigger>
-                        ))}
-                    </TabsList>
+                            {cat}
+                        </TabsTrigger>
+                    ))}
+                </TabsList>
                 </div>
 
                 <TabsContent value={selectedCategory} className="mt-4">

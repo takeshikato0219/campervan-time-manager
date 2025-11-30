@@ -1043,15 +1043,15 @@ export const staffScheduleRouter = createTRPCRouter({
 
             // テーブルが存在しない場合は作成
             try {
-            await db.execute(sql`CREATE TABLE IF NOT EXISTS \`staffScheduleAdjustments\` (
-                        \`id\` int AUTO_INCREMENT PRIMARY KEY NOT NULL,
-                        \`userId\` int NOT NULL,
-                        \`periodStart\` date NOT NULL,
-                        \`periodEnd\` date NOT NULL,
-                        \`adjustment\` int NOT NULL DEFAULT 0,
-                        \`createdAt\` timestamp DEFAULT CURRENT_TIMESTAMP NOT NULL,
-                        \`updatedAt\` timestamp DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP NOT NULL
-            )`);
+                await db.execute(sql`CREATE TABLE IF NOT EXISTS \`staffScheduleAdjustments\` (
+                    \`id\` int AUTO_INCREMENT PRIMARY KEY NOT NULL,
+                    \`userId\` int NOT NULL,
+                    \`periodStart\` date NOT NULL,
+                    \`periodEnd\` date NOT NULL,
+                    \`adjustment\` int NOT NULL DEFAULT 0,
+                    \`createdAt\` timestamp DEFAULT CURRENT_TIMESTAMP NOT NULL,
+                    \`updatedAt\` timestamp DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP NOT NULL
+                )`);
             await db.execute(sql`CREATE TABLE IF NOT EXISTS \`staffScheduleStatusColors\` (
                         \`id\` int AUTO_INCREMENT PRIMARY KEY NOT NULL,
                         \`status\` varchar(50) NOT NULL UNIQUE,
@@ -1085,7 +1085,7 @@ export const staffScheduleRouter = createTRPCRouter({
                     // 既に存在する場合は無視
                 }
             }
-        } catch (error: any) {
+            } catch (error: any) {
                 if (!error?.message?.includes("already exists")) {
                     console.warn("[staffSchedule] 調整休テーブル作成エラー（無視）:", error?.message);
                 }

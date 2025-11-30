@@ -147,12 +147,12 @@ export default function StaffSchedule() {
                             戻る
                         </Button>
                     </Link>
-                    <div>
+                <div>
                         <h1 className="text-2xl sm:text-3xl font-bold">スタッフ休み予定一覧</h1>
                         <p className="text-[hsl(var(--muted-foreground))] mt-2 text-sm sm:text-base">
-                            期間: {format(parse(scheduleData.period.start, "yyyy-MM-dd", new Date()), "yyyy年MM月dd日")} ～{" "}
-                            {format(parse(scheduleData.period.end, "yyyy-MM-dd", new Date()), "yyyy年MM月dd日")}
-                        </p>
+                        期間: {format(parse(scheduleData.period.start, "yyyy-MM-dd", new Date()), "yyyy年MM月dd日")} ～{" "}
+                        {format(parse(scheduleData.period.end, "yyyy-MM-dd", new Date()), "yyyy年MM月dd日")}
+                    </p>
                     </div>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
@@ -170,9 +170,9 @@ export default function StaffSchedule() {
 
             {/* スケジュール表 */}
             <div className="staff-schedule-table-wrapper" style={{ overflowY: 'visible' }}>
-                <table className="w-full border-collapse border border-[hsl(var(--border))] text-xs">
-                    <thead>
-                        <tr>
+                    <table className="w-full border-collapse border border-[hsl(var(--border))] text-xs">
+                        <thead>
+                            <tr>
                             <th 
                                 className="border border-[hsl(var(--border))] p-1 sm:p-2 min-w-[70px] bg-[hsl(var(--muted))]"
                                 style={{ 
@@ -183,11 +183,11 @@ export default function StaffSchedule() {
                                     backgroundColor: 'hsl(var(--muted))'
                                 }}
                             >
-                                日付
-                            </th>
-                            {filteredUsers.map((u) => (
-                                <th
-                                    key={u.id}
+                                    日付
+                                </th>
+                                {filteredUsers.map((u) => (
+                                    <th
+                                        key={u.id}
                                     className="border border-[hsl(var(--border))] p-1 sm:p-2 min-w-[60px] sm:min-w-[80px] bg-[hsl(var(--muted))]"
                                     style={{ 
                                         position: 'sticky', 
@@ -195,15 +195,15 @@ export default function StaffSchedule() {
                                         zIndex: 50,
                                         backgroundColor: 'hsl(var(--muted))'
                                     }}
-                                >
+                                    >
                                     <span className="text-[10px] sm:text-xs font-semibold">{u.name}</span>
-                                </th>
-                            ))}
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {filteredScheduleData.map((day) => (
-                            <tr key={day.date}>
+                                    </th>
+                                ))}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {filteredScheduleData.map((day) => (
+                                <tr key={day.date}>
                                     <td
                                         className={`border border-[hsl(var(--border))] p-1 sm:p-2 text-[10px] sm:text-xs sticky left-0 z-10 ${day.isWeekend ? "bg-pink-100" : "bg-white"
                                             }`}
@@ -226,25 +226,25 @@ export default function StaffSchedule() {
                                                 </div>
                                             ) : (
                                                 <>
-                                                    <div className="text-[10px] sm:text-xs font-medium">
-                                                        {STATUS_LABELS[entry.status as ScheduleStatus]}
-                                                    </div>
-                                                    {entry.comment && (
-                                                        <div className="text-[8px] sm:text-[9px] text-[hsl(var(--muted-foreground))] mt-0.5 truncate">
-                                                            {entry.comment}
-                                                        </div>
+                                            <div className="text-[10px] sm:text-xs font-medium">
+                                                {STATUS_LABELS[entry.status as ScheduleStatus]}
+                                            </div>
+                                            {entry.comment && (
+                                                <div className="text-[8px] sm:text-[9px] text-[hsl(var(--muted-foreground))] mt-0.5 truncate">
+                                                    {entry.comment}
+                                                </div>
                                                     )}
                                                 </>
                                             )}
                                         </td>
                                     ))}
-                            </tr>
-                        ))}
-                    </tbody>
-                    {/* 集計行 */}
-                    <tfoot>
-                        <tr className="bg-yellow-50">
-                            <td className="border border-[hsl(var(--border))] p-1 sm:p-2 text-[10px] sm:text-xs font-medium sticky left-0 z-10">
+                                </tr>
+                            ))}
+                        </tbody>
+                        {/* 集計行 */}
+                        <tfoot>
+                            <tr className="bg-yellow-50">
+                                <td className="border border-[hsl(var(--border))] p-1 sm:p-2 text-[10px] sm:text-xs font-medium sticky left-0 z-10">
                                     休みの数
                                 </td>
                                 {filteredSummary.map((s) => (
@@ -252,19 +252,19 @@ export default function StaffSchedule() {
                                         {s.restDays || 0}
                                     </td>
                                 ))}
-                        </tr>
-                        <tr className="bg-gray-50">
-                            <td className="border border-[hsl(var(--border))] p-1 sm:p-2 text-[10px] sm:text-xs font-medium sticky left-0 z-10">
-                                合計
-                            </td>
-                            {filteredSummary.map((s) => (
-                                <td key={s.userId} className="border border-[hsl(var(--border))] p-1 sm:p-2 text-[10px] sm:text-xs text-center">
-                                    {s.totalRest}
+                            </tr>
+                            <tr className="bg-gray-50">
+                                <td className="border border-[hsl(var(--border))] p-1 sm:p-2 text-[10px] sm:text-xs font-medium sticky left-0 z-10">
+                                    合計
                                 </td>
-                            ))}
-                        </tr>
-                    </tfoot>
-                </table>
+                                {filteredSummary.map((s) => (
+                                    <td key={s.userId} className="border border-[hsl(var(--border))] p-1 sm:p-2 text-[10px] sm:text-xs text-center">
+                                        {s.totalRest}
+                                    </td>
+                                ))}
+                            </tr>
+                        </tfoot>
+                    </table>
             </div>
         </div>
     );

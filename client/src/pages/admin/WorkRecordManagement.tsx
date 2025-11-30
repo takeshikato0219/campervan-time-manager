@@ -282,7 +282,7 @@ export default function WorkRecordManagement() {
             <Card>
                 <CardHeader>
                     <div className="flex items-center justify-between">
-                        <CardTitle>作業記録一覧</CardTitle>
+                    <CardTitle>作業記録一覧</CardTitle>
                         <Button
                             onClick={() => setIsAddDialogOpen(true)}
                             className="flex items-center gap-2"

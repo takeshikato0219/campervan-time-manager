@@ -608,7 +608,6 @@ export const analyticsRouter = createTRPCRouter({
             }
 
             // マージされた各インターバルに対して、休憩時間を引いた時間を計算
-            // attendance.tsのcalculateWorkMinutesと同じロジックを使用
             let workMinutes = 0;
 
             console.log("[getWorkReportDetail] マージされたインターバル数:", mergedIntervals.length);
@@ -623,36 +622,26 @@ export const analyticsRouter = createTRPCRouter({
 
                 console.log(`[getWorkReportDetail] インターバル[${i}]: ${startTimeStr} - ${endTimeStr}`);
 
-                // attendance.tsのcalculateWorkMinutesと同じロジック
+                // 同じ日の作業記録を想定（日を跨ぐ場合は考慮）
                 const startMin = timeToMinutes(startTimeStr);
                 const endMin = timeToMinutes(endTimeStr);
 
                 if (startMin === null || endMin === null) {
-                    console.log("[getWorkReportDetail] 時刻の変換失敗:", { startTimeStr, endTimeStr, startMin, endMin });
+                    console.log("[getWorkReportDetail] 時刻の変換失敗:", { startTimeStr, endTimeStr });
                     continue;
                 }
 
-                // 基本時間（休憩時間を引く前）
-                // 同じ日の作業記録を想定
-                let workStart = startMin;
-                let workEnd = endMin;
-
-                // 日を跨ぐ場合は24時間を加算
-                if (startDate.toDateString() !== endDate.toDateString()) {
+                // 日を跨ぐ場合の処理
+                let effectiveEndMin = endMin;
+                if (startDate.toDateString() !== endDate.toDateString() || (endMin < startMin && startDate.toDateString() === endDate.toDateString())) {
                     console.log("[getWorkReportDetail] 日を跨ぐインターバル:", { startDate: startDate.toDateString(), endDate: endDate.toDateString() });
-                    workEnd = endMin + 24 * 60;
+                    effectiveEndMin = endMin + 24 * 60;
                 }
 
-                // 終了時刻が開始時刻より前の場合は日を跨いだとみなす
-                if (endMin < startMin && startDate.toDateString() === endDate.toDateString()) {
-                    console.log("[getWorkReportDetail] 時刻が逆転しているため日を跨ぐとみなす:", { startMin, endMin });
-                    workEnd = endMin + 24 * 60;
-                }
-
-                const baseMinutes = Math.max(0, workEnd - workStart);
+                // attendance.tsと同じロジックで休憩時間を引く
+                const baseMinutes = Math.max(0, effectiveEndMin - startMin);
                 console.log(`[getWorkReportDetail] インターバル[${i}] 基本時間: ${baseMinutes}分 (${Math.floor(baseMinutes / 60)}時間${baseMinutes % 60}分)`);
 
-                // この時間帯に含まれる休憩時間を計算（attendance.tsのcalculateWorkMinutesと同じロジック）
                 let breakTotal = 0;
                 for (const bt of breakTimes) {
                     const s = timeToMinutes(bt.startTime);
@@ -668,15 +657,15 @@ export const analyticsRouter = createTRPCRouter({
                         e += 24 * 60;
                     }
 
-                    // 作業区間 [workStart, workEnd] と休憩区間 [s, e] の重なり
-                    const overlapStart = Math.max(workStart, s);
-                    const overlapEnd = Math.min(workEnd, e);
+                    // 作業区間 [startMin, effectiveEndMin] と休憩区間 [s, e] の重なり
+                    const overlapStart = Math.max(startMin, s);
+                    const overlapEnd = Math.min(effectiveEndMin, e);
                     if (overlapEnd > overlapStart) {
                         const overlapMinutes = overlapEnd - overlapStart;
                         breakTotal += overlapMinutes;
                         console.log("[getWorkReportDetail] 休憩時間重複:", {
                             intervalIndex: i,
-                            workInterval: `${workStart}分-${workEnd}分 (${startTimeStr}-${endTimeStr})`,
+                            workInterval: `${startMin}分-${effectiveEndMin}分 (${startTimeStr}-${endTimeStr})`,
                             breakInterval: `${s}分-${e}分 (${bt.startTime}-${bt.endTime})`,
                             overlap: `${overlapStart}分-${overlapEnd}分 (${overlapMinutes}分)`,
                             breakTotal: `${breakTotal}分`
