@@ -99,9 +99,9 @@ export default function Login() {
                     </form>
 
                     <div className="mt-6 flex justify-center">
-                        <img
-                            src="/katomotor.png"
-                            alt="Kato Motor"
+                        <img 
+                            src="/katomotor.png" 
+                            alt="Kato Motor" 
                             className="max-w-full h-auto max-h-32 object-contain"
                         />
                     </div>

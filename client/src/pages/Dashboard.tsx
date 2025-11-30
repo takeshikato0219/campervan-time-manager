@@ -387,19 +387,19 @@ export default function Dashboard() {
                                                         {(msg as any).expireDays}日表示
                                                     </span>
                                                 )}
-                                                {(msg.userId === user?.id || user?.role === "admin") && (
-                                                    <Button
-                                                        variant="outline"
-                                                        size="xs"
-                                                        className="h-6 px-2 text-[10px]"
-                                                        onClick={() => {
-                                                            if (!window.confirm("この掲示板の投稿を削除しますか？")) return;
-                                                            deleteBulletinMutation.mutate({ id: msg.id });
-                                                        }}
-                                                    >
-                                                        削除
-                                                    </Button>
-                                                )}
+                                            {(msg.userId === user?.id || user?.role === "admin") && (
+                                                <Button
+                                                    variant="outline"
+                                                    size="xs"
+                                                    className="h-6 px-2 text-[10px]"
+                                                    onClick={() => {
+                                                        if (!window.confirm("この掲示板の投稿を削除しますか？")) return;
+                                                        deleteBulletinMutation.mutate({ id: msg.id });
+                                                    }}
+                                                >
+                                                    削除
+                                                </Button>
+                                            )}
                                             </div>
                                         </div>
                                         <p className="mt-1 text-xs sm:text-sm whitespace-pre-wrap break-words">
