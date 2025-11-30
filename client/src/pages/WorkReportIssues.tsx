@@ -26,6 +26,14 @@ export default function WorkReportIssues() {
 
     const utils = trpc.useUtils();
     const canEdit = user?.role === "admin" || user?.role === "sub_admin";
+    
+    console.log("[WorkReportIssues] Component render:", {
+        userId,
+        workDate,
+        canEdit,
+        userRole: user?.role,
+        isAddDialogOpen,
+    });
 
     const { data: detail, isLoading, error, refetch } = trpc.analytics.getWorkReportDetail.useQuery(
         {
@@ -176,6 +184,7 @@ export default function WorkReportIssues() {
     };
 
     const handleAddWork = () => {
+        console.log("[WorkReportIssues] ========== handleAddWork 開始 ==========");
         console.log("[WorkReportIssues] handleAddWork called", {
             selectedVehicleId,
             selectedProcessId,
@@ -183,47 +192,65 @@ export default function WorkReportIssues() {
             editEndTime,
             workDate,
             userId,
+            workDescription: editWorkDescription,
         });
 
         if (!selectedVehicleId || !selectedProcessId || !editStartTime) {
-            toast.error("車両、工程、開始時刻を入力してください");
+            const errorMsg = "車両、工程、開始時刻を入力してください";
             console.error("[WorkReportIssues] Validation failed:", {
                 selectedVehicleId: !!selectedVehicleId,
                 selectedProcessId: !!selectedProcessId,
                 editStartTime: !!editStartTime,
+                errorMsg,
             });
+            toast.error(errorMsg);
+            return;
+        }
+
+        if (!userId) {
+            console.error("[WorkReportIssues] userId is missing");
+            toast.error("ユーザー情報が取得できません");
             return;
         }
 
         const startDateTime = `${workDate}T${editStartTime}:00+09:00`;
         const endDateTime = editEndTime ? `${workDate}T${editEndTime}:00+09:00` : undefined;
 
-        console.log("[WorkReportIssues] Creating work record:", {
-            userId: userId!,
+        const mutationData = {
+            userId: userId,
             vehicleId: parseInt(selectedVehicleId),
             processId: parseInt(selectedProcessId),
             startTime: startDateTime,
             endTime: endDateTime,
             workDescription: editWorkDescription || undefined,
+        };
+
+        console.log("[WorkReportIssues] Creating work record with data:", mutationData);
+        console.log("[WorkReportIssues] createWorkRecordMutation state:", {
+            isPending: createWorkRecordMutation.isPending,
+            isError: createWorkRecordMutation.isError,
+            isSuccess: createWorkRecordMutation.isSuccess,
         });
 
-        createWorkRecordMutation.mutate({
-            userId: userId!,
-            vehicleId: parseInt(selectedVehicleId),
-            processId: parseInt(selectedProcessId),
-            startTime: startDateTime,
-            endTime: endDateTime,
-            workDescription: editWorkDescription || undefined,
-        });
+        try {
+            createWorkRecordMutation.mutate(mutationData);
+            console.log("[WorkReportIssues] mutation.mutate() 呼び出し完了");
+        } catch (error) {
+            console.error("[WorkReportIssues] mutation.mutate() でエラー:", error);
+            toast.error("作業記録の追加に失敗しました");
+        }
+        console.log("[WorkReportIssues] ========== handleAddWork 終了 ==========");
     };
 
     const handleOpenAddDialog = () => {
+        console.log("[WorkReportIssues] handleOpenAddDialog called");
         setSelectedVehicleId("");
         setSelectedProcessId("");
         setEditStartTime("");
         setEditEndTime("");
         setEditWorkDescription("");
         setIsAddDialogOpen(true);
+        console.log("[WorkReportIssues] 追加ダイアログを開きました");
     };
 
     if (!userId || !workDate) {
@@ -400,9 +427,15 @@ export default function WorkReportIssues() {
                         <CardTitle className="text-lg sm:text-xl">作業記録</CardTitle>
                         {canEdit && (
                             <Button
+                                type="button"
                                 size="sm"
                                 variant="outline"
-                                onClick={handleOpenAddDialog}
+                                onClick={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    console.log("[WorkReportIssues] 追加ボタン（ヘッダー）がクリックされました");
+                                    handleOpenAddDialog();
+                                }}
                             >
                                 <Plus className="h-4 w-4 mr-2" />
                                 追加
@@ -637,8 +670,16 @@ export default function WorkReportIssues() {
 
             {/* 追加ダイアログ */}
             {isAddDialogOpen && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-2 sm:p-4 overflow-y-auto">
-                    <Card className="w-full max-w-md min-w-0 my-auto">
+                <div 
+                    className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-2 sm:p-4 overflow-y-auto"
+                    onClick={(e) => {
+                        if (e.target === e.currentTarget) {
+                            console.log("[WorkReportIssues] ダイアログ背景をクリック - 閉じます");
+                            setIsAddDialogOpen(false);
+                        }
+                    }}
+                >
+                    <Card className="w-full max-w-md min-w-0 my-auto" onClick={(e) => e.stopPropagation()}>
                         <CardHeader className="p-3 sm:p-4 md:p-6">
                             <CardTitle className="text-base sm:text-lg md:text-xl">作業記録を追加</CardTitle>
                         </CardHeader>
@@ -704,16 +745,27 @@ export default function WorkReportIssues() {
                             </div>
                             <div className="flex flex-col sm:flex-row gap-2 pt-2">
                                 <Button
+                                    type="button"
                                     className="flex-1 w-full sm:w-auto"
-                                    onClick={handleAddWork}
+                                    onClick={(e) => {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                        console.log("[WorkReportIssues] 追加ボタンがクリックされました");
+                                        handleAddWork();
+                                    }}
                                     disabled={createWorkRecordMutation.isPending}
                                 >
-                                    追加
+                                    {createWorkRecordMutation.isPending ? "追加中..." : "追加"}
                                 </Button>
                                 <Button
+                                    type="button"
                                     variant="outline"
                                     className="flex-1 w-full sm:w-auto"
-                                    onClick={() => setIsAddDialogOpen(false)}
+                                    onClick={(e) => {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                        setIsAddDialogOpen(false);
+                                    }}
                                 >
                                     キャンセル
                                 </Button>
