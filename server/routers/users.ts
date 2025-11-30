@@ -59,6 +59,30 @@ export const usersRouter = createTRPCRouter({
                 });
             }
 
+            // role ENUMにexternalが含まれているか確認し、含まれていない場合は追加
+            const pool = getPool();
+            if (pool) {
+                try {
+                    // 現在のrole ENUM定義を確認
+                    const [columns]: any = await pool.execute(
+                        `SHOW COLUMNS FROM \`users\` WHERE Field = 'role'`
+                    );
+                    if (columns.length > 0) {
+                        const columnType = columns[0].Type;
+                        // externalが含まれていない場合は追加
+                        if (!columnType.includes("external")) {
+                            await pool.execute(
+                                `ALTER TABLE \`users\` MODIFY COLUMN \`role\` ENUM('field_worker', 'sales_office', 'sub_admin', 'admin', 'external') NOT NULL DEFAULT 'field_worker'`
+                            );
+                            console.log("[users.create] Added 'external' to role ENUM");
+                        }
+                    }
+                } catch (alterError: any) {
+                    // ENUMの更新が失敗した場合はログのみ（既に含まれている可能性がある）
+                    console.log("[users.create] Role ENUM update may have been skipped:", alterError?.message);
+                }
+            }
+
             // ユーザー名の重複チェック
             const existing = await db
                 .select()
