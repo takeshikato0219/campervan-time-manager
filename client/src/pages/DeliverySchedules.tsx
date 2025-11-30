@@ -184,17 +184,64 @@ export default function DeliverySchedules() {
     const groupedByDay = useMemo(() => {
         const map = new Map<string, any[]>();
         (data || []).forEach((item: any) => {
-            // 納車予定日（deliveryPlannedDate）でグループ化
-            const d = item.deliveryPlannedDate ? new Date(item.deliveryPlannedDate) : null;
-            const key = d ? format(d, "yyyy-MM-dd") : "未設定";
-            const list = map.get(key) || [];
-            list.push(item);
-            map.set(key, list);
+            // 制作分（productionMonth）を基準にグループ化
+            // 制作分から月を抽出（例：「11月ワングラム制作分」→ 11）
+            let productionMonthNum: number | null = null;
+            if (item.productionMonth) {
+                const match = item.productionMonth.match(/^(\d+)月/);
+                if (match) {
+                    productionMonthNum = parseInt(match[1], 10);
+                }
+            }
+
+            // 表示されている年月より後の制作分は表示しない（今月制作が前月に表示されないようにする）
+            // 制作分は現在の年を基準にしていると仮定（年越しの場合は要調整）
+            if (productionMonthNum !== null) {
+                // 制作分の月が表示月より後の場合はスキップ
+                // ただし、年をまたぐ場合（例：12月制作分を1月に表示）は考慮しない
+                if (productionMonthNum > month) {
+                    return; // このアイテムをスキップ
+                }
+            }
+
+            // 制作分がある場合は制作分でグループ化、ない場合は納車予定日でグループ化
+            if (item.productionMonth) {
+                const key = item.productionMonth;
+                const list = map.get(key) || [];
+                list.push(item);
+                map.set(key, list);
+            } else {
+                // 制作分がない場合は納車予定日でグループ化
+                const d = item.deliveryPlannedDate ? new Date(item.deliveryPlannedDate) : null;
+                const key = d ? format(d, "yyyy-MM-dd") : "未設定";
+                const list = map.get(key) || [];
+                list.push(item);
+                map.set(key, list);
+            }
         });
-        return Array.from(map.entries()).sort(([a], [b]) =>
-            a === "未設定" ? 1 : b === "未設定" ? -1 : a.localeCompare(b)
-        );
-    }, [data]);
+        return Array.from(map.entries()).sort(([a], [b]) => {
+            // 制作分の場合は月の順序でソート（例：「11月ワングラム制作分」→ 11）
+            const getMonthFromKey = (key: string): number => {
+                if (key.includes("月ワングラム制作分")) {
+                    const match = key.match(/^(\d+)月/);
+                    if (match) {
+                        return parseInt(match[1], 10);
+                    }
+                }
+                // 日付形式の場合（yyyy-MM-dd）
+                if (key.match(/^\d{4}-\d{2}-\d{2}$/)) {
+                    return new Date(key).getMonth() + 1;
+                }
+                return 999; // 「未設定」などは最後に
+            };
+            const monthA = getMonthFromKey(a);
+            const monthB = getMonthFromKey(b);
+            if (monthA !== monthB) {
+                return monthA - monthB;
+            }
+            return a === "未設定" ? 1 : b === "未設定" ? -1 : a.localeCompare(b);
+        });
+    }, [data, month]);
 
     // 納期遅れリスト（希望納期が過去のもの）
     const overdueItems = useMemo(() => {
@@ -500,10 +547,15 @@ export default function DeliverySchedules() {
                         </div>
                     ) : isCalendarMode ? (
                         <div className="space-y-3">
-                            {groupedByDay.map(([day, items]) => (
+                            {groupedByDay.map(([day, items]) => {
+                                // 制作分の場合は制作分名を表示、それ以外は日付を表示
+                                const isProductionMonth = day.includes("月ワングラム制作分");
+                                const displayHeader = isProductionMonth ? day : (day === "未設定" ? "日付未設定" : format(new Date(day), "M月d日"));
+                                
+                                return (
                                 <div key={day} className="border border-[hsl(var(--border))] rounded-lg">
                                     <div className="px-2 sm:px-3 py-1.5 sm:py-2 bg-[hsl(var(--muted))] text-xs sm:text-sm font-semibold flex items-center justify-between">
-                                        <span>{day === "未設定" ? "日付未設定" : format(new Date(day), "M月d日")}</span>
+                                        <span>{displayHeader}</span>
                                         <span className="text-[10px] sm:text-xs text-[hsl(var(--muted-foreground))]">
                                             {items.length}件
                                         </span>
