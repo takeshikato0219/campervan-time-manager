@@ -4,7 +4,7 @@ import { trpc } from "../../lib/trpc";
 import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/card";
 import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
-import { Edit, Trash2 } from "lucide-react";
+import { Edit, Trash2, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import {
@@ -46,6 +46,16 @@ export default function WorkRecordManagement() {
     const [selectedVehicleId, setSelectedVehicleId] = useState<string>("");
     const [selectedProcessId, setSelectedProcessId] = useState<string>("");
     const [selectedUserId, setSelectedUserId] = useState<string>("");
+    const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+    const [newRecord, setNewRecord] = useState({
+        userId: "",
+        vehicleId: "",
+        processId: "",
+        workDate: formatDateForInput(new Date()),
+        startTime: "",
+        endTime: "",
+        workDescription: "",
+    });
 
     const [editingRecord, setEditingRecord] = useState<{
         id: number;
@@ -96,6 +106,26 @@ export default function WorkRecordManagement() {
         },
     });
 
+    const createMutation = trpc.workRecords.create.useMutation({
+        onSuccess: () => {
+            toast.success("作業記録を追加しました");
+            setIsAddDialogOpen(false);
+            setNewRecord({
+                userId: "",
+                vehicleId: "",
+                processId: "",
+                workDate: formatDateForInput(new Date()),
+                startTime: "",
+                endTime: "",
+                workDescription: "",
+            });
+            refetch();
+        },
+        onError: (error) => {
+            toast.error(error.message || "追加に失敗しました");
+        },
+    });
+
     const handleEdit = (record: any) => {
         const startDate = new Date(record.startTime);
         const endDate = record.endTime ? new Date(record.endTime) : new Date();
@@ -134,6 +164,25 @@ export default function WorkRecordManagement() {
         if (confirm("本当に削除しますか？")) {
             deleteMutation.mutate({ id });
         }
+    };
+
+    const handleAdd = () => {
+        if (!newRecord.userId || !newRecord.vehicleId || !newRecord.processId || !newRecord.workDate || !newRecord.startTime) {
+            toast.error("スタッフ、車両、工程、日付、開始時刻を入力してください");
+            return;
+        }
+
+        const startDateTime = `${newRecord.workDate}T${newRecord.startTime}:00+09:00`;
+        const endDateTime = newRecord.endTime ? `${newRecord.workDate}T${newRecord.endTime}:00+09:00` : undefined;
+
+        createMutation.mutate({
+            userId: parseInt(newRecord.userId),
+            vehicleId: parseInt(newRecord.vehicleId),
+            processId: parseInt(newRecord.processId),
+            startTime: startDateTime,
+            endTime: endDateTime,
+            workDescription: newRecord.workDescription || undefined,
+        });
     };
 
     const formatTime = (date: Date | string) => {
@@ -232,7 +281,16 @@ export default function WorkRecordManagement() {
             {/* 作業記録一覧 */}
             <Card>
                 <CardHeader>
-                    <CardTitle>作業記録一覧</CardTitle>
+                    <div className="flex items-center justify-between">
+                        <CardTitle>作業記録一覧</CardTitle>
+                        <Button
+                            onClick={() => setIsAddDialogOpen(true)}
+                            className="flex items-center gap-2"
+                        >
+                            <Plus className="h-4 w-4" />
+                            追加
+                        </Button>
+                    </div>
                 </CardHeader>
                 <CardContent>
                     {filteredRecords && filteredRecords.length > 0 ? (
@@ -397,6 +455,128 @@ export default function WorkRecordManagement() {
                                     variant="outline"
                                     className="flex-1"
                                     onClick={() => setEditingRecord(null)}
+                                >
+                                    キャンセル
+                                </Button>
+                            </div>
+                        </CardContent>
+                    </Card>
+                </div>
+            )}
+
+            {/* 追加ダイアログ */}
+            {isAddDialogOpen && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+                    <Card className="w-full max-w-md mx-4">
+                        <CardHeader>
+                            <CardTitle>作業記録を追加</CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                            <div>
+                                <label className="text-sm font-medium">スタッフ</label>
+                                <select
+                                    className="flex h-10 w-full rounded-md border border-[hsl(var(--input))] bg-[hsl(var(--background))] px-3 py-2 text-sm"
+                                    value={newRecord.userId}
+                                    onChange={(e) =>
+                                        setNewRecord({ ...newRecord, userId: e.target.value })
+                                    }
+                                >
+                                    <option value="">選択してください</option>
+                                    {users?.filter((u) => u.role !== "external").map((u) => (
+                                        <option key={u.id} value={u.id}>
+                                            {u.name || u.username}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div>
+                                <label className="text-sm font-medium">車両</label>
+                                <select
+                                    className="flex h-10 w-full rounded-md border border-[hsl(var(--input))] bg-[hsl(var(--background))] px-3 py-2 text-sm"
+                                    value={newRecord.vehicleId}
+                                    onChange={(e) =>
+                                        setNewRecord({ ...newRecord, vehicleId: e.target.value })
+                                    }
+                                >
+                                    <option value="">選択してください</option>
+                                    {vehicles?.map((v) => (
+                                        <option key={v.id} value={v.id}>
+                                            {v.vehicleNumber}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div>
+                                <label className="text-sm font-medium">工程</label>
+                                <select
+                                    className="flex h-10 w-full rounded-md border border-[hsl(var(--input))] bg-[hsl(var(--background))] px-3 py-2 text-sm"
+                                    value={newRecord.processId}
+                                    onChange={(e) =>
+                                        setNewRecord({ ...newRecord, processId: e.target.value })
+                                    }
+                                >
+                                    <option value="">選択してください</option>
+                                    {processes?.map((p) => (
+                                        <option key={p.id} value={p.id}>
+                                            {p.name}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="text-sm font-medium">作業日</label>
+                                    <Input
+                                        type="date"
+                                        value={newRecord.workDate}
+                                        onChange={(e) =>
+                                            setNewRecord({ ...newRecord, workDate: e.target.value })
+                                        }
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-sm font-medium">開始時刻</label>
+                                    <Input
+                                        type="time"
+                                        value={newRecord.startTime}
+                                        onChange={(e) =>
+                                            setNewRecord({ ...newRecord, startTime: e.target.value })
+                                        }
+                                    />
+                                </div>
+                            </div>
+                            <div>
+                                <label className="text-sm font-medium">終了時刻（任意）</label>
+                                <Input
+                                    type="time"
+                                    value={newRecord.endTime}
+                                    onChange={(e) =>
+                                        setNewRecord({ ...newRecord, endTime: e.target.value })
+                                    }
+                                />
+                            </div>
+                            <div>
+                                <label className="text-sm font-medium">作業内容（任意）</label>
+                                <textarea
+                                    className="flex min-h-[80px] w-full rounded-md border border-[hsl(var(--input))] bg-[hsl(var(--background))] px-3 py-2 text-sm"
+                                    value={newRecord.workDescription}
+                                    onChange={(e) =>
+                                        setNewRecord({ ...newRecord, workDescription: e.target.value })
+                                    }
+                                />
+                            </div>
+                            <div className="flex gap-2">
+                                <Button
+                                    className="flex-1"
+                                    onClick={handleAdd}
+                                    disabled={createMutation.isPending}
+                                >
+                                    追加
+                                </Button>
+                                <Button
+                                    variant="outline"
+                                    className="flex-1"
+                                    onClick={() => setIsAddDialogOpen(false)}
                                 >
                                     キャンセル
                                 </Button>
