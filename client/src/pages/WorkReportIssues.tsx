@@ -12,11 +12,17 @@ import { toast } from "sonner";
 
 export default function WorkReportIssues() {
     const { user } = useAuth();
-    const [location, setLocation] = useLocation();
-    const params = new URLSearchParams(location.split("?")[1] || "");
-    const userId = params.get("userId") ? parseInt(params.get("userId")!) : null;
-    const workDate = params.get("workDate") || "";
-    const issueType = params.get("type") || ""; // "excessive" or "low"
+    const [location] = useLocation();
+    
+    // URLパラメータを取得（window.location.searchを使用）
+    const searchParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : new URLSearchParams();
+    const userIdParam = searchParams.get("userId");
+    const workDateParam = searchParams.get("workDate");
+    const issueTypeParam = searchParams.get("type");
+    
+    const userId = userIdParam ? parseInt(userIdParam) : null;
+    const workDate = workDateParam || "";
+    const issueType = issueTypeParam || "";
 
     const utils = trpc.useUtils();
     const canEdit = user?.role === "admin" || user?.role === "sub_admin";
@@ -188,6 +194,12 @@ export default function WorkReportIssues() {
                     <CardContent className="p-6">
                         <p className="text-[hsl(var(--muted-foreground))]">
                             パラメータが正しくありません。
+                        </p>
+                        <p className="text-sm text-[hsl(var(--muted-foreground))] mt-2">
+                            userId: {userIdParam || "未指定"}, workDate: {workDateParam || "未指定"}
+                        </p>
+                        <p className="text-sm text-[hsl(var(--muted-foreground))] mt-2">
+                            URL: {typeof window !== 'undefined' ? window.location.href : 'N/A'}
                         </p>
                     </CardContent>
                 </Card>
