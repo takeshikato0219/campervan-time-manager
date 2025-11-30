@@ -771,11 +771,31 @@ export const deliverySchedulesRouter = createTRPCRouter({
                             .where(eq(schema.deliverySchedules.id, input.id));
                     }
                 } else {
-                    // statusフィールドがない場合は通常のDrizzleクエリを使用
-                    await db
-                        .update(schema.deliverySchedules)
-                        .set(updateData)
-                        .where(eq(schema.deliverySchedules.id, input.id));
+                    // statusフィールドがない場合も生SQLクエリを使用して確実に更新
+                    const pool = getPool();
+                    if (pool) {
+                        // updateDataの各フィールドをSET句に変換
+                        const fields: string[] = [];
+                        const values: any[] = [];
+                        
+                        for (const [key, value] of Object.entries(updateData)) {
+                            fields.push(`\`${key}\` = ?`);
+                            values.push(value);
+                        }
+                        
+                        // IDを最後に追加
+                        values.push(input.id);
+                        
+                        const updateQuery = `UPDATE \`deliverySchedules\` SET ${fields.join(", ")} WHERE \`id\` = ?`;
+                        await pool.execute(updateQuery, values);
+                        console.log("[deliverySchedules.update] ✅ Fields updated using raw SQL");
+                    } else {
+                        // poolが取得できない場合は通常のDrizzleクエリを使用
+                        await db
+                            .update(schema.deliverySchedules)
+                            .set(updateData)
+                            .where(eq(schema.deliverySchedules.id, input.id));
+                    }
                 }
 
                 console.log("[deliverySchedules.update] ✅ Update successful");
