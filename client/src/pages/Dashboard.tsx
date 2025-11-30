@@ -264,13 +264,13 @@ export default function Dashboard() {
                         <p className="font-semibold text-red-900 text-sm sm:text-base">
                             作業報告が間違えている可能性があります（過去3日）
                         </p>
-                        <ul className="list-disc pl-5 space-y-0.5 text-xs sm:text-sm text-red-900">
+                        <ul className="list-disc pl-5 space-y-1 text-xs sm:text-sm text-red-900">
                             {excessiveWorkUsers.flatMap((u) =>
                                 u.dates.map((d: string) => (
                                     <li key={`${u.userId}-${d}`}>
                                         <Link
                                             href={`/work-report-issues?userId=${u.userId}&workDate=${d}&type=excessive`}
-                                            className="hover:underline cursor-pointer"
+                                            className="hover:underline cursor-pointer hover:text-red-950 transition-colors block py-1 px-2 -mx-2 rounded hover:bg-red-100"
                                         >
                                             <span className="font-semibold">{u.userName}</span>
                                             <span>
@@ -278,6 +278,7 @@ export default function Dashboard() {
                                                 {format(new Date(d), "MM/dd")}
                                                 日の作業報告が、出勤時間を超えています
                                             </span>
+                                            <span className="text-[10px] ml-2 text-red-700">（クリックして修正）</span>
                                         </Link>
                                     </li>
                                 ))
@@ -294,13 +295,13 @@ export default function Dashboard() {
                         <p className="font-semibold text-yellow-900 text-sm sm:text-base">
                             作業報告が不足している可能性があります（過去3日）
                         </p>
-                        <ul className="list-disc pl-5 space-y-0.5 text-xs sm:text-sm text-yellow-900">
+                        <ul className="list-disc pl-5 space-y-1 text-xs sm:text-sm text-yellow-900">
                             {recentLowWorkUsers.flatMap((u) =>
                                 u.dates.map((d: string) => (
                                     <li key={`${u.userId}-${d}`}>
                                         <Link
                                             href={`/work-report-issues?userId=${u.userId}&workDate=${d}&type=low`}
-                                            className="hover:underline cursor-pointer"
+                                            className="hover:underline cursor-pointer hover:text-yellow-950 transition-colors block py-1 px-2 -mx-2 rounded hover:bg-yellow-100"
                                         >
                                             <span className="font-semibold">{u.userName}</span>
                                             <span>
@@ -308,6 +309,7 @@ export default function Dashboard() {
                                                 {format(new Date(d), "MM/dd")}
                                                 日の作業報告を入れていません
                                             </span>
+                                            <span className="text-[10px] ml-2 text-yellow-700">（クリックして修正）</span>
                                         </Link>
                                     </li>
                                 ))
