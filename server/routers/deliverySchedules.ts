@@ -41,6 +41,7 @@ async function ensureDeliverySchedulesTable(db: any) {
               \`baseCarReady\` ENUM('yes','no'),
               \`furnitureReady\` ENUM('yes','no'),
               \`inCharge\` VARCHAR(100),
+              \`productionMonth\` VARCHAR(100),
               \`dueDate\` DATE,
               \`desiredIncomingPlannedDate\` DATE,
               \`incomingPlannedDate\` DATE,
@@ -59,6 +60,24 @@ async function ensureDeliverySchedulesTable(db: any) {
             )
             `
         );
+        
+        // 既存のテーブルにproductionMonthカラムが存在しない場合は追加
+        const pool = getPool();
+        if (pool) {
+            try {
+                const [columns]: any = await pool.execute(
+                    "SHOW COLUMNS FROM `deliverySchedules` LIKE 'productionMonth'"
+                );
+                if (columns.length === 0) {
+                    await pool.execute(
+                        "ALTER TABLE `deliverySchedules` ADD COLUMN `productionMonth` VARCHAR(100) AFTER `inCharge`"
+                    );
+                    console.log("[deliverySchedules] Added productionMonth column");
+                }
+            } catch (alterError) {
+                console.error("[deliverySchedules] Failed to add productionMonth column:", alterError);
+            }
+        }
     } catch (e) {
         console.error("[deliverySchedules] ensureDeliverySchedulesTable failed:", e);
     }
@@ -397,6 +416,7 @@ export const deliverySchedulesRouter = createTRPCRouter({
                 baseCarReady: z.enum(["yes", "no"]).optional(),
                 furnitureReady: z.enum(["yes", "no"]).optional(),
                 inCharge: z.string().optional(),
+                productionMonth: z.string().optional(), // ワングラム制作分（例: "11月ワングラム制作分"）
                 dueDate: z.string().optional(), // yyyy-MM-dd（ワングラム入庫予定）
                 desiredIncomingPlannedDate: z.string().optional(), // yyyy-MM-dd（希望ワングラム完成予定日・katomo入力）
                 incomingPlannedDate: z.string().optional(),
@@ -460,6 +480,7 @@ export const deliverySchedulesRouter = createTRPCRouter({
                     baseCarReady: normalizeEnum(input.baseCarReady, ["yes", "no"]),
                     furnitureReady: normalizeEnum(input.furnitureReady, ["yes", "no"]),
                     inCharge: normalizeString(input.inCharge),
+                    productionMonth: normalizeString(input.productionMonth),
                     dueDate: parseDate(input.dueDate),
                     desiredIncomingPlannedDate: parseDate(input.desiredIncomingPlannedDate),
                     incomingPlannedDate: parseDate(input.incomingPlannedDate),
@@ -517,6 +538,11 @@ export const deliverySchedulesRouter = createTRPCRouter({
                 if (insertData.inCharge !== undefined) {
                     fields.push("inCharge");
                     values.push(insertData.inCharge);
+                    placeholders.push("?");
+                }
+                if (insertData.productionMonth !== undefined) {
+                    fields.push("productionMonth");
+                    values.push(insertData.productionMonth);
                     placeholders.push("?");
                 }
                 if (insertData.dueDate !== undefined) {
@@ -609,6 +635,7 @@ export const deliverySchedulesRouter = createTRPCRouter({
                 baseCarReady: z.enum(["yes", "no"]).optional(),
                 furnitureReady: z.enum(["yes", "no"]).optional(),
                 inCharge: z.string().optional(),
+                productionMonth: z.string().optional(), // ワングラム制作分（例: "11月ワングラム制作分"）
                 dueDate: z.string().optional(),
                 desiredIncomingPlannedDate: z.string().optional(), // yyyy-MM-dd（希望ワングラム完成予定日・katomo入力）
                 incomingPlannedDate: z.string().optional(),
@@ -662,6 +689,7 @@ export const deliverySchedulesRouter = createTRPCRouter({
             if (input.baseCarReady !== undefined) updateData.baseCarReady = input.baseCarReady;
             if (input.furnitureReady !== undefined) updateData.furnitureReady = input.furnitureReady;
             if (input.inCharge !== undefined) updateData.inCharge = input.inCharge;
+            if (input.productionMonth !== undefined) updateData.productionMonth = input.productionMonth;
 
             const due = parseDate(input.dueDate);
             if (input.dueDate !== undefined) updateData.dueDate = due ?? null;

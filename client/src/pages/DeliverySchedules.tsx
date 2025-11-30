@@ -275,6 +275,7 @@ export default function DeliverySchedules() {
             comment: "",
             claimComment: "",
             oemComment: "",
+            productionMonth: "",
             status: "katomo_stock",
         });
         setSelectedOptions([]);
@@ -326,6 +327,7 @@ export default function DeliverySchedules() {
             baseCarReady: editing.baseCarReady || undefined,
             furnitureReady: editing.furnitureReady || undefined,
             inCharge: editing.inCharge || undefined,
+            productionMonth: editing.productionMonth || undefined,
             dueDate: normalizeDate(editing.dueDate),
             desiredIncomingPlannedDate: normalizeDate(editing.desiredIncomingPlannedDate),
             incomingPlannedDate: normalizeDate(editing.incomingPlannedDate),
@@ -686,9 +688,11 @@ export default function DeliverySchedules() {
                                                                         担当: {item.inCharge}
                                                                     </span>
                                                                 )}
-                                                                <span className="px-2 py-0.5 rounded bg-gray-100 text-gray-700">
-                                                                    {month}月ワングラム制作分
-                                                                </span>
+                                                                {item.productionMonth && (
+                                                                    <span className="px-2 py-0.5 rounded bg-gray-100 text-gray-700">
+                                                                        {item.productionMonth}
+                                                                    </span>
+                                                                )}
                                                             </div>
                                                         )}
 
@@ -1852,6 +1856,14 @@ export default function DeliverySchedules() {
                                 <Input
                                     value={editing.inCharge}
                                     onChange={(e) => setEditing({ ...editing, inCharge: e.target.value })}
+                                />
+                            </div>
+                            <div>
+                                <label className="text-xs font-medium block mb-1">ワングラム制作分</label>
+                                <Input
+                                    value={editing.productionMonth || ""}
+                                    onChange={(e) => setEditing({ ...editing, productionMonth: e.target.value })}
+                                    placeholder="例: 11月ワングラム制作分"
                                 />
                             </div>
                             <div className="grid grid-cols-2 gap-2">

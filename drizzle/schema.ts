@@ -105,6 +105,7 @@ export const deliverySchedules = mysqlTable("deliverySchedules", {
     baseCarReady: mysqlEnum("baseCarReady", ["yes", "no"]), // ベース車◯✕
     furnitureReady: mysqlEnum("furnitureReady", ["yes", "no"]), // 家具◯✕
     inCharge: varchar("inCharge", { length: 100 }), // 担当
+    productionMonth: varchar("productionMonth", { length: 100 }), // ワングラム制作分（例: "11月ワングラム制作分"）
     // 日付系
     dueDate: date("dueDate"), // ワングラム入庫予定（遅れ日数計算の基準日）
     desiredIncomingPlannedDate: date("desiredIncomingPlannedDate"), // 希望ワングラム完成予定日（katomo入力）
