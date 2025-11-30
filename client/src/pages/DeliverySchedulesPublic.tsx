@@ -61,7 +61,9 @@ export default function DeliverySchedulesPublic() {
     const groupedByDay = useMemo(() => {
         const map = new Map<string, any[]>();
         (data || []).forEach((item: any) => {
-            const d = item.deliveryPlannedDate ? new Date(item.deliveryPlannedDate) : null;
+            // ワングラム側にはdeliveryPlannedDateを使用しない
+            // 代わりにincomingPlannedDate（ワングラム完成予定日）でグループ化
+            const d = item.incomingPlannedDate ? new Date(item.incomingPlannedDate) : null;
             const key = d ? format(d, "yyyy-MM-dd") : "未設定";
             const list = map.get(key) || [];
             list.push(item);

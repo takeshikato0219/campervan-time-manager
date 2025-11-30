@@ -226,14 +226,17 @@ export const deliverySchedulesRouter = createTRPCRouter({
 
                 return finalRecords.map((r) => {
                     try {
+                        // ワングラム側にはdeliveryPlannedDateを表示しない（除外）
+                        const { deliveryPlannedDate, ...rest } = r;
                         return {
-                            ...r,
+                            ...rest,
                             delayDays: calcDelayDays(r.dueDate),
                         };
                     } catch (e) {
                         console.warn("[deliverySchedules.publicList] Mapping error for record:", r.id, e);
+                        const { deliveryPlannedDate, ...rest } = r;
                         return {
-                            ...r,
+                            ...rest,
                             delayDays: 0,
                         };
                     }
