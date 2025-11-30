@@ -1,6 +1,6 @@
 import { createTRPCRouter, protectedProcedure } from "../_core/trpc";
 import { getDb, getPool, schema } from "../db";
-import { eq, sql, inArray } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { z } from "zod";
 
 export const analyticsRouter = createTRPCRouter({
@@ -553,15 +553,23 @@ export const analyticsRouter = createTRPCRouter({
             
             console.log("[getWorkReportDetail] 休憩時間:", breakTimes.map(bt => ({ start: bt.startTime, end: bt.endTime })));
 
-            // 時刻文字列（"HH:MM"）を分に変換する関数
-            const timeToMinutes = (timeStr: string | null | undefined): number | null => {
-                if (!timeStr) return null;
-                const parts = timeStr.split(":");
-                if (parts.length !== 2) return null;
-                const hours = parseInt(parts[0], 10);
-                const minutes = parseInt(parts[1], 10);
-                if (isNaN(hours) || isNaN(minutes)) return null;
-                return hours * 60 + minutes;
+            // 時刻文字列（"HH:MM"）を分に変換する関数（attendance.tsと同じロジック）
+            const timeToMinutes = (t?: string | null): number | null => {
+                if (!t) return null;
+                const [hh, mm] = t.split(":");
+                const h = Number(hh);
+                const m = Number(mm);
+                if (!Number.isFinite(h) || !Number.isFinite(m)) return null;
+                const total = h * 60 + m;
+                if (total < 0 || total > 23 * 60 + 59) return null;
+                return total;
+            };
+
+            // Dateオブジェクトから時刻文字列（"HH:MM"）を取得する関数
+            const dateToTimeString = (date: Date): string => {
+                const hours = String(date.getHours()).padStart(2, "0");
+                const minutes = String(date.getMinutes()).padStart(2, "0");
+                return `${hours}:${minutes}`;
             };
 
             // 作業記録の合計時間を計算（重複時間を考慮し、休憩時間を引く）
@@ -606,12 +614,25 @@ export const analyticsRouter = createTRPCRouter({
                 const startDate = interval.start;
                 const endDate = interval.end;
 
-                // 作業記録の開始時刻・終了時刻をその日の0時からの経過分数に変換
-                const startMinutes = startDate.getHours() * 60 + startDate.getMinutes();
-                let endMinutes = endDate.getHours() * 60 + endDate.getMinutes();
+                // Dateオブジェクトから時刻文字列を抽出し、0時からの経過分数に変換
+                const startTimeStr = dateToTimeString(startDate);
+                const endTimeStr = dateToTimeString(endDate);
+                
+                const startMinutes = timeToMinutes(startTimeStr);
+                let endMinutes = timeToMinutes(endTimeStr);
+
+                if (startMinutes === null || endMinutes === null) {
+                    console.log("[getWorkReportDetail] 時刻の変換失敗:", { startTimeStr, endTimeStr });
+                    continue;
+                }
 
                 // 日を跨ぐ場合は24時間を加算
                 if (startDate.toDateString() !== endDate.toDateString()) {
+                    endMinutes += 24 * 60;
+                }
+
+                // 終了時刻が開始時刻より前の場合は日を跨いだとみなす
+                if (endMinutes < startMinutes) {
                     endMinutes += 24 * 60;
                 }
 
@@ -640,8 +661,8 @@ export const analyticsRouter = createTRPCRouter({
                         const overlapMinutes = overlapEnd - overlapStart;
                         breakTotal += overlapMinutes;
                         console.log("[getWorkReportDetail] 休憩時間重複:", {
-                            workInterval: `${startMinutes}分-${endMinutes}分`,
-                            breakInterval: `${breakStart}分-${breakEnd}分`,
+                            workInterval: `${startMinutes}分-${endMinutes}分 (${startTimeStr}-${endTimeStr})`,
+                            breakInterval: `${breakStart}分-${breakEnd}分 (${bt.startTime}-${bt.endTime})`,
                             overlap: `${overlapStart}分-${overlapEnd}分 (${overlapMinutes}分)`
                         });
                     }
@@ -649,7 +670,7 @@ export const analyticsRouter = createTRPCRouter({
 
                 const duration = Math.max(0, baseMinutes - breakTotal);
                 console.log("[getWorkReportDetail] 作業時間計算:", {
-                    interval: `${startMinutes}分-${endMinutes}分`,
+                    interval: `${startMinutes}分-${endMinutes}分 (${startTimeStr}-${endTimeStr})`,
                     baseMinutes,
                     breakTotal,
                     duration
