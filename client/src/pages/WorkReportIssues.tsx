@@ -86,51 +86,17 @@ export default function WorkReportIssues() {
             
             // データを再取得
             try {
-                console.log("[WorkReportIssues] Step 1: 直接refetchを実行");
+                console.log("[WorkReportIssues] データ再取得開始");
+                // invalidateしてからrefetchする
+                utils.analytics.getWorkReportDetail.invalidate();
                 const refetchResult = await refetch();
-                console.log("[WorkReportIssues] Step 2: refetch完了", {
+                console.log("[WorkReportIssues] refetch完了", {
                     isSuccess: refetchResult.isSuccess,
                     isError: refetchResult.isError,
-                    dataExists: !!refetchResult.data,
-                    workRecordsCount: refetchResult.data?.workRecords?.length,
+                    workRecordsCount: refetchResult.data?.workRecords?.length || 0,
                 });
-                
-                if (refetchResult.data) {
-                    console.log("[WorkReportIssues] refetch成功 - データ:", {
-                        userId: refetchResult.data.userId,
-                        workDate: refetchResult.data.workDate,
-                        workRecordsCount: refetchResult.data.workRecords?.length,
-                        workRecords: refetchResult.data.workRecords?.map((r: any) => ({
-                            id: r.id,
-                            vehicleId: r.vehicleId,
-                            processId: r.processId,
-                        })),
-                    });
-                } else {
-                    console.warn("[WorkReportIssues] refetch結果にdataがありません");
-                    // invalidateを試みる
-                    console.log("[WorkReportIssues] Step 3: invalidateを実行して自動再取得を試みる");
-                    await utils.analytics.getWorkReportDetail.invalidate({
-                        userId: userId!,
-                        workDate,
-                    });
-                    // 少し待ってから再度refetch
-                    setTimeout(async () => {
-                        console.log("[WorkReportIssues] Step 4: リトライrefetch");
-                        const retryResult = await refetch();
-                        console.log("[WorkReportIssues] リトライ結果:", {
-                            isSuccess: retryResult.isSuccess,
-                            workRecordsCount: retryResult.data?.workRecords?.length,
-                        });
-                    }, 500);
-                }
             } catch (error) {
                 console.error("[WorkReportIssues] データ再取得中にエラー:", error);
-                // エラーが発生しても、invalidateを試みる
-                utils.analytics.getWorkReportDetail.invalidate({
-                    userId: userId!,
-                    workDate,
-                });
             }
         },
         onError: (error) => {
@@ -145,7 +111,7 @@ export default function WorkReportIssues() {
             setIsEditDialogOpen(false);
             setEditingRecord(null);
             // データを再取得
-            await utils.analytics.getWorkReportDetail.invalidate();
+            utils.analytics.getWorkReportDetail.invalidate();
             await refetch();
         },
         onError: (error) => {
@@ -158,7 +124,7 @@ export default function WorkReportIssues() {
         onSuccess: async () => {
             toast.success("作業記録を削除しました");
             // データを再取得
-            await utils.analytics.getWorkReportDetail.invalidate();
+            utils.analytics.getWorkReportDetail.invalidate();
             await refetch();
         },
         onError: (error) => {
@@ -171,7 +137,7 @@ export default function WorkReportIssues() {
         onSuccess: async () => {
             toast.success("出勤記録を更新しました");
             // データを再取得
-            await utils.analytics.getWorkReportDetail.invalidate();
+            utils.analytics.getWorkReportDetail.invalidate();
             await refetch();
         },
         onError: (error) => {
