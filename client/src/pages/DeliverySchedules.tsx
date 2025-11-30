@@ -721,6 +721,16 @@ export default function DeliverySchedules() {
                                                                 )}
                                                             </div>
                                                         )}
+
+                                                        {/* katomotorお客さん納期 */}
+                                                        {item.deliveryPlannedDate && (
+                                                            <div className="flex items-center gap-2">
+                                                                <span className="text-[11px] sm:text-xs font-semibold">katomotorお客さん納期:</span>
+                                                                <span className="text-[11px] sm:text-xs">
+                                                                    {format(new Date(item.deliveryPlannedDate), "M月d日")}
+                                                                </span>
+                                                            </div>
+                                                        )}
                                                     </div>
                                                 );
                                             })}
@@ -1007,6 +1017,17 @@ export default function DeliverySchedules() {
                                                                 )}
                                                             </div>
                                                         )}
+
+                                                        {/* katomotorお客さん納期 */}
+                                                        {item.deliveryPlannedDate && (
+                                                            <div className="border-t pt-2 text-xs sm:text-sm">
+                                                                <span className="text-[hsl(var(--muted-foreground))]">katomotorお客さん納期: </span>
+                                                                <span className="font-semibold">{format(new Date(item.deliveryPlannedDate), "M月d日")}</span>
+                                                            </div>
+                                                        )}
+
+                                                        {/* コメント機能 */}
+                                                        <VehicleChat vehicleId={item.id} canEdit={!!canEdit} />
 
                                                         {/* ボタン類（準管理者以上のみ） */}
                                                         {canEdit && (
@@ -1397,6 +1418,14 @@ export default function DeliverySchedules() {
                                                 {item.pickupConfirmed === "true" && (
                                                     <span className="ml-1 px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700 text-[10px]">確定済み</span>
                                                 )}
+                                            </div>
+                                        )}
+
+                                        {/* katomotorお客さん納期 */}
+                                        {item.deliveryPlannedDate && (
+                                            <div className="border-t pt-2 text-xs sm:text-sm">
+                                                <span className="text-[hsl(var(--muted-foreground))]">katomotorお客さん納期: </span>
+                                                <span className="font-semibold">{format(new Date(item.deliveryPlannedDate), "M月d日")}</span>
                                             </div>
                                         )}
 
@@ -2036,6 +2065,16 @@ export default function DeliverySchedules() {
                                     value={editing.desiredIncomingPlannedDate}
                                     onChange={(e) =>
                                         setEditing({ ...editing, desiredIncomingPlannedDate: e.target.value })
+                                    }
+                                />
+                            </div>
+                            <div>
+                                <label className="text-xs font-medium block mb-1">katomotorお客さん納期</label>
+                                <Input
+                                    type="date"
+                                    value={editing.deliveryPlannedDate}
+                                    onChange={(e) =>
+                                        setEditing({ ...editing, deliveryPlannedDate: e.target.value })
                                     }
                                 />
                             </div>
