@@ -5,7 +5,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card"
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { format } from "date-fns";
-import { ChevronLeft, ChevronRight, CalendarDays, Edit, Plus, Trash2, CheckCircle2, FileText, MessageCircle, Send } from "lucide-react";
+import { ChevronLeft, ChevronRight, CalendarDays, Edit, Plus, Trash2, CheckCircle2, FileText, MessageCircle, Send, AlertTriangle } from "lucide-react";
+import { Link } from "wouter";
 import { toast } from "sonner";
 import { VehicleChat } from "../components/VehicleChat";
 
@@ -261,6 +262,56 @@ export default function DeliverySchedules() {
         });
     }, [data]);
 
+    // 制作月遅延リスト（制作月が過ぎていて、引き取り待ちより前のステータスの車）
+    const delayedProductionItems = useMemo(() => {
+        if (!data) return [];
+        const now = new Date();
+        const currentYear = now.getFullYear();
+        const currentMonth = now.getMonth() + 1; // 1-12
+
+        return data.filter((item: any) => {
+            // 完成済みは除外
+            if (item.status === "completed") return false;
+            
+            // 引き取り待ちより前のステータスのみ（katomo_stock, wg_storage, wg_production）
+            const beforePickupStatuses = ["katomo_stock", "wg_storage", "wg_production"];
+            if (!beforePickupStatuses.includes(item.status)) return false;
+
+            // 制作月を抽出
+            if (!item.productionMonth) return false;
+            const match = item.productionMonth.match(/^(\d+)月/);
+            if (!match) return false;
+            
+            const productionMonthNum = parseInt(match[1], 10); // 1-12
+            
+            // 制作月が現在の年月より前の場合、遅延とみなす
+            // 年をまたぐ場合は考慮（例：12月制作分を1月に確認）
+            let isDelayed = false;
+            if (productionMonthNum < currentMonth) {
+                // 同じ年の前の月
+                isDelayed = true;
+            } else if (productionMonthNum === 12 && currentMonth === 1) {
+                // 年越しの場合（前年12月 → 今年1月）
+                isDelayed = true;
+            }
+
+            return isDelayed;
+        }).sort((a: any, b: any) => {
+            // 制作月の順序でソート（古い順）
+            const aMatch = a.productionMonth.match(/^(\d+)月/);
+            const bMatch = b.productionMonth.match(/^(\d+)月/);
+            const aMonth = aMatch ? parseInt(aMatch[1], 10) : 999;
+            const bMonth = bMatch ? parseInt(bMatch[1], 10) : 999;
+            if (aMonth !== bMonth) return aMonth - bMonth;
+            
+            // 同じ制作月なら、ステータスの順序でソート
+            const statusOrder = ["katomo_stock", "wg_storage", "wg_production"];
+            const aStatusIndex = statusOrder.indexOf(a.status);
+            const bStatusIndex = statusOrder.indexOf(b.status);
+            return aStatusIndex - bStatusIndex;
+        });
+    }, [data]);
+
     const activeItems = (data || []).filter((item: any) => item.status !== "completed");
     const completedItems = (data || []).filter((item: any) => item.status === "completed");
     const revisionRequestedItems = completedItems.filter((item: any) => item.completionStatus === "revision_requested");
@@ -451,46 +502,69 @@ export default function DeliverySchedules() {
                 {/* 日付ナビゲーション */}
                 <Card className="bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200">
                     <CardContent className="p-4">
-                        <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-                            {/* 左側: 年月表示と今月ボタン */}
-                            <div className="flex items-center gap-1">
-                                <div className="flex flex-col items-start">
-                                    <span className={`text-lg sm:text-xl font-bold ${isCurrentMonth ? "text-blue-600" : "text-gray-800"}`}>
-                                        {year}年{month}月
-                                    </span>
-                                    {isCurrentMonth && (
-                                        <span className="text-xs text-blue-500 font-medium">（今月）</span>
-                                    )}
+                        <div className="flex flex-col gap-4">
+                            <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+                                {/* 左側: 年月表示と今月ボタン */}
+                                <div className="flex items-center gap-1">
+                                    <div className="flex flex-col items-start">
+                                        <span className={`text-lg sm:text-xl font-bold ${isCurrentMonth ? "text-blue-600" : "text-gray-800"}`}>
+                                            {year}年{month}月
+                                        </span>
+                                        {isCurrentMonth && (
+                                            <span className="text-xs text-blue-500 font-medium">（今月）</span>
+                                        )}
+                                    </div>
+                                    <Button
+                                        variant={isCurrentMonth ? "default" : "secondary"}
+                                        size="sm"
+                                        onClick={handleCurrentMonth}
+                                        className="h-10 px-4 font-semibold shadow-sm hover:shadow-md transition-shadow ml-1"
+                                    >
+                                        今月
+                                    </Button>
                                 </div>
-                                <Button
-                                    variant={isCurrentMonth ? "default" : "secondary"}
-                                    size="sm"
-                                    onClick={handleCurrentMonth}
-                                    className="h-10 px-4 font-semibold shadow-sm hover:shadow-md transition-shadow ml-1"
-                                >
-                                    今月
-                                </Button>
+
+                                {/* 右側: 矢印ボタン */}
+                                <div className="flex items-center gap-3">
+                                    <Button
+                                        variant="outline"
+                                        size="icon"
+                                        onClick={handlePrevMonth}
+                                        className="h-10 w-10 shadow-sm hover:shadow-md transition-shadow"
+                                    >
+                                        <ChevronLeft className="h-5 w-5" />
+                                    </Button>
+                                    <Button
+                                        variant="outline"
+                                        size="icon"
+                                        onClick={handleNextMonth}
+                                        className="h-10 w-10 shadow-sm hover:shadow-md transition-shadow"
+                                    >
+                                        <ChevronRight className="h-5 w-5" />
+                                    </Button>
+                                </div>
                             </div>
 
-                            {/* 右側: 矢印ボタン */}
-                            <div className="flex items-center gap-3">
-                                <Button
-                                    variant="outline"
-                                    size="icon"
-                                    onClick={handlePrevMonth}
-                                    className="h-10 w-10 shadow-sm hover:shadow-md transition-shadow"
-                                >
-                                    <ChevronLeft className="h-5 w-5" />
-                                </Button>
-                                <Button
-                                    variant="outline"
-                                    size="icon"
-                                    onClick={handleNextMonth}
-                                    className="h-10 w-10 shadow-sm hover:shadow-md transition-shadow"
-                                >
-                                    <ChevronRight className="h-5 w-5" />
-                                </Button>
-                            </div>
+                            {/* 遅延情報 */}
+                            {delayedProductionItems.length > 0 && (
+                                <div className="flex items-center justify-between gap-3 pt-2 border-t border-blue-300">
+                                    <div className="flex items-center gap-2">
+                                        <AlertTriangle className="h-5 w-5 text-orange-600" />
+                                        <span className="text-sm sm:text-base font-semibold text-orange-700">
+                                            {delayedProductionItems.length}台遅延中
+                                        </span>
+                                    </div>
+                                    <Link href="/delivery-schedules/delayed">
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            className="h-9 px-4 text-sm font-semibold border-orange-300 text-orange-700 hover:bg-orange-50"
+                                        >
+                                            遅延一覧
+                                        </Button>
+                                    </Link>
+                                </div>
+                            )}
                         </div>
                     </CardContent>
                 </Card>

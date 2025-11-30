@@ -11,6 +11,7 @@ import Analytics from "./pages/Analytics";
 import VehicleProductionTime from "./pages/VehicleProductionTime";
 import DeliverySchedules from "./pages/DeliverySchedules";
 import DeliverySchedulesPublic from "./pages/DeliverySchedulesPublic";
+import DeliveryDelayedList from "./pages/DeliveryDelayedList";
 import VehicleChecks from "./pages/VehicleChecks";
 import AttendanceManagement from "./pages/admin/AttendanceManagement";
 import WorkRecordManagement from "./pages/admin/WorkRecordManagement";
@@ -103,6 +104,9 @@ export default function App() {
                 </Route>
                 <Route path="/delivery-schedules">
                     {() => <ProtectedRoute component={DeliverySchedules} />}
+                </Route>
+                <Route path="/delivery-schedules/delayed">
+                    {() => <ProtectedRoute component={DeliveryDelayedList} />}
                 </Route>
                 <Route path="/analytics">
                     {() => <ProtectedRoute component={Analytics} />}
