@@ -52,6 +52,7 @@ async function ensureDeliverySchedulesTable(db: any) {
               \`photosJson\` TEXT,
               \`oemComment\` TEXT,
               \`status\` ENUM('katomo_stock','wg_storage','wg_production','wg_wait_pickup','katomo_checked','completed') NOT NULL DEFAULT 'katomo_stock',
+              \`completionStatus\` ENUM('ok','checked','revision_requested'),
               \`pickupConfirmed\` ENUM('true','false') NOT NULL DEFAULT 'false',
               \`incomingPlannedDateConfirmed\` ENUM('true','false') NOT NULL DEFAULT 'false',
               \`specSheetUrl\` TEXT,
@@ -67,6 +68,7 @@ async function ensureDeliverySchedulesTable(db: any) {
             const columnsToCheck = [
                 { name: 'productionMonth', type: 'VARCHAR(100)', after: 'inCharge' },
                 { name: 'desiredIncomingPlannedDate', type: 'DATE', after: 'dueDate' },
+                { name: 'completionStatus', type: "ENUM('ok','checked','revision_requested')", after: 'status' },
                 { name: 'incomingPlannedDateConfirmed', type: "ENUM('true','false') NOT NULL DEFAULT 'false'", after: 'pickupConfirmed' },
             ];
 
@@ -682,6 +684,7 @@ export const deliverySchedulesRouter = createTRPCRouter({
                     { name: 'productionMonth', type: 'VARCHAR(100)', after: 'inCharge' },
                     { name: 'desiredIncomingPlannedDate', type: 'DATE', after: 'dueDate' },
                     { name: 'incomingPlannedDateConfirmed', type: "ENUM('true','false') NOT NULL DEFAULT 'false'", after: 'pickupConfirmed' },
+                    { name: 'completionStatus', type: "ENUM('ok','checked','revision_requested')", after: 'status' },
                 ];
 
                 for (const col of columnsToCheck) {
