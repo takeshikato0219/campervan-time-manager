@@ -550,9 +550,11 @@ export const analyticsRouter = createTRPCRouter({
                 records: debugRows.map((r: any) => ({
                     id: r.id,
                     startTime: r.startTime,
+                    startTimeISO: r.startTime ? new Date(r.startTime).toISOString() : null,
+                    startTimeJST: r.startTime ? new Date(r.startTime).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' }) : null,
                     startDate: r.startDate,
                     startDateFormatted: r.startDateFormatted,
-                    matchesWorkDate: r.startDateFormatted === input.workDate || r.startDate === input.workDate,
+                    matchesWorkDate: r.startDateFormatted === input.workDate || (r.startDate && r.startDate.toISOString().split('T')[0] === input.workDate),
                 })),
             });
 
@@ -571,9 +573,19 @@ export const analyticsRouter = createTRPCRouter({
                 console.log("[getWorkReportDetail] 作業記録の詳細:", workRecordsRows.map((r: any) => ({
                     id: r.id,
                     startTime: r.startTime,
+                    startTimeISO: r.startTime ? new Date(r.startTime).toISOString() : null,
+                    startTimeJST: r.startTime ? new Date(r.startTime).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' }) : null,
+                    startDate: r.startTime ? new Date(r.startTime).toISOString().split('T')[0] : null,
                     endTime: r.endTime,
                     vehicleId: r.vehicleId,
                 })));
+            } else {
+                console.log("[getWorkReportDetail] ⚠️ 作業記録が取得できませんでした。検索条件:", {
+                    userId: input.userId,
+                    workDate: input.workDate,
+                    searchStart: `STR_TO_DATE('${input.workDate}', '%Y-%m-%d')`,
+                    searchEnd: `DATE_ADD(STR_TO_DATE('${input.workDate}', '%Y-%m-%d'), INTERVAL 1 DAY)`,
+                });
             }
 
             const workRecords = (workRecordsRows || []).map((row: any) => ({

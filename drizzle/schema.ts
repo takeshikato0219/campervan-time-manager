@@ -117,7 +117,7 @@ export const deliverySchedules = mysqlTable("deliverySchedules", {
     claimComment: text("claimComment"), // 納車チェック後のクレーム・傷など
     photosJson: text("photosJson"), // 写真URLのJSON配列文字列
     oemComment: text("oemComment"), // ワングラム側メモ（任意）
-    status: mysqlEnum("status", ["katomo_stock", "wg_storage", "wg_production", "wg_wait_pickup", "katomo_checked", "completed"])
+    status: mysqlEnum("status", ["katomo_stock", "wg_storage", "wg_production", "wg_wait_pickup", "katomo_picked_up", "katomo_checked", "completed"])
         .default("katomo_stock"), // 車両状態
     completionStatus: mysqlEnum("completionStatus", ["ok", "checked", "revision_requested"]), // 完成後の状態（OK、チェック済み、修正依頼）
     pickupConfirmed: mysqlEnum("pickupConfirmed", ["true", "false"]).default("false"), // 引き取り予定日の確定フラグ

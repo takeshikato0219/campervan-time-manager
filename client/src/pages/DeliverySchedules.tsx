@@ -327,6 +327,8 @@ export default function DeliverySchedules() {
                 return "ワングラム製作中";
             case "wg_wait_pickup":
                 return "ワングラム完成引き取り待ち";
+            case "katomo_picked_up":
+                return "katomo引き取り済み";
             case "katomo_checked":
                 return "katomoチェック済み";
             case "completed":
@@ -341,6 +343,7 @@ export default function DeliverySchedules() {
         "wg_storage",
         "wg_production",
         "wg_wait_pickup",
+        "katomo_picked_up",
         "katomo_checked",
         "completed",
     ];
@@ -350,6 +353,7 @@ export default function DeliverySchedules() {
         { key: "wg_storage", label: "ワングラム保管中" },
         { key: "wg_production", label: "ワングラム製作中" },
         { key: "wg_wait_pickup", label: "ワングラム完成引き取り待ち" },
+        { key: "katomo_picked_up", label: "katomo引き取り済み" },
         { key: "katomo_checked", label: "katomoチェック済み" },
     ] as const;
 
@@ -883,10 +887,22 @@ export default function DeliverySchedules() {
                                                                                 : ""
                                                                         }
                                                                         onChange={(e) => {
+                                                                            const value = e.target.value;
+                                                                            // 空文字列または値が無い場合はundefinedにする（カレンダーの消去ボタンに対応）
                                                                             updateMutation.mutate({
                                                                                 id: item.id,
-                                                                                incomingPlannedDate: e.target.value || undefined,
+                                                                                incomingPlannedDate: value === "" ? undefined : (value || undefined),
                                                                             });
+                                                                        }}
+                                                                        onInput={(e) => {
+                                                                            // ブラウザのカレンダーの消去ボタンに対応
+                                                                            const target = e.target as HTMLInputElement;
+                                                                            if (target.value === "") {
+                                                                                updateMutation.mutate({
+                                                                                    id: item.id,
+                                                                                    incomingPlannedDate: undefined,
+                                                                                });
+                                                                            }
                                                                         }}
                                                                         className="text-sm sm:text-base px-2 py-1 border rounded flex-1"
                                                                     />
@@ -958,10 +974,22 @@ export default function DeliverySchedules() {
                                                                                 : ""
                                                                         }
                                                                         onChange={(e) => {
+                                                                            const value = e.target.value;
+                                                                            // 空文字列または値が無い場合はundefinedにする（カレンダーの消去ボタンに対応）
                                                                             updateMutation.mutate({
                                                                                 id: item.id,
-                                                                                shippingPlannedDate: e.target.value || undefined,
+                                                                                shippingPlannedDate: value === "" ? undefined : (value || undefined),
                                                                             });
+                                                                        }}
+                                                                        onInput={(e) => {
+                                                                            // ブラウザのカレンダーの消去ボタンに対応
+                                                                            const target = e.target as HTMLInputElement;
+                                                                            if (target.value === "") {
+                                                                                updateMutation.mutate({
+                                                                                    id: item.id,
+                                                                                    shippingPlannedDate: undefined,
+                                                                                });
+                                                                            }
                                                                         }}
                                                                         className="text-sm sm:text-base px-2 py-1 border rounded flex-1"
                                                                     />

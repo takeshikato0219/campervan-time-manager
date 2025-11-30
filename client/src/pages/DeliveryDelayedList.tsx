@@ -12,6 +12,7 @@ const statusLabel = (status: string) => {
         wg_storage: "ワングラム保管中",
         wg_production: "ワングラム製作中",
         wg_wait_pickup: "ワングラム完成引き取り待ち",
+        katomo_picked_up: "katomo引き取り済み",
         katomo_checked: "katomoチェック済み",
         completed: "完成",
     };

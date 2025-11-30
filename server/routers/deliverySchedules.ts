@@ -51,7 +51,7 @@ async function ensureDeliverySchedulesTable(db: any) {
               \`claimComment\` TEXT,
               \`photosJson\` TEXT,
               \`oemComment\` TEXT,
-              \`status\` ENUM('katomo_stock','wg_storage','wg_production','wg_wait_pickup','katomo_checked','completed') NOT NULL DEFAULT 'katomo_stock',
+              \`status\` ENUM('katomo_stock','wg_storage','wg_production','wg_wait_pickup','katomo_picked_up','katomo_checked','completed') NOT NULL DEFAULT 'katomo_stock',
               \`completionStatus\` ENUM('ok','checked','revision_requested'),
               \`pickupConfirmed\` ENUM('true','false') NOT NULL DEFAULT 'false',
               \`incomingPlannedDateConfirmed\` ENUM('true','false') NOT NULL DEFAULT 'false',
@@ -66,7 +66,7 @@ async function ensureDeliverySchedulesTable(db: any) {
         const pool = getPool();
         if (pool) {
             const columnsToCheck = [
-                { name: 'status', type: "ENUM('katomo_stock','wg_storage','wg_production','wg_wait_pickup','katomo_checked','completed') NOT NULL DEFAULT 'katomo_stock'", after: 'oemComment' },
+                { name: 'status', type: "ENUM('katomo_stock','wg_storage','wg_production','wg_wait_pickup','katomo_picked_up','katomo_checked','completed') NOT NULL DEFAULT 'katomo_stock'", after: 'oemComment' },
                 { name: 'productionMonth', type: 'VARCHAR(100)', after: 'inCharge' },
                 { name: 'desiredIncomingPlannedDate', type: 'DATE', after: 'dueDate' },
                 { name: 'completionStatus', type: "ENUM('ok','checked','revision_requested')", after: 'status' },
@@ -83,6 +83,17 @@ async function ensureDeliverySchedulesTable(db: any) {
                             `ALTER TABLE \`deliverySchedules\` ADD COLUMN \`${col.name}\` ${col.type} AFTER \`${col.after}\``
                         );
                         console.log(`[deliverySchedules] Added ${col.name} column`);
+                    } else if (col.name === 'status') {
+                        // statusカラムが既に存在する場合、ENUM値を更新（katomo_picked_upを追加）
+                        try {
+                            await pool.execute(
+                                `ALTER TABLE \`deliverySchedules\` MODIFY COLUMN \`status\` ${col.type}`
+                            );
+                            console.log(`[deliverySchedules] Updated ${col.name} ENUM values`);
+                        } catch (updateError: any) {
+                            // ENUMの更新が失敗した場合はログのみ（既に新しいENUM値が含まれている可能性がある）
+                            console.log(`[deliverySchedules] ENUM update for ${col.name} may have been skipped:`, updateError?.message);
+                        }
                     }
                 } catch (alterError: any) {
                     // カラムが既に存在する場合は無視
@@ -777,7 +788,7 @@ export const deliverySchedulesRouter = createTRPCRouter({
                 if (pool) {
                     // 必要なカラムが存在するか確認し、存在しない場合は追加
                     const requiredColumns = [
-                        { name: 'status', type: "ENUM('katomo_stock','wg_storage','wg_production','wg_wait_pickup','katomo_checked','completed') NOT NULL DEFAULT 'katomo_stock'", after: 'oemComment' },
+                        { name: 'status', type: "ENUM('katomo_stock','wg_storage','wg_production','wg_wait_pickup','katomo_picked_up','katomo_checked','completed') NOT NULL DEFAULT 'katomo_stock'", after: 'oemComment' },
                         { name: 'productionMonth', type: 'VARCHAR(100)', after: 'inCharge' },
                         { name: 'desiredIncomingPlannedDate', type: 'DATE', after: 'dueDate' },
                         { name: 'completionStatus', type: "ENUM('ok','checked','revision_requested')", after: 'status' },
@@ -794,6 +805,17 @@ export const deliverySchedulesRouter = createTRPCRouter({
                                     `ALTER TABLE \`deliverySchedules\` ADD COLUMN \`${col.name}\` ${col.type} AFTER \`${col.after}\``
                                 );
                                 console.log(`[deliverySchedules.update] Added missing ${col.name} column`);
+                            } else if (col.name === 'status') {
+                                // statusカラムが既に存在する場合、ENUM値を更新（katomo_picked_upを追加）
+                                try {
+                                    await pool.execute(
+                                        `ALTER TABLE \`deliverySchedules\` MODIFY COLUMN \`status\` ${col.type}`
+                                    );
+                                    console.log(`[deliverySchedules.update] Updated ${col.name} ENUM values`);
+                                } catch (updateError: any) {
+                                    // ENUMの更新が失敗した場合はログのみ（既に新しいENUM値が含まれている可能性がある）
+                                    console.log(`[deliverySchedules.update] ENUM update for ${col.name} may have been skipped:`, updateError?.message);
+                                }
                             }
                         } catch (alterError: any) {
                             // カラムが既に存在する場合は無視

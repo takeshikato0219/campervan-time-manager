@@ -81,6 +81,44 @@ pnpm start
 
 ## 🔍 確認すべきログ情報
 
+### 作業記録関連のログ（作業記録が追加されない問題の調査）
+
+作業記録を追加した後、一覧に表示されない場合は、以下のログを確認してください：
+
+1. **作業記録作成時のログ**
+   ```
+   [workRecords.create] 作業記録を作成しました: ユーザーID=XX, 車両ID=XX, 記録ID=XX
+   [workRecords.create] startTime (ISO): 2025-11-25T10:11:00.000Z
+   [workRecords.create] startTime (JST): 2025/11/25 19:11:00
+   ```
+   - `記録ID` が表示されているか確認（作成成功の証拠）
+   - `startTime` の値が正しいか確認（特にJST時刻）
+
+2. **作業記録取得時のログ**
+   ```
+   [getWorkReportDetail] 作業記録を取得: {userId: XX, workDate: '2025-11-25', ...}
+   [getWorkReportDetail] 取得した作業記録数: X
+   ```
+   - `workDate` が正しい日付形式（YYYY-MM-DD）か確認
+   - `取得した作業記録数` が0になっていないか確認
+
+3. **デバッグログ（該当ユーザーの最新10件）**
+   ```
+   [getWorkReportDetail] デバッグ: 該当ユーザーの最新10件の作業記録: {...}
+   ```
+   - 作成した作業記録がリストに含まれているか確認
+   - `startDateFormatted` と `workDate` が一致しているか確認
+   - `matchesWorkDate: true/false` を確認
+
+4. **SQLクエリのログ**
+   ```
+   [getWorkReportDetail] 作業記録を取得: {query: "SELECT ... WHERE ...", ...}
+   ```
+   - SQLクエリの内容を確認
+   - WHERE条件が正しいか確認
+
+### その他のエラーログ
+
 エラーが発生した際に、以下の情報があると原因特定に役立ちます：
 
 1. **エラーメッセージ**

@@ -47,6 +47,8 @@ export default function DeliverySchedulesPublic() {
                 return "ワングラム製作中";
             case "wg_wait_pickup":
                 return "ワングラム完成引き取り待ち";
+            case "katomo_picked_up":
+                return "katomo引き取り済み";
             case "katomo_checked":
                 return "katomoチェック済み";
             case "completed":

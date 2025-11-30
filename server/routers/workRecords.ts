@@ -173,6 +173,13 @@ export const workRecordsRouter = createTRPCRouter({
                 }
 
                 console.log(`[workRecords.create] 作業記録を作成しました: ユーザーID=${input.userId}, 車両ID=${input.vehicleId}, 記録ID=${inserted.id}`);
+                console.log(`[workRecords.create] 保存されたstartTime:`, {
+                    id: inserted.id,
+                    startTime: inserted.startTime,
+                    startTimeISO: inserted.startTime?.toISOString(),
+                    startTimeJST: inserted.startTime?.toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' }),
+                    startDate: inserted.startTime ? new Date(inserted.startTime).toISOString().split('T')[0] : null,
+                });
 
                 // 作成されたレコードの詳細情報を取得
                 const vehicles = await db.select().from(schema.vehicles);
@@ -190,7 +197,7 @@ export const workRecordsRouter = createTRPCRouter({
                     customerName: vehicle?.customerName || null,
                     processName: process?.name || "不明",
                     workDescription: inserted.workDescription || null,
-                    durationMinutes: inserted.endTime 
+                    durationMinutes: inserted.endTime
                         ? Math.floor((new Date(inserted.endTime).getTime() - new Date(inserted.startTime).getTime()) / (1000 * 60))
                         : 0,
                 };

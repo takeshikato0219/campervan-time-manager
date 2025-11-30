@@ -93,7 +93,7 @@ export default function WorkReportIssues() {
                     userId: userId!,
                     workDate,
                 });
-                
+
                 // 少し待ってからrefetch（データベースへの反映を待つ）
                 await new Promise(resolve => setTimeout(resolve, 500));
 
