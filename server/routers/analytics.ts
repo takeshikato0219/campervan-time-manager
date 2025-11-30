@@ -550,7 +550,7 @@ export const analyticsRouter = createTRPCRouter({
             const breakTimes = await db.select().from(schema.breakTimes).then((times) =>
                 times.filter((bt) => bt.isActive === "true")
             );
-            
+
             console.log("[getWorkReportDetail] 休憩時間:", breakTimes.map(bt => ({ start: bt.startTime, end: bt.endTime })));
 
             // 時刻文字列（"HH:MM"）を分に変換する関数（attendance.tsと同じロジック）
@@ -608,80 +608,96 @@ export const analyticsRouter = createTRPCRouter({
             }
 
             // マージされた各インターバルに対して、休憩時間を引いた時間を計算
+            // attendance.tsのcalculateWorkMinutesと同じロジックを使用
             let workMinutes = 0;
 
-            for (const interval of mergedIntervals) {
+            console.log("[getWorkReportDetail] マージされたインターバル数:", mergedIntervals.length);
+            for (let i = 0; i < mergedIntervals.length; i++) {
+                const interval = mergedIntervals[i];
                 const startDate = interval.start;
                 const endDate = interval.end;
 
-                // Dateオブジェクトから時刻文字列を抽出し、0時からの経過分数に変換
+                // Dateオブジェクトから時刻文字列を抽出（"HH:MM"形式）
                 const startTimeStr = dateToTimeString(startDate);
                 const endTimeStr = dateToTimeString(endDate);
-                
-                const startMinutes = timeToMinutes(startTimeStr);
-                let endMinutes = timeToMinutes(endTimeStr);
 
-                if (startMinutes === null || endMinutes === null) {
-                    console.log("[getWorkReportDetail] 時刻の変換失敗:", { startTimeStr, endTimeStr });
+                console.log(`[getWorkReportDetail] インターバル[${i}]: ${startTimeStr} - ${endTimeStr}`);
+
+                // attendance.tsのcalculateWorkMinutesと同じロジック
+                const startMin = timeToMinutes(startTimeStr);
+                const endMin = timeToMinutes(endTimeStr);
+
+                if (startMin === null || endMin === null) {
+                    console.log("[getWorkReportDetail] 時刻の変換失敗:", { startTimeStr, endTimeStr, startMin, endMin });
                     continue;
                 }
 
+                // 基本時間（休憩時間を引く前）
+                // 同じ日の作業記録を想定
+                let workStart = startMin;
+                let workEnd = endMin;
+
                 // 日を跨ぐ場合は24時間を加算
                 if (startDate.toDateString() !== endDate.toDateString()) {
-                    endMinutes += 24 * 60;
+                    console.log("[getWorkReportDetail] 日を跨ぐインターバル:", { startDate: startDate.toDateString(), endDate: endDate.toDateString() });
+                    workEnd = endMin + 24 * 60;
                 }
 
                 // 終了時刻が開始時刻より前の場合は日を跨いだとみなす
-                if (endMinutes < startMinutes) {
-                    endMinutes += 24 * 60;
+                if (endMin < startMin && startDate.toDateString() === endDate.toDateString()) {
+                    console.log("[getWorkReportDetail] 時刻が逆転しているため日を跨ぐとみなす:", { startMin, endMin });
+                    workEnd = endMin + 24 * 60;
                 }
 
-                const baseMinutes = Math.max(0, endMinutes - startMinutes);
-                
-                // この時間帯に含まれる休憩時間を計算
+                const baseMinutes = Math.max(0, workEnd - workStart);
+                console.log(`[getWorkReportDetail] インターバル[${i}] 基本時間: ${baseMinutes}分 (${Math.floor(baseMinutes / 60)}時間${baseMinutes % 60}分)`);
+
+                // この時間帯に含まれる休憩時間を計算（attendance.tsのcalculateWorkMinutesと同じロジック）
                 let breakTotal = 0;
                 for (const bt of breakTimes) {
-                    const breakStart = timeToMinutes(bt.startTime);
-                    const breakEndRaw = timeToMinutes(bt.endTime);
-                    if (breakStart === null || breakEndRaw === null) {
+                    const s = timeToMinutes(bt.startTime);
+                    const eRaw = timeToMinutes(bt.endTime);
+                    if (s === null || eRaw === null) {
                         console.log("[getWorkReportDetail] 休憩時間の変換失敗:", { start: bt.startTime, end: bt.endTime });
                         continue;
                     }
-                    
-                    let breakEnd = breakEndRaw;
+
+                    let e = eRaw;
                     // 休憩が日を跨ぐ場合
-                    if (breakEnd < breakStart) {
-                        breakEnd += 24 * 60;
+                    if (e < s) {
+                        e += 24 * 60;
                     }
 
-                    // 作業区間 [startMinutes, endMinutes] と休憩区間 [breakStart, breakEnd] の重なり
-                    const overlapStart = Math.max(startMinutes, breakStart);
-                    const overlapEnd = Math.min(endMinutes, breakEnd);
+                    // 作業区間 [workStart, workEnd] と休憩区間 [s, e] の重なり
+                    const overlapStart = Math.max(workStart, s);
+                    const overlapEnd = Math.min(workEnd, e);
                     if (overlapEnd > overlapStart) {
                         const overlapMinutes = overlapEnd - overlapStart;
                         breakTotal += overlapMinutes;
                         console.log("[getWorkReportDetail] 休憩時間重複:", {
-                            workInterval: `${startMinutes}分-${endMinutes}分 (${startTimeStr}-${endTimeStr})`,
-                            breakInterval: `${breakStart}分-${breakEnd}分 (${bt.startTime}-${bt.endTime})`,
-                            overlap: `${overlapStart}分-${overlapEnd}分 (${overlapMinutes}分)`
+                            intervalIndex: i,
+                            workInterval: `${workStart}分-${workEnd}分 (${startTimeStr}-${endTimeStr})`,
+                            breakInterval: `${s}分-${e}分 (${bt.startTime}-${bt.endTime})`,
+                            overlap: `${overlapStart}分-${overlapEnd}分 (${overlapMinutes}分)`,
+                            breakTotal: `${breakTotal}分`
                         });
                     }
                 }
 
                 const duration = Math.max(0, baseMinutes - breakTotal);
-                console.log("[getWorkReportDetail] 作業時間計算:", {
-                    interval: `${startMinutes}分-${endMinutes}分 (${startTimeStr}-${endTimeStr})`,
-                    baseMinutes,
-                    breakTotal,
-                    duration
+                console.log(`[getWorkReportDetail] インターバル[${i}] 最終計算:`, {
+                    baseMinutes: `${baseMinutes}分 (${Math.floor(baseMinutes / 60)}時間${baseMinutes % 60}分)`,
+                    breakTotal: `${breakTotal}分 (${Math.floor(breakTotal / 60)}時間${breakTotal % 60}分)`,
+                    duration: `${duration}分 (${Math.floor(duration / 60)}時間${duration % 60}分)`
                 });
                 workMinutes += duration;
             }
 
             console.log("[getWorkReportDetail] 最終的な作業時間:", {
-                workMinutes,
+                workMinutes: `${workMinutes}分 (${Math.floor(workMinutes / 60)}時間${workMinutes % 60}分)`,
                 workRecordsCount: workRecords.length,
-                mergedIntervalsCount: mergedIntervals.length
+                mergedIntervalsCount: mergedIntervals.length,
+                breakTimesCount: breakTimes.length
             });
 
             return {
