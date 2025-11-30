@@ -63,53 +63,78 @@ export default function WorkReportIssues() {
 
     // Mutations
     const createWorkRecordMutation = trpc.workRecords.create.useMutation({
-        onSuccess: () => {
+        onMutate: async () => {
+            console.log("[WorkReportIssues] createWorkRecordMutation.mutate started");
+        },
+        onSuccess: async () => {
+            console.log("[WorkReportIssues] 作業記録追加成功 - データ再取得開始");
             toast.success("作業記録を追加しました");
             setIsAddDialogOpen(false);
             setSelectedVehicleId("");
             setSelectedProcessId("");
             setEditStartTime("");
             setEditEndTime("");
-            refetch();
-            utils.analytics.getWorkReportDetail.invalidate();
+            setEditWorkDescription("");
+            // データを再取得
+            console.log("[WorkReportIssues] invalidating getWorkReportDetail query");
+            utils.analytics.getWorkReportDetail.invalidate({
+                userId: userId!,
+                workDate,
+            });
+            console.log("[WorkReportIssues] refetching getWorkReportDetail");
+            // 直接refetchを実行
+            await refetch();
+            // utils経由でもrefetchを試みる
+            await utils.analytics.getWorkReportDetail.refetch({
+                userId: userId!,
+                workDate,
+            });
+            console.log("[WorkReportIssues] データ再取得完了");
         },
         onError: (error) => {
             toast.error(error.message || "作業記録の追加に失敗しました");
+            console.error("[WorkReportIssues] 作業記録追加エラー:", error);
         },
     });
 
     const updateWorkRecordMutation = trpc.workRecords.update.useMutation({
-        onSuccess: () => {
+        onSuccess: async () => {
             toast.success("作業記録を更新しました");
             setIsEditDialogOpen(false);
             setEditingRecord(null);
-            refetch();
-            utils.analytics.getWorkReportDetail.invalidate();
+            // データを再取得
+            await utils.analytics.getWorkReportDetail.invalidate();
+            await refetch();
         },
         onError: (error) => {
             toast.error(error.message || "作業記録の更新に失敗しました");
+            console.error("[WorkReportIssues] 作業記録更新エラー:", error);
         },
     });
 
     const deleteWorkRecordMutation = trpc.workRecords.delete.useMutation({
-        onSuccess: () => {
+        onSuccess: async () => {
             toast.success("作業記録を削除しました");
-            refetch();
-            utils.analytics.getWorkReportDetail.invalidate();
+            // データを再取得
+            await utils.analytics.getWorkReportDetail.invalidate();
+            await refetch();
         },
         onError: (error) => {
             toast.error(error.message || "作業記録の削除に失敗しました");
+            console.error("[WorkReportIssues] 作業記録削除エラー:", error);
         },
     });
 
     const updateAttendanceMutation = trpc.attendance.updateAttendance.useMutation({
-        onSuccess: () => {
+        onSuccess: async () => {
             toast.success("出勤記録を更新しました");
-            refetch();
-            utils.analytics.getWorkReportDetail.invalidate();
+            // データを再取得
+            await utils.analytics.getWorkReportDetail.invalidate();
+            await refetch();
         },
         onError: (error) => {
             toast.error(error.message || "出勤記録の更新に失敗しました");
+            console.error("[WorkReportIssues] 出勤記録更新エラー:", error);
         },
     });
 
@@ -151,13 +176,36 @@ export default function WorkReportIssues() {
     };
 
     const handleAddWork = () => {
+        console.log("[WorkReportIssues] handleAddWork called", {
+            selectedVehicleId,
+            selectedProcessId,
+            editStartTime,
+            editEndTime,
+            workDate,
+            userId,
+        });
+
         if (!selectedVehicleId || !selectedProcessId || !editStartTime) {
             toast.error("車両、工程、開始時刻を入力してください");
+            console.error("[WorkReportIssues] Validation failed:", {
+                selectedVehicleId: !!selectedVehicleId,
+                selectedProcessId: !!selectedProcessId,
+                editStartTime: !!editStartTime,
+            });
             return;
         }
 
         const startDateTime = `${workDate}T${editStartTime}:00+09:00`;
         const endDateTime = editEndTime ? `${workDate}T${editEndTime}:00+09:00` : undefined;
+
+        console.log("[WorkReportIssues] Creating work record:", {
+            userId: userId!,
+            vehicleId: parseInt(selectedVehicleId),
+            processId: parseInt(selectedProcessId),
+            startTime: startDateTime,
+            endTime: endDateTime,
+            workDescription: editWorkDescription || undefined,
+        });
 
         createWorkRecordMutation.mutate({
             userId: userId!,
