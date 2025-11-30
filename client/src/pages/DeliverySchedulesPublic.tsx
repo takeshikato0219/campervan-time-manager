@@ -160,10 +160,10 @@ export default function DeliverySchedulesPublic() {
                                                             <div className="min-w-0 flex-1">
                                                                 <p className="font-semibold text-sm sm:text-base break-words">
                                                                     {item.vehicleName}
+                                                                    {item.customerName && ` / ${item.customerName}様`}
                                                                 </p>
                                                                 <p className="text-[11px] sm:text-xs text-[hsl(var(--muted-foreground))] break-words">
-                                                                    {item.vehicleType || "車種未設定"} ／{" "}
-                                                                    {item.customerName || "お客様名未設定"}
+                                                                    {item.vehicleType || "車種未設定"}
                                                                 </p>
                                                             </div>
                                                             <div className="flex flex-col items-end gap-1 flex-shrink-0">
@@ -240,10 +240,10 @@ export default function DeliverySchedulesPublic() {
                                                             <div className="min-w-0 flex-1">
                                                                 <p className="font-bold text-base sm:text-lg break-words">
                                                                     {item.vehicleName}
+                                                                    {item.customerName && ` / ${item.customerName}様`}
                                                                 </p>
                                                                 <p className="text-xs sm:text-sm text-[hsl(var(--muted-foreground))] break-words">
-                                                                    {item.vehicleType || "車種未設定"} ／{" "}
-                                                                    {item.customerName || "お客様名未設定"}
+                                                                    {item.vehicleType || "車種未設定"}
                                                                 </p>
                                                             </div>
                                                             <div className="flex flex-col items-end gap-1 flex-shrink-0">
@@ -319,10 +319,10 @@ export default function DeliverySchedulesPublic() {
                                                         <div className="min-w-0 flex-1">
                                                             <p className="font-bold text-base sm:text-lg break-words">
                                                                 {item.vehicleName}
+                                                                {item.customerName && ` / ${item.customerName}様`}
                                                             </p>
                                                             <p className="text-xs sm:text-sm text-[hsl(var(--muted-foreground))] break-words">
-                                                                {item.vehicleType || "車種未設定"} ／{" "}
-                                                                {item.customerName || "お客様名未設定"}
+                                                                {item.vehicleType || "車種未設定"}
                                                             </p>
                                                         </div>
                                                         <div className="flex flex-col items-end gap-1 flex-shrink-0">
