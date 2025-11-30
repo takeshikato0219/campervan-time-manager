@@ -75,22 +75,29 @@ export const usersRouter = createTRPCRouter({
 
             const hashedPassword = await bcrypt.hash(input.password, 10);
 
-            // categoryが空文字列、undefined、または無効な値の場合はnullにする
-            let categoryValue: "elephant" | "squirrel" | null = null;
-            const category = input.category;
-            if (category === "elephant" || category === "squirrel") {
-                categoryValue = category;
-            } else if (category === "" || category === null || category === undefined) {
-                categoryValue = null;
+            // categoryの値を決定
+            // externalロールの場合はcategoryを送信しない（undefinedにする）
+            // それ以外で有効な値の場合はその値を使用、無効な値の場合はundefined
+            let categoryValue: "elephant" | "squirrel" | undefined = undefined;
+            if (input.role !== "external") {
+                const category = input.category;
+                if (category === "elephant" || category === "squirrel") {
+                    categoryValue = category;
+                }
             }
 
-            await db.insert(schema.users).values({
+            // categoryがundefinedの場合は、データベースに送信しない
+            const insertData: any = {
                 username: input.username,
                 password: hashedPassword,
                 name: input.name || null,
                 role: input.role,
-                category: categoryValue,
-            });
+            };
+            if (categoryValue !== undefined) {
+                insertData.category = categoryValue;
+            }
+
+            await db.insert(schema.users).values(insertData);
 
             return { success: true };
         }),
@@ -148,7 +155,18 @@ export const usersRouter = createTRPCRouter({
             }
             if (input.name !== undefined) updateData.name = input.name;
             if (input.role !== undefined) updateData.role = input.role;
-            if (input.category !== undefined) updateData.category = input.category;
+            // categoryの処理: externalロールの場合はcategoryを送信しない
+            if (input.category !== undefined) {
+                if (input.role === "external") {
+                    // externalロールの場合はcategoryを送信しない（undefinedのまま）
+                } else {
+                    // 有効な値の場合のみ設定
+                    if (input.category === "elephant" || input.category === "squirrel") {
+                        updateData.category = input.category;
+                    }
+                    // nullや無効な値の場合はundefinedのまま（データベースに送信しない）
+                }
+            }
 
             if (Object.keys(updateData).length > 0) {
                 await db.update(schema.users).set(updateData).where(eq(schema.users.id, input.id));
