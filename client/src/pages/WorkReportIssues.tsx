@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useLocation, Link } from "wouter";
 import { trpc } from "../lib/trpc";
 import { useAuth } from "../hooks/useAuth";
@@ -25,6 +25,17 @@ export default function WorkReportIssues() {
     const issueType = issueTypeParam || "";
 
     const utils = trpc.useUtils();
+    
+    // 状態変数の定義を先に
+    const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+    const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+    const [editingRecord, setEditingRecord] = useState<any>(null);
+    const [selectedVehicleId, setSelectedVehicleId] = useState("");
+    const [selectedProcessId, setSelectedProcessId] = useState("");
+    const [editStartTime, setEditStartTime] = useState("");
+    const [editEndTime, setEditEndTime] = useState("");
+    const [editWorkDescription, setEditWorkDescription] = useState("");
+    
     const canEdit = user?.role === "admin" || user?.role === "sub_admin";
     
     console.log("[WorkReportIssues] Component render:", {
@@ -47,16 +58,6 @@ export default function WorkReportIssues() {
 
     const { data: vehicles } = trpc.vehicles.list.useQuery({});
     const { data: processes } = trpc.processes.list.useQuery();
-
-    // 編集ダイアログの状態
-    const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
-    const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
-    const [editingRecord, setEditingRecord] = useState<any>(null);
-    const [selectedVehicleId, setSelectedVehicleId] = useState("");
-    const [selectedProcessId, setSelectedProcessId] = useState("");
-    const [editStartTime, setEditStartTime] = useState("");
-    const [editEndTime, setEditEndTime] = useState("");
-    const [editWorkDescription, setEditWorkDescription] = useState("");
 
     const formatDuration = (minutes: number) => {
         const hours = Math.floor(minutes / 60);
@@ -242,16 +243,17 @@ export default function WorkReportIssues() {
         console.log("[WorkReportIssues] ========== handleAddWork 終了 ==========");
     };
 
-    const handleOpenAddDialog = () => {
+    const handleOpenAddDialog = useCallback(() => {
+        const userCanEdit = user?.role === "admin" || user?.role === "sub_admin";
         console.log("[WorkReportIssues] ========== handleOpenAddDialog 開始 ==========");
         console.log("[WorkReportIssues] handleOpenAddDialog called", {
-            canEdit,
+            canEdit: userCanEdit,
             userRole: user?.role,
             vehiclesCount: vehicles?.length || 0,
             processesCount: processes?.length || 0,
         });
         
-        if (!canEdit) {
+        if (!userCanEdit) {
             console.error("[WorkReportIssues] canEdit is false, cannot open dialog");
             toast.error("編集権限がありません");
             return;
@@ -263,11 +265,9 @@ export default function WorkReportIssues() {
         setEditEndTime("");
         setEditWorkDescription("");
         setIsAddDialogOpen(true);
-        console.log("[WorkReportIssues] 追加ダイアログを開きました", {
-            isAddDialogOpen: true,
-        });
+        console.log("[WorkReportIssues] 追加ダイアログを開きました");
         console.log("[WorkReportIssues] ========== handleOpenAddDialog 終了 ==========");
-    };
+    }, [user, vehicles, processes]);
 
     if (!userId || !workDate) {
         return (
