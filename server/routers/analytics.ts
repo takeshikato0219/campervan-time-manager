@@ -495,7 +495,7 @@ export const analyticsRouter = createTRPCRouter({
 
             const attendance = attendanceRows[0];
             const userName = attendance.userName;
-            
+
             // 出勤時間の計算:
             // - attendanceWorkMinutes (workMinutesカラム) が存在する場合: 既に休憩時間が引かれている（calculateWorkMinutesで計算済み）
             // - 存在しない場合: 単純な時間差なので、休憩時間（90分）を引く必要がある
@@ -550,6 +550,8 @@ export const analyticsRouter = createTRPCRouter({
             const breakTimes = await db.select().from(schema.breakTimes).then((times) =>
                 times.filter((bt) => bt.isActive === "true")
             );
+            
+            console.log("[getWorkReportDetail] 休憩時間:", breakTimes.map(bt => ({ start: bt.startTime, end: bt.endTime })));
 
             // 時刻文字列（"HH:MM"）を分に変換する関数
             const timeToMinutes = (timeStr: string | null | undefined): number | null => {
@@ -574,7 +576,7 @@ export const analyticsRouter = createTRPCRouter({
 
             for (const record of sortedRecords) {
                 if (!record.startTime) continue;
-                
+
                 const start = new Date(record.startTime);
                 const end = record.endTime ? new Date(record.endTime) : new Date();
 
@@ -603,16 +605,16 @@ export const analyticsRouter = createTRPCRouter({
             for (const interval of mergedIntervals) {
                 const startDate = interval.start;
                 const endDate = interval.end;
-                
+
                 // 作業記録の開始時刻・終了時刻をその日の0時からの経過分数に変換
                 const startMinutes = startDate.getHours() * 60 + startDate.getMinutes();
                 let endMinutes = endDate.getHours() * 60 + endDate.getMinutes();
-                
+
                 // 日を跨ぐ場合は24時間を加算
                 if (startDate.toDateString() !== endDate.toDateString()) {
                     endMinutes += 24 * 60;
                 }
-                
+
                 const baseMinutes = Math.max(0, endMinutes - startMinutes);
                 
                 // この時間帯に含まれる休憩時間を計算
@@ -620,7 +622,10 @@ export const analyticsRouter = createTRPCRouter({
                 for (const bt of breakTimes) {
                     const breakStart = timeToMinutes(bt.startTime);
                     const breakEndRaw = timeToMinutes(bt.endTime);
-                    if (breakStart === null || breakEndRaw === null) continue;
+                    if (breakStart === null || breakEndRaw === null) {
+                        console.log("[getWorkReportDetail] 休憩時間の変換失敗:", { start: bt.startTime, end: bt.endTime });
+                        continue;
+                    }
                     
                     let breakEnd = breakEndRaw;
                     // 休憩が日を跨ぐ場合
@@ -632,11 +637,23 @@ export const analyticsRouter = createTRPCRouter({
                     const overlapStart = Math.max(startMinutes, breakStart);
                     const overlapEnd = Math.min(endMinutes, breakEnd);
                     if (overlapEnd > overlapStart) {
-                        breakTotal += overlapEnd - overlapStart;
+                        const overlapMinutes = overlapEnd - overlapStart;
+                        breakTotal += overlapMinutes;
+                        console.log("[getWorkReportDetail] 休憩時間重複:", {
+                            workInterval: `${startMinutes}分-${endMinutes}分`,
+                            breakInterval: `${breakStart}分-${breakEnd}分`,
+                            overlap: `${overlapStart}分-${overlapEnd}分 (${overlapMinutes}分)`
+                        });
                     }
                 }
 
                 const duration = Math.max(0, baseMinutes - breakTotal);
+                console.log("[getWorkReportDetail] 作業時間計算:", {
+                    interval: `${startMinutes}分-${endMinutes}分`,
+                    baseMinutes,
+                    breakTotal,
+                    duration
+                });
                 workMinutes += duration;
             }
 
