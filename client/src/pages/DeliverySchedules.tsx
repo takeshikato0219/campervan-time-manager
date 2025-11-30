@@ -531,6 +531,7 @@ export default function DeliverySchedules() {
                                                             <p className="font-semibold text-sm sm:text-base break-words">
                                                                 {item.vehicleName}
                                                                 {item.customerName && ` / ${item.customerName}様`}
+                                                                {item.productionMonth && ` / ${item.productionMonth}`}
                                                             </p>
                                                             <p className="text-[11px] sm:text-xs text-[hsl(var(--muted-foreground))] break-words">
                                                                 {item.vehicleType || "車種未設定"}
@@ -624,6 +625,7 @@ export default function DeliverySchedules() {
                                                                 <p className="font-bold text-xl sm:text-2xl md:text-3xl break-words">
                                                                     {item.vehicleName}
                                                                     {item.customerName && ` / ${item.customerName}様`}
+                                                                    {item.productionMonth && ` / ${item.productionMonth}`}
                                                                 </p>
                                                                 <p className="text-xs sm:text-sm text-[hsl(var(--muted-foreground))] break-words mt-0.5">
                                                                     {item.vehicleType || "車種未設定"}
@@ -1859,12 +1861,26 @@ export default function DeliverySchedules() {
                                 />
                             </div>
                             <div>
-                                <label className="text-xs font-medium block mb-1">ワングラム制作分</label>
-                                <Input
-                                    value={editing.productionMonth || ""}
-                                    onChange={(e) => setEditing({ ...editing, productionMonth: e.target.value })}
-                                    placeholder="例: 11月ワングラム制作分"
-                                />
+                                <label className="text-xs font-medium block mb-1">ワングラム制作分（月選択）</label>
+                                <select
+                                    className="flex h-9 w-full rounded-md border border-[hsl(var(--input))] bg-[hsl(var(--background))] px-2 text-xs"
+                                    value={editing.productionMonth ? editing.productionMonth.replace("月ワングラム制作分", "") : ""}
+                                    onChange={(e) => {
+                                        const month = e.target.value;
+                                        if (month) {
+                                            setEditing({ ...editing, productionMonth: `${month}月ワングラム制作分` });
+                                        } else {
+                                            setEditing({ ...editing, productionMonth: "" });
+                                        }
+                                    }}
+                                >
+                                    <option value="">未選択</option>
+                                    {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
+                                        <option key={m} value={m}>
+                                            {m}月
+                                        </option>
+                                    ))}
+                                </select>
                             </div>
                             <div>
                                 <label className="text-xs font-medium block mb-1">ワングラム入庫予定</label>

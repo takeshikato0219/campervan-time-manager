@@ -161,6 +161,7 @@ export default function DeliverySchedulesPublic() {
                                                                 <p className="font-semibold text-sm sm:text-base break-words">
                                                                     {item.vehicleName}
                                                                     {item.customerName && ` / ${item.customerName}様`}
+                                                                    {item.productionMonth && ` / ${item.productionMonth}`}
                                                                 </p>
                                                                 <p className="text-[11px] sm:text-xs text-[hsl(var(--muted-foreground))] break-words">
                                                                     {item.vehicleType || "車種未設定"}
@@ -241,6 +242,7 @@ export default function DeliverySchedulesPublic() {
                                                                 <p className="font-bold text-base sm:text-lg break-words">
                                                                     {item.vehicleName}
                                                                     {item.customerName && ` / ${item.customerName}様`}
+                                                                    {item.productionMonth && ` / ${item.productionMonth}`}
                                                                 </p>
                                                                 <p className="text-xs sm:text-sm text-[hsl(var(--muted-foreground))] break-words">
                                                                     {item.vehicleType || "車種未設定"}
