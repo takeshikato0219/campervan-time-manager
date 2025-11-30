@@ -1,6 +1,6 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { createTRPCRouter, protectedProcedure, adminProcedure, subAdminProcedure } from "../_core/trpc";
+import { createTRPCRouter, protectedProcedure, subAdminProcedure } from "../_core/trpc";
 import { getDb, schema } from "../db";
 import { eq, and, isNull, gte, lte, desc } from "drizzle-orm";
 import { startOfDay, endOfDay } from "date-fns";
@@ -126,12 +126,27 @@ export const workRecordsRouter = createTRPCRouter({
             }
 
             try {
+                const startTimeDate = new Date(input.startTime);
+                const endTimeDate = input.endTime ? new Date(input.endTime) : null;
+
+                console.log("[workRecords.create] 作業記録を追加:", {
+                    userId: input.userId,
+                    vehicleId: input.vehicleId,
+                    processId: input.processId,
+                    startTimeInput: input.startTime,
+                    startTimeDate: startTimeDate.toISOString(),
+                    startTimeLocal: startTimeDate.toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' }),
+                    endTimeInput: input.endTime,
+                    endTimeDate: endTimeDate?.toISOString(),
+                    endTimeLocal: endTimeDate?.toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' }),
+                });
+
                 await db.insert(schema.workRecords).values({
                     userId: input.userId,
                     vehicleId: input.vehicleId,
                     processId: input.processId,
-                    startTime: new Date(input.startTime),
-                    endTime: input.endTime ? new Date(input.endTime) : null,
+                    startTime: startTimeDate,
+                    endTime: endTimeDate,
                     workDescription: input.workDescription,
                 });
 
@@ -159,8 +174,25 @@ export const workRecordsRouter = createTRPCRouter({
 
                 console.log(`[workRecords.create] 作業記録を作成しました: ユーザーID=${input.userId}, 車両ID=${input.vehicleId}, 記録ID=${inserted.id}`);
 
+                // 作成されたレコードの詳細情報を取得
+                const vehicles = await db.select().from(schema.vehicles);
+                const processes = await db.select().from(schema.processes);
+                const vehicle = vehicles.find(v => v.id === inserted.vehicleId);
+                const process = processes.find(p => p.id === inserted.processId);
+
                 return {
                     id: inserted.id,
+                    startTime: inserted.startTime,
+                    endTime: inserted.endTime,
+                    vehicleId: inserted.vehicleId,
+                    processId: inserted.processId,
+                    vehicleNumber: vehicle?.vehicleNumber || "不明",
+                    customerName: vehicle?.customerName || null,
+                    processName: process?.name || "不明",
+                    workDescription: inserted.workDescription || null,
+                    durationMinutes: inserted.endTime 
+                        ? Math.floor((new Date(inserted.endTime).getTime() - new Date(inserted.startTime).getTime()) / (1000 * 60))
+                        : 0,
                 };
             } catch (error: any) {
                 console.error(`[workRecords.create] エラー: 作業記録作成に失敗しました`, error);

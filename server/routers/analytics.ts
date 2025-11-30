@@ -504,6 +504,7 @@ export const analyticsRouter = createTRPCRouter({
                 : Math.max(0, (Number(attendance.attendanceMinutes) || 0) - 90);  // 単純な時間差から休憩時間を引く
 
             // 作業記録を取得
+            // 日付範囲で確実に検索: 指定日の00:00:00から翌日の00:00:00の前まで
             const workRecordsQuery = `
                 SELECT
                     wr.id,
@@ -525,13 +526,55 @@ export const analyticsRouter = createTRPCRouter({
                 LEFT JOIN \`processes\` p ON p.id = wr.processId
                 WHERE
                     wr.userId = ?
-                    AND DATE(wr.startTime) = ?
+                    AND wr.startTime >= STR_TO_DATE(?, '%Y-%m-%d')
+                    AND wr.startTime < DATE_ADD(STR_TO_DATE(?, '%Y-%m-%d'), INTERVAL 1 DAY)
                 ORDER BY wr.startTime ASC
             `;
+            // デバッグ: データベース内の該当ユーザーの最新10件の作業記録を確認
+            const debugQuery = `
+                SELECT 
+                    id,
+                    userId,
+                    startTime,
+                    DATE(startTime) as startDate,
+                    DATE_FORMAT(startTime, '%Y-%m-%d') as startDateFormatted
+                FROM \`workRecords\`
+                WHERE userId = ?
+                ORDER BY startTime DESC
+                LIMIT 10
+            `;
+            const [debugRows]: any = await pool.execute(debugQuery, [input.userId]);
+            console.log("[getWorkReportDetail] デバッグ: 該当ユーザーの最新10件の作業記録:", {
+                userId: input.userId,
+                workDate: input.workDate,
+                records: debugRows.map((r: any) => ({
+                    id: r.id,
+                    startTime: r.startTime,
+                    startDate: r.startDate,
+                    startDateFormatted: r.startDateFormatted,
+                    matchesWorkDate: r.startDateFormatted === input.workDate || r.startDate === input.workDate,
+                })),
+            });
+
+            console.log("[getWorkReportDetail] 作業記録を取得:", {
+                userId: input.userId,
+                workDate: input.workDate,
+                query: workRecordsQuery,
+            });
             const [workRecordsRows]: any = await pool.execute(workRecordsQuery, [
                 input.userId,
                 input.workDate,
+                input.workDate, // 2回渡す
             ]);
+            console.log("[getWorkReportDetail] 取得した作業記録数:", workRecordsRows?.length || 0);
+            if (workRecordsRows && workRecordsRows.length > 0) {
+                console.log("[getWorkReportDetail] 作業記録の詳細:", workRecordsRows.map((r: any) => ({
+                    id: r.id,
+                    startTime: r.startTime,
+                    endTime: r.endTime,
+                    vehicleId: r.vehicleId,
+                })));
+            }
 
             const workRecords = (workRecordsRows || []).map((row: any) => ({
                 id: row.id,

@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState } from "react";
 import { useLocation, Link } from "wouter";
 import { trpc } from "../lib/trpc";
 import { useAuth } from "../hooks/useAuth";
@@ -13,19 +13,19 @@ import { toast } from "sonner";
 export default function WorkReportIssues() {
     const { user } = useAuth();
     const [location] = useLocation();
-    
+
     // URLパラメータを取得（window.location.searchを使用）
     const searchParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : new URLSearchParams();
     const userIdParam = searchParams.get("userId");
     const workDateParam = searchParams.get("workDate");
     const issueTypeParam = searchParams.get("type");
-    
+
     const userId = userIdParam ? parseInt(userIdParam) : null;
     const workDate = workDateParam || "";
     const issueType = issueTypeParam || "";
 
     const utils = trpc.useUtils();
-    
+
     // 状態変数の定義を先に
     const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
     const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
@@ -35,9 +35,9 @@ export default function WorkReportIssues() {
     const [editStartTime, setEditStartTime] = useState("");
     const [editEndTime, setEditEndTime] = useState("");
     const [editWorkDescription, setEditWorkDescription] = useState("");
-    
+
     const canEdit = user?.role === "admin" || user?.role === "sub_admin";
-    
+
     console.log("[WorkReportIssues] Component render:", {
         userId,
         workDate,
@@ -75,8 +75,8 @@ export default function WorkReportIssues() {
         onMutate: async () => {
             console.log("[WorkReportIssues] createWorkRecordMutation.mutate started");
         },
-        onSuccess: async () => {
-            console.log("[WorkReportIssues] 作業記録追加成功 - データ再取得開始");
+        onSuccess: async (createdRecord) => {
+            console.log("[WorkReportIssues] 作業記録追加成功:", createdRecord);
             toast.success("作業記録を追加しました");
             setIsAddDialogOpen(false);
             setSelectedVehicleId("");
@@ -84,18 +84,40 @@ export default function WorkReportIssues() {
             setEditStartTime("");
             setEditEndTime("");
             setEditWorkDescription("");
-            
+
             // データを再取得
             try {
-                console.log("[WorkReportIssues] データ再取得開始");
-                // invalidateしてからrefetchする
-                utils.analytics.getWorkReportDetail.invalidate();
+                console.log("[WorkReportIssues] データ再取得開始", { userId, workDate, createdRecord });
+                // クエリを無効化
+                utils.analytics.getWorkReportDetail.invalidate({
+                    userId: userId!,
+                    workDate,
+                });
+                
+                // 少し待ってからrefetch（データベースへの反映を待つ）
+                await new Promise(resolve => setTimeout(resolve, 500));
+
                 const refetchResult = await refetch();
                 console.log("[WorkReportIssues] refetch完了", {
                     isSuccess: refetchResult.isSuccess,
                     isError: refetchResult.isError,
                     workRecordsCount: refetchResult.data?.workRecords?.length || 0,
                 });
+
+                // データがまだ取得できない場合は、もう一度試す
+                if (!refetchResult.data || refetchResult.data.workRecords?.length === 0) {
+                    console.log("[WorkReportIssues] 作業記録が0件のため、2秒後に再試行");
+                    setTimeout(async () => {
+                        await utils.analytics.getWorkReportDetail.invalidate({
+                            userId: userId!,
+                            workDate,
+                        });
+                        const retryResult = await refetch();
+                        console.log("[WorkReportIssues] リトライ結果:", {
+                            workRecordsCount: retryResult.data?.workRecords?.length || 0,
+                        });
+                    }, 2000);
+                }
             } catch (error) {
                 console.error("[WorkReportIssues] データ再取得中にエラー:", error);
             }
@@ -243,22 +265,21 @@ export default function WorkReportIssues() {
         console.log("[WorkReportIssues] ========== handleAddWork 終了 ==========");
     };
 
-    const handleOpenAddDialog = useCallback(() => {
-        const userCanEdit = user?.role === "admin" || user?.role === "sub_admin";
+    const handleOpenAddDialog = () => {
         console.log("[WorkReportIssues] ========== handleOpenAddDialog 開始 ==========");
         console.log("[WorkReportIssues] handleOpenAddDialog called", {
-            canEdit: userCanEdit,
+            canEdit,
             userRole: user?.role,
             vehiclesCount: vehicles?.length || 0,
             processesCount: processes?.length || 0,
         });
-        
-        if (!userCanEdit) {
+
+        if (!canEdit) {
             console.error("[WorkReportIssues] canEdit is false, cannot open dialog");
             toast.error("編集権限がありません");
             return;
         }
-        
+
         setSelectedVehicleId("");
         setSelectedProcessId("");
         setEditStartTime("");
@@ -267,7 +288,7 @@ export default function WorkReportIssues() {
         setIsAddDialogOpen(true);
         console.log("[WorkReportIssues] 追加ダイアログを開きました");
         console.log("[WorkReportIssues] ========== handleOpenAddDialog 終了 ==========");
-    }, [user, vehicles, processes]);
+    };
 
     if (!userId || !workDate) {
         return (
@@ -471,7 +492,7 @@ export default function WorkReportIssues() {
                 <CardContent className="p-4 sm:p-6">
                     {detail.workRecords && detail.workRecords.length > 0 ? (
                         <div className="space-y-3">
-                            {detail.workRecords.map((record) => {
+                            {detail.workRecords.map((record: any) => {
                                 const startTime = typeof record.startTime === "string"
                                     ? new Date(record.startTime)
                                     : record.startTime;
@@ -487,7 +508,7 @@ export default function WorkReportIssues() {
                                         className="p-3 sm:p-4 border border-[hsl(var(--border))] rounded-lg bg-gray-50"
                                     >
                                         <div className="flex items-start justify-between gap-2 mb-2">
-                                            <div 
+                                            <div
                                                 className={`flex-1 min-w-0 ${canEdit ? "cursor-pointer hover:opacity-80" : ""}`}
                                                 onClick={() => canEdit && handleEditRecord(record)}
                                             >
@@ -585,15 +606,14 @@ export default function WorkReportIssues() {
                     <div className="pt-4 border-t border-[hsl(var(--border))]">
                         <p className="text-sm text-[hsl(var(--muted-foreground))] mb-1">差</p>
                         <p
-                            className={`text-2xl font-bold ${
-                                detail.summary.differenceMinutes > 30
-                                    ? "text-red-600"
-                                    : detail.summary.differenceMinutes > 0
+                            className={`text-2xl font-bold ${detail.summary.differenceMinutes > 30
+                                ? "text-red-600"
+                                : detail.summary.differenceMinutes > 0
                                     ? "text-orange-600"
                                     : detail.summary.differenceMinutes < 0
-                                    ? "text-yellow-600"
-                                    : "text-gray-600"
-                            }`}
+                                        ? "text-yellow-600"
+                                        : "text-gray-600"
+                                }`}
                         >
                             {detail.summary.differenceMinutes > 0 ? "+" : ""}
                             {formatDuration(detail.summary.differenceMinutes)}
@@ -695,7 +715,7 @@ export default function WorkReportIssues() {
 
             {/* 追加ダイアログ */}
             {isAddDialogOpen && (
-                <div 
+                <div
                     className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-2 sm:p-4 overflow-y-auto"
                     onClick={(e) => {
                         if (e.target === e.currentTarget) {
