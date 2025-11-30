@@ -715,36 +715,22 @@ export default function DeliverySchedules() {
 
 
                                                         {/* その他の情報 */}
-                                                        {(item.optionName || item.prefecture || item.baseCarReady || item.furnitureReady || item.inCharge) && (
+                                                        {(item.optionName || item.inCharge) && (
                                                             <div className="flex flex-wrap items-center gap-1.5 text-xs sm:text-sm">
-                                                                {item.optionName && (
-                                                                    <span className="px-2 py-0.5 rounded bg-blue-50 text-blue-700">
-                                                                        オプション: {item.optionName}
-                                                                    </span>
-                                                                )}
-                                                                {item.prefecture && (
-                                                                    <span className="px-2 py-0.5 rounded bg-blue-50 text-blue-700">
-                                                                        納車県: {item.prefecture}
-                                                                    </span>
-                                                                )}
-                                                                {item.baseCarReady && (
-                                                                    <span className="px-2 py-0.5 rounded bg-emerald-50 text-emerald-700">
-                                                                        ベース車: {item.baseCarReady === "yes" ? "◯" : "✕"}
-                                                                    </span>
-                                                                )}
-                                                                {item.furnitureReady && (
-                                                                    <span className="px-2 py-0.5 rounded bg-indigo-50 text-indigo-700">
-                                                                        家具: {item.furnitureReady === "yes" ? "◯" : "✕"}
-                                                                    </span>
-                                                                )}
+                                                                {item.optionName && (() => {
+                                                                    // オプションを「/」で分割して、一つひとつ表示
+                                                                    const options = typeof item.optionName === "string" 
+                                                                        ? item.optionName.split("/").map((opt: string) => opt.trim()).filter((opt: string) => opt)
+                                                                        : [];
+                                                                    return options.map((opt: string, index: number) => (
+                                                                        <span key={index} className="px-2 py-0.5 rounded bg-blue-50 text-blue-700">
+                                                                            {opt}
+                                                                        </span>
+                                                                    ));
+                                                                })()}
                                                                 {item.inCharge && (
                                                                     <span className="px-2 py-0.5 rounded bg-gray-100 text-gray-700">
                                                                         担当: {item.inCharge}
-                                                                    </span>
-                                                                )}
-                                                                {item.productionMonth && (
-                                                                    <span className="px-2 py-0.5 rounded bg-gray-100 text-gray-700">
-                                                                        {item.productionMonth}
                                                                     </span>
                                                                 )}
                                                             </div>
