@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import React, { useState, useCallback } from "react";
 import { useAuth } from "../hooks/useAuth";
 import { trpc } from "../lib/trpc";
 import { Button } from "../components/ui/button";
@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card"
 import { Input } from "../components/ui/input";
 import TimelineCalendar from "../components/TimelineCalendar";
 import { Plus, AlertCircle } from "lucide-react";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { toast } from "sonner";
 import { format, startOfDay, endOfDay, isSameDay, subDays } from "date-fns";
 import { useDateChangeDetector } from "../hooks/useDateChangeDetector";
@@ -15,6 +15,14 @@ import { usePageVisibility } from "../hooks/usePageVisibility";
 
 export default function Dashboard() {
     const { user } = useAuth();
+    const [, setLocation] = useLocation();
+
+    // ワングラムアカウント（externalロール）の場合は納車スケジュールページへリダイレクト
+    React.useEffect(() => {
+        if (user?.role === "external") {
+            setLocation("/delivery-schedules");
+        }
+    }, [user, setLocation]);
     const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
     const [selectedVehicleId, setSelectedVehicleId] = useState("");
     const [selectedProcessId, setSelectedProcessId] = useState("");

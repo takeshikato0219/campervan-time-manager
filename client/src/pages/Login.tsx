@@ -17,7 +17,12 @@ export default function Login() {
             toast.success("ログインしました");
             // 少し待ってからリロード（Cookieが設定されるのを待つ）
             setTimeout(() => {
-                window.location.href = "/"; // ページリロードで認証状態を更新
+                // ワングラムアカウント（externalロール）の場合は納車スケジュールページへ
+                if (data.user?.role === "external") {
+                    window.location.href = "/delivery-schedules";
+                } else {
+                    window.location.href = "/"; // ページリロードで認証状態を更新
+                }
             }, 100);
         },
         onError: (error) => {
