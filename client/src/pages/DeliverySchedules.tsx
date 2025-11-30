@@ -888,21 +888,11 @@ export default function DeliverySchedules() {
                                                                         }
                                                                         onChange={(e) => {
                                                                             const value = e.target.value;
-                                                                            // 空文字列または値が無い場合はundefinedにする（カレンダーの消去ボタンに対応）
+                                                                            // カレンダーの消去ボタン対応: 空文字列の場合はnullを送信（サーバー側でnullが許可されている）
                                                                             updateMutation.mutate({
                                                                                 id: item.id,
-                                                                                incomingPlannedDate: value === "" ? undefined : (value || undefined),
+                                                                                incomingPlannedDate: value === "" ? null : value,
                                                                             });
-                                                                        }}
-                                                                        onInput={(e) => {
-                                                                            // ブラウザのカレンダーの消去ボタンに対応
-                                                                            const target = e.target as HTMLInputElement;
-                                                                            if (target.value === "") {
-                                                                                updateMutation.mutate({
-                                                                                    id: item.id,
-                                                                                    incomingPlannedDate: undefined,
-                                                                                });
-                                                                            }
                                                                         }}
                                                                         className="text-sm sm:text-base px-2 py-1 border rounded flex-1"
                                                                     />
@@ -975,21 +965,11 @@ export default function DeliverySchedules() {
                                                                         }
                                                                         onChange={(e) => {
                                                                             const value = e.target.value;
-                                                                            // 空文字列または値が無い場合はundefinedにする（カレンダーの消去ボタンに対応）
+                                                                            // カレンダーの消去ボタン対応: 空文字列の場合はnullを送信（サーバー側でnullが許可されている）
                                                                             updateMutation.mutate({
                                                                                 id: item.id,
-                                                                                shippingPlannedDate: value === "" ? undefined : (value || undefined),
+                                                                                shippingPlannedDate: value === "" ? null : value,
                                                                             });
-                                                                        }}
-                                                                        onInput={(e) => {
-                                                                            // ブラウザのカレンダーの消去ボタンに対応
-                                                                            const target = e.target as HTMLInputElement;
-                                                                            if (target.value === "") {
-                                                                                updateMutation.mutate({
-                                                                                    id: item.id,
-                                                                                    shippingPlannedDate: undefined,
-                                                                                });
-                                                                            }
                                                                         }}
                                                                         className="text-sm sm:text-base px-2 py-1 border rounded flex-1"
                                                                     />
